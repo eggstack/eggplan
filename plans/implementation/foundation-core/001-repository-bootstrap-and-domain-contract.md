@@ -1,6 +1,6 @@
 # Foundation Core M001 — Repository Bootstrap and Typed Domain Contract
 
-Status: ready for handoff
+Status: closed
 
 Repository baseline: ce2d6e7a6c1cecbe7ff554daf9d603d2d604d98c plus the planning bootstrap commit that registers this plan.
 

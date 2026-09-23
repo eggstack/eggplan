@@ -1,6 +1,6 @@
 # Foundation Core and Repository Roadmap
 
-Status: ready
+Status: active
 
 Long-term references:
 
@@ -93,7 +93,7 @@ M003 stays roadmap-level until M002 makes the concrete implementation visible.
 
 Class: infrastructure / invariant
 
-Status: ready.
+Status: closed.
 
 Plan: plans/implementation/foundation-core/001-repository-bootstrap-and-domain-contract.md
 
@@ -104,7 +104,7 @@ tests pass, and canonical digest fixtures are frozen.
 
 Class: capability / invariant
 
-Status: blocked on M001.
+Status: ready after M001 closure.
 
 Plan: plans/implementation/foundation-core/002-repository-store-cas-and-subject.md
 

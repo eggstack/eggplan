@@ -52,7 +52,7 @@ Planning-system bootstrap:
 
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
-| Foundation core/repository | ready | M001 ready; M002 blocked on M001 | plans/subsystems/foundation-core-roadmap.md |
+| Foundation core/repository | active | M001 closed; M002 ready | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | blocked | M001 waits on Foundation M002 | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | blocked | M001 waits on Evidence M001 | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 waits on Foundation M002 + Evidence M001 | plans/subsystems/codegg-integration-roadmap.md |
@@ -63,13 +63,12 @@ Planning-system bootstrap:
 
 | Subsystem | Milestone | Status | Implementation plan | Handoff |
 |---|---|---|---|---|
-| Foundation | M001 repository bootstrap + typed domain contract | ready | plans/implementation/foundation-core/001-repository-bootstrap-and-domain-contract.md | first implementation handoff |
+| Foundation | M002 repository store/CAS/Git subject | ready | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | M001 closed at 08a9cdb |
 
 ## Registered blocked implementation plans
 
 | Subsystem | Milestone | Status | Implementation plan | Blocker |
 |---|---|---|---|---|
-| Foundation | M002 repository store/CAS/Git subject | blocked | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | Foundation M001 closure |
 | Evidence | M001 evidence ledger/assessment | blocked | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | Foundation M002 closure |
 
 Later roadmap milestones intentionally do not yet have implementation plans.
@@ -77,9 +76,8 @@ Write those only after their prerequisite interfaces are concrete.
 
 ## Current execution order
 
-1. Foundation M001 — create workspace + eggplan-core typed/domain/schema contract.
-2. Close M001 with domain/bounds/graph/schema evidence.
-3. Foundation M002 — repository store, CAS, safe persistence, Git SubjectRevision.
+1. Foundation M001 — closed at 08a9cdb with domain/bounds/graph/schema evidence.
+2. Foundation M002 — repository store, CAS, safe persistence, Git SubjectRevision.
 4. Close M002 including contention/interrupted-write/cross-platform evidence.
 5. Evidence M001 — immutable observation ledger + subject-aware assessment.
 6. After Evidence M001, Projection/CLI M001 and CodeGG Integration M001 may be

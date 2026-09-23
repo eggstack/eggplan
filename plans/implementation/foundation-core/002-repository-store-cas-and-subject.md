@@ -1,8 +1,9 @@
 # Foundation Core M002 — Repository Store, CAS, and Subject Identity
 
-Status: blocked
+Status: ready for handoff
 
-Repository baseline: to be re-established after Foundation M001 closure.
+Repository baseline: 08a9cdb (`feat(core): bootstrap typed planning domain`),
+re-established after Foundation M001 closure on 2026-09-23.
 
 Source roadmap:
 

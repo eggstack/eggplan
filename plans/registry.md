@@ -35,6 +35,10 @@ eggstack/eggplan was an empty Git repository when planning was established on
 No Rust workspace or production capability existed at that baseline. Planning
 documents are not evidence that implementation exists.
 
+Planning-system bootstrap:
+
+- 42ec41eff3e35c15acacaa0d717320c40543fbc1 — canonical specs, ADRs, subsystem roadmaps, registry, and initial implementation handoffs.
+
 ## Accepted architectural decisions
 
 | ADR | Status | Decision |

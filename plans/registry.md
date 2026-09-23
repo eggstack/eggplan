@@ -53,10 +53,10 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | ready | M001 closed; M002 conditionally closed historically; M003 closed with native Linux/macOS/Windows qualification | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | corrective required | M001 closed historically; C001 active after Foundation M003; M002 blocked on C001 | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | blocked | M001 waits on Foundation M003 + Evidence C001 so it does not bind to known-incomplete schema/subject semantics | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | blocked | M001 waits on Foundation M003 + Evidence C001 before golden parity/adaptation | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | blocked | Provider SPI waits on Evidence C001 corrected matching contract | plans/subsystems/eggstack-integration-roadmap.md |
+| Evidence/closure | active | M001 and C001 closed; M002 ready for implementation planning | plans/subsystems/evidence-closure-roadmap.md |
+| Projection/CLI | ready for planning | M001 corrective blockers cleared; bounded plan still required | plans/subsystems/projection-cli-roadmap.md |
+| CodeGG integration | ready for planning | M001 corrective blockers cleared; current CodeGG interfaces must be re-checked | plans/subsystems/codegg-integration-roadmap.md |
+| Eggstack integrations | ready for planning | Provider SPI corrective blocker cleared; sibling interfaces must be re-checked | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -67,27 +67,28 @@ Planning-system bootstrap:
 | Foundation | M002 repository store/CAS/Git subject | conditionally closed | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | historical closure; platform caveat resolved by M003 |
 | Foundation | M003 subject scope + strict schema + platform hardening | closed | plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md | closure plans/closure/foundation-core/003-closed.md |
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
-| Evidence | M001 C001 verification binding + end-to-end evidence corrective | active | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | Foundation M003 closed |
+| Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
 
-## Corrective gate and later roadmap work
+## Corrective gate and later roadmap planning
 
-The next two handoffs are intentionally serialized:
+The two corrective handoffs completed sequentially:
 
 1. Foundation M003 — closed at 7656aefff9f809f963bba6f4373ac8f1603445e9; hosted native workflow 35860695866 passed.
-2. Evidence M001 C001 — active after Foundation M003 closure.
+2. Evidence M001 C001 — closed at eeb5d99515d44b5842cc867190fe3257c28c966f; hosted workflow 35864604300 passed.
 
-The following roadmap milestones are temporarily blocked behind that corrective
-gate and intentionally do not yet have implementation plans:
+The following roadmap milestones have cleared the corrective dependency gate.
+They do not yet have implementation plans and require their own bounded
+planning handoffs:
 
-| Subsystem | Milestone | Blocker |
+| Subsystem | Milestone | Next planning work |
 |---|---|---|
-| Evidence/closure | M002 closure records and integrity/recovery | Evidence M001 C001 closure |
-| Projection/CLI | M001 CLI control surface and derived registry | Foundation M003 + Evidence M001 C001 closure |
-| CodeGG integration | M001 golden parity and adapter seam | Foundation M003 + Evidence M001 C001 closure |
-| Eggstack integrations | M001 provider SPI | Evidence M001 C001 closure |
+| Evidence/closure | M002 closure records and integrity/recovery | Write/register bounded implementation plan |
+| Projection/CLI | M001 CLI control surface and derived registry | Write/register bounded implementation plan |
+| CodeGG integration | M001 golden parity and adapter seam | Re-check CodeGG interfaces; write/register plan |
+| Eggstack integrations | M001 provider SPI | Re-check provider interfaces; write/register plan |
 
-Do not write or execute these downstream plans merely to increase plan count.
-Re-open planning after the corrective contracts are qualified.
+These roadmaps are ready for bounded planning handoffs. Do not write plans
+merely to increase plan count; re-check external interfaces where listed.
 
 ## Current execution order
 
@@ -96,18 +97,18 @@ Re-open planning after the corrective contracts are qualified.
    cross-platform caveat and later subject-scope finding are carried forward.
 3. Evidence M001 — historically closed at e711355; later review found
    verification matching too broad for specific execution requirements.
-4. Execute Foundation M003 (closed):
+4. Foundation M003 (closed):
    - exclude Eggplan-managed state from source dirty-subject identity;
    - make schema-v1 nested parsing fail closed;
    - add native Linux/macOS/Windows CI and close or narrowly document platform gaps;
    - repair directly related README/architecture drift.
-5. After Foundation M003 closed, execute Evidence M001 C001:
+5. Execute Evidence M001 C001 after Foundation M003 closure (closed):
    - introduce verification-spec digest binding with explicit v1/v2 compatibility;
    - fail closed for legacy unbound execution requirements;
    - add the persist/recapture/assess regression and architecture/evidence.md.
-6. Only after both correctives close, plan/execute Evidence M002,
-   Projection/CLI M001, CodeGG Integration M001, and Eggstack Provider SPI M001
-   against the corrected contracts.
+6. Corrective gates passed. Reopen planning for Evidence M002, Projection/CLI
+   M001, CodeGG Integration M001, and Eggstack Provider SPI M001 against the
+   corrected contracts.
 7. Stabilize CodeGG parity before staged CodeGG ownership migration.
 8. Add attestation/service/distribution work after local contracts are qualified.
 

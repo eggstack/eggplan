@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: blocked
+Status: ready for planning
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -54,7 +54,10 @@ Role: eventual distribution/update integration, not evidence-core dependency.
 
 ### M001 — Evidence provider SPI
 
-Blocked until Evidence M001 C001 closes. Provider adapters must emit the corrected verification-spec binding and must not stabilize the current overly broad kind/provider/subject matching contract.
+Evidence M001 C001 is closed. The corrective dependency gate is cleared;
+re-check sibling provider interfaces and write a bounded implementation plan
+before implementation. Provider adapters must emit the corrected
+verification-spec binding.
 
 After the corrective gate, freeze adapter traits, capability/failure reporting, sync/async boundary, provider identity construction, and verification-binding handoff.
 

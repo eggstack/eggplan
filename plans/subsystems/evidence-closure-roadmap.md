@@ -78,7 +78,7 @@ criterion matching, exact-subject policy, pure assessment, and explanations.
 
 ### M001 C001 — Verification binding and end-to-end evidence corrective
 
-Status: active after Foundation M003 closure.
+Status: closed. See plans/closure/evidence-closure/001-c001-closed.md.
 
 Plan: plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md
 
@@ -93,7 +93,8 @@ Historical M001 closure remains preserved.
 
 ### M002 — Closure records and integrity/recovery
 
-Blocked on M001 C001 closure. Closure records must be built on corrected
+Ready for implementation planning after M001 C001 closure. Closure records
+must be built on corrected
 subject and verification-binding semantics and must not encode the known broad
 matching behavior as durable closure authority.
 

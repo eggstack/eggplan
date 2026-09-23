@@ -1,8 +1,8 @@
 # Evidence M001 C001 — Verification Binding and End-to-End Evidence Corrective
 
-Status: active
+Status: closed
 
-Repository baseline: ff5f60c (Foundation M003 closure and C001 handoff).
+Repository baseline: ff5f60c4355177985fcc7bb3ec043d1ed0f684d5 (Foundation M003 closure and C001 handoff).
 
 Source roadmap:
 
@@ -44,9 +44,9 @@ not invalidate its own SubjectRevision after Foundation M003.
 Also add the evidence architecture document already referenced by the M001
 closure record. Historical M001 closure remains unchanged.
 
-## 2. Why this corrective is blocked
+## 2. Why this corrective was blocked
 
-Foundation M003 must land first because this corrective depends on:
+At handoff, Foundation M003 had to land first because this corrective depended on:
 
 - Eggplan state not participating in the source dirty fingerprint;
 - strict schema-version decoding/migration dispatch foundations;

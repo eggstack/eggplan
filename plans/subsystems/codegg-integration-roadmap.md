@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: blocked
+Status: ready for planning
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -49,7 +49,11 @@ CodeGG-specific ownership to preserve:
 
 ### M001 — Golden parity and adapter seam
 
-Blocked until Foundation M003 and Evidence M001 C001 close. CodeGG parity must target the corrected subject-scope, strict-schema, verification-binding, and cross-platform contracts rather than reproducing known post-closure defects.
+Foundation M003 and Evidence M001 C001 are closed. The corrective dependency
+gate is cleared; re-check current CodeGG interfaces and write a bounded
+implementation plan before implementation. CodeGG parity must target the
+corrected subject-scope, strict-schema, verification-binding, and
+cross-platform contracts.
 
 After the corrective gate, port representative CodeGG WorkPlan fixtures and semantics to Eggplan and
 define mapping adapters. No production CodeGG ownership change is required.

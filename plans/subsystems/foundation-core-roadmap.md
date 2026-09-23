@@ -114,14 +114,27 @@ Exit: repository-local state safely persists/reopens; stale revisions conflict;
 interrupted writes fail closed; current Git clean/dirty subject is
 deterministically captured.
 
-### M003 — Foundation hardening and migration guards
+### M003 — Subject scope, strict schema, and platform hardening
 
-Class: invariant / polish
+Class: invariant / corrective hardening / qualification
 
-Ready for planning after M002 conditional closure. Add property/fuzz tests,
-schema migration fixtures, static dependency guards, corruption/recovery cases,
-and any cross-platform filesystem corrections revealed by qualification. The
-first plan should prioritize the outstanding Windows/macOS qualification.
+Status: ready.
+
+Plan: plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md
+
+This milestone now owns the concrete post-closure findings discovered after
+Evidence M001:
+
+- Eggplan-managed .eggplan state must be excluded from Git dirty subject
+  identity so persisting plans/evidence cannot stale their own source subject;
+- schema-v1 plan decoding must reject unknown nested fields while preserving
+  valid v1 canonical bytes/digests;
+- native Linux/macOS/Windows CI must qualify repository lock, replacement,
+  path, Git-subject, and durability behavior and correct platform defects;
+- directly related README/architecture drift must be repaired.
+
+The historical M001/M002 closure records remain unchanged. M003 closure
+establishes the current corrected qualification state.
 
 ## 8. Cross-cutting requirements
 
@@ -147,5 +160,7 @@ described truthfully rather than overclaimed.
 ## 11. Completion definition
 
 This subsystem closes when the typed core and repository store are qualified,
-schema/migration behavior is documented, and downstream evidence work can rely
-on stable revisions and subjects.
+schema/migration behavior is documented, Eggplan administrative state cannot
+self-perturb the source subject, strict v1 decoding is proven, native supported
+platform evidence is recorded, and downstream evidence work can rely on stable
+revisions and subjects.

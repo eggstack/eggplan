@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: ready
+Status: blocked
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -54,8 +54,9 @@ Role: eventual distribution/update integration, not evidence-core dependency.
 
 ### M001 — Evidence provider SPI
 
-Ready for planning after Evidence M001. Freeze adapter traits, capability/failure
-reporting, sync/async boundary, and provider identity construction.
+Blocked until Evidence M001 C001 closes. Provider adapters must emit the corrected verification-spec binding and must not stabilize the current overly broad kind/provider/subject matching contract.
+
+After the corrective gate, freeze adapter traits, capability/failure reporting, sync/async boundary, provider identity construction, and verification-binding handoff.
 
 ### M002 — Eggwork and Eggsearch
 

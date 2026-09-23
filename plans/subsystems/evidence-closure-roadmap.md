@@ -76,14 +76,30 @@ Plan: plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.m
 Deliver normalized statuses, provider identities, append-only observations,
 criterion matching, exact-subject policy, pure assessment, and explanations.
 
+### M001 C001 — Verification binding and end-to-end evidence corrective
+
+Status: blocked on Foundation M003 closure.
+
+Plan: plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md
+
+Post-closure review found that kind/provider/subject matching is too broad for
+specific execution verification: one Test observation can otherwise satisfy an
+unrelated Test requirement. C001 adds a verification-spec digest binding,
+explicit v1/v2 compatibility, fail-closed treatment for legacy unbound
+execution requirements, the integrated persist/recapture/assess regression,
+and the missing architecture/evidence.md document.
+
+Historical M001 closure remains preserved.
+
 ### M002 — Closure records and integrity/recovery
 
-Ready for planning after M001 closure. Preserve the M002 platform
-qualification caveat; closure records must not overclaim Windows/macOS.
+Blocked on M001 C001 closure. Closure records must be built on corrected
+subject and verification-binding semantics and must not encode the known broad
+matching behavior as durable closure authority.
 
-Add closure candidate snapshots, requirement-to-evidence matrices, corrupt
-observation detection, correction/supersession lineage, and repository reopen
-qualification.
+After C001, add closure candidate snapshots, requirement-to-evidence matrices,
+corrupt observation detection, correction/supersession lineage, and repository
+reopen qualification.
 
 ### M003 — Policy extensions
 
@@ -99,6 +115,6 @@ mixed criteria, and deterministic repeated assessment.
 
 ## 9. Completion definition
 
-This subsystem closes when closure cannot be manufactured by free-form claims
-or status labels and historical observations remain inspectable and
-reproducible.
+This subsystem closes when closure cannot be manufactured by free-form claims,
+status labels, unrelated same-kind observations, or self-perturbing Eggplan
+state, and historical observations remain inspectable and reproducible.

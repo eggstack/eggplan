@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: ready
+Status: blocked
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -30,9 +30,9 @@ It does not own canonical domain semantics or execution.
 
 ### M001 — CLI control surface and derived registry
 
-Ready for planning after Evidence M001 closure.
+Blocked until Foundation M003 and Evidence M001 C001 close. The CLI and its machine-readable JSON/projection contracts must not freeze the known self-staleness, loose-v1 parsing, or broad execution-evidence matching behavior.
 
-Commands should cover init, new, show, status, ready, graph, check, evidence,
+After the corrective gate, commands should cover init, new, show, status, ready, graph, check, evidence,
 and assess with JSON output and bounded diagnostics.
 
 ### M002 — Markdown import/render

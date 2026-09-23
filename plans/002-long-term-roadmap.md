@@ -24,8 +24,16 @@ This roadmap sequences product capability. It does not imply implementation.
       M002 repository store + CAS + Git subject
         |
         v
+      M003 subject/schema/platform hardening
+        |
+        v
     Evidence and closure
       M001 evidence ledger + deterministic assessment
+        |
+        v
+      M001 C001 verification-binding corrective
+        |
+        v
       M002 closure records + evidence integrity/recovery
         |
         +--------------------+
@@ -77,6 +85,20 @@ Exit: two processes/actors cannot silently overwrite revisions, interrupted
 writes do not become canonical state, and subject revisions are stable enough
 for evidence staleness.
 
+### M003 — Subject scope, strict schema, and platform hardening
+
+Class: invariant / corrective hardening / qualification
+
+Correct post-closure foundation findings before downstream consumers freeze the
+contracts: exclude Eggplan-managed state from the source dirty-subject
+fingerprint, make schema-v1 nested decoding fail closed, qualify native
+Linux/macOS/Windows repository behavior, and repair directly related
+documentation drift.
+
+Exit: Eggplan state cannot stale its own source subject at the same Git HEAD,
+unknown v1 fields are rejected without changing valid v1 canonical bytes, and
+supported-platform evidence is recorded truthfully.
+
 ## 4. Evidence and closure
 
 ### M001 — Evidence ledger and deterministic assessment
@@ -90,13 +112,28 @@ and pure assessment.
 Exit: passing, failed, not-run, skipped, unavailable, inconclusive, in-flight,
 stale, and judgment-only cases are distinguishable and tested.
 
+### M001 C001 — Verification binding corrective
+
+Class: invariant / corrective compatibility hardening
+
+Bind execution-derived requirements and observations to an explicit
+verification-spec digest. Preserve v1 state through an explicit compatibility
+reader, fail closed for legacy unbound execution requirements, and add an
+end-to-end subject-capture -> evidence-persist -> subject-recapture ->
+assessment regression.
+
+Exit: unrelated same-kind observations cannot satisfy a specific verification
+requirement, legacy state gains no invented proof, and persisted Eggplan
+evidence does not self-stale its source subject.
+
 ### M002 — Closure records and evidence integrity/recovery
 
 Class: capability
 
-Implement closure candidates/records, exact requirement-to-evidence matrices,
-observation digests, supersession/correction semantics, reopen verification,
-and fail-closed handling of corrupt/dangling observations.
+After M001 C001 closure, implement closure candidates/records, exact
+requirement-to-evidence matrices, observation digests,
+supersession/correction semantics, reopen verification, and fail-closed
+handling of corrupt/dangling observations.
 
 Exit: a Plan cannot close without evidence permitted by its criteria, and
 historical evidence is not rewritten.

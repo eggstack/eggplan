@@ -52,8 +52,8 @@ Planning-system bootstrap:
 
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
-| Foundation core/repository | ready | M001 closed; M002 conditionally closed; M003 corrective hardening ready | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | corrective required | M001 closed historically; C001 blocked on Foundation M003; M002 blocked on C001 | plans/subsystems/evidence-closure-roadmap.md |
+| Foundation core/repository | ready | M001 closed; M002 conditionally closed historically; M003 closed with native Linux/macOS/Windows qualification | plans/subsystems/foundation-core-roadmap.md |
+| Evidence/closure | corrective required | M001 closed historically; C001 ready after Foundation M003; M002 blocked on C001 | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | blocked | M001 waits on Foundation M003 + Evidence C001 so it does not bind to known-incomplete schema/subject semantics | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 waits on Foundation M003 + Evidence C001 before golden parity/adaptation | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | blocked | Provider SPI waits on Evidence C001 corrected matching contract | plans/subsystems/eggstack-integration-roadmap.md |
@@ -64,17 +64,17 @@ Planning-system bootstrap:
 | Subsystem | Milestone | Status | Implementation plan | Handoff |
 |---|---|---|---|---|
 | Foundation | M001 repository bootstrap + typed domain | closed | plans/implementation/foundation-core/001-repository-bootstrap-and-domain-contract.md | closure plans/closure/foundation-core/001-closed.md |
-| Foundation | M002 repository store/CAS/Git subject | conditionally closed | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | historical closure; Linux qualified; Windows/macOS evidence outstanding |
-| Foundation | M003 subject scope + strict schema + platform hardening | ready | plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md | first corrective/hardening handoff |
+| Foundation | M002 repository store/CAS/Git subject | conditionally closed | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | historical closure; platform caveat resolved by M003 |
+| Foundation | M003 subject scope + strict schema + platform hardening | closed | plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md | closure plans/closure/foundation-core/003-closed.md |
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
-| Evidence | M001 C001 verification binding + end-to-end evidence corrective | blocked | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | waits on Foundation M003 closure |
+| Evidence | M001 C001 verification binding + end-to-end evidence corrective | ready | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | Foundation M003 closed |
 
 ## Corrective gate and later roadmap work
 
 The next two handoffs are intentionally serialized:
 
-1. Foundation M003 — ready.
-2. Evidence M001 C001 — blocked on Foundation M003 closure.
+1. Foundation M003 — closed at 7656aefff9f809f963bba6f4373ac8f1603445e9; hosted native workflow 35860695866 passed.
+2. Evidence M001 C001 — ready and next in execution order.
 
 The following roadmap milestones are temporarily blocked behind that corrective
 gate and intentionally do not yet have implementation plans:
@@ -96,12 +96,12 @@ Re-open planning after the corrective contracts are qualified.
    cross-platform caveat and later subject-scope finding are carried forward.
 3. Evidence M001 — historically closed at e711355; later review found
    verification matching too broad for specific execution requirements.
-4. Execute Foundation M003:
+4. Execute Foundation M003 (closed):
    - exclude Eggplan-managed state from source dirty-subject identity;
    - make schema-v1 nested parsing fail closed;
    - add native Linux/macOS/Windows CI and close or narrowly document platform gaps;
    - repair directly related README/architecture drift.
-5. After Foundation M003 closes, execute Evidence M001 C001:
+5. After Foundation M003 closed, execute Evidence M001 C001:
    - introduce verification-spec digest binding with explicit v1/v2 compatibility;
    - fail closed for legacy unbound execution requirements;
    - add the persist/recapture/assess regression and architecture/evidence.md.

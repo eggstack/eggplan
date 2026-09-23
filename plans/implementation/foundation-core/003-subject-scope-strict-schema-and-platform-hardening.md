@@ -1,6 +1,6 @@
 # Foundation Core M003 — Subject Scope, Strict Schema, and Platform Hardening
 
-Status: active
+Status: closed
 
 Repository baseline: c1fa03b697d68a53eb8d11648e67946f66fe3875
 

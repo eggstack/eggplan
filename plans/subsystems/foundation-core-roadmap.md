@@ -118,7 +118,7 @@ deterministically captured.
 
 Class: invariant / corrective hardening / qualification
 
-Status: ready.
+Status: closed.
 
 Plan: plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md
 

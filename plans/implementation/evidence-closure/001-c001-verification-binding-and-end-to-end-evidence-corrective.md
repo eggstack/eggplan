@@ -1,6 +1,6 @@
 # Evidence M001 C001 — Verification Binding and End-to-End Evidence Corrective
 
-Status: blocked on Foundation M003 closure
+Status: ready for handoff
 
 Repository baseline: c1fa03b697d68a53eb8d11648e67946f66fe3875; rebase to the
 Foundation M003 closure commit before execution.

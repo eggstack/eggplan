@@ -1,6 +1,6 @@
 # Evidence and Closure Roadmap
 
-Status: blocked
+Status: ready
 
 Long-term references: plans/000-long-term-specification.md sections 8-12 and 17-20.
 
@@ -68,7 +68,8 @@ subject identity and repository persistence.
 
 ### M001 — Evidence ledger and assessment
 
-Status: blocked on Foundation M002.
+Status: ready after Foundation M002 conditional closure. Preserve the
+Windows/macOS qualification caveat from Foundation M002.
 
 Plan: plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md
 

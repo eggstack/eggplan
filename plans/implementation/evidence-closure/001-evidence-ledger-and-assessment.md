@@ -1,8 +1,10 @@
 # Evidence and Closure M001 — Evidence Ledger and Deterministic Assessment
 
-Status: blocked
+Status: ready for handoff
 
-Repository baseline: to be established after Foundation M002 closure.
+Repository baseline: 7be1fba (Foundation M002 conditional closure and
+Evidence M001 handoff), re-established after Foundation M002 closure on
+2026-09-23.
 
 Source roadmap:
 
@@ -19,6 +21,11 @@ Applicable ADRs: ADR-0001, ADR-0002, ADR-0003.
 Primary class: capability / invariant
 
 Hard dependency: Foundation M002 closure.
+
+Platform qualification carried from Foundation M002: Linux storage/subject
+behavior is verified. Windows/macOS runtime and cross-target evidence remain
+outstanding; this milestone must preserve the documented durability limits and
+must not claim those platforms qualified.
 
 ## 1. Objective
 

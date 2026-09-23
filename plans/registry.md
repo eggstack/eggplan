@@ -53,7 +53,7 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | active | M001 closed; M002 conditionally closed; M003 roadmap-level | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | blocked | M001 waits on Foundation M002 | plans/subsystems/evidence-closure-roadmap.md |
+| Evidence/closure | ready | M001 ready; Windows/macOS platform caveat inherited | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | blocked | M001 waits on Evidence M001 | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 waits on Foundation M002 + Evidence M001 | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | proposed | provider SPI waits on evidence contract | plans/subsystems/eggstack-integration-roadmap.md |
@@ -64,12 +64,19 @@ Planning-system bootstrap:
 | Subsystem | Milestone | Status | Implementation plan | Handoff |
 |---|---|---|---|---|
 | Foundation | M002 repository store/CAS/Git subject | conditionally closed | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | Linux qualified; Windows/macOS platform evidence outstanding |
+| Evidence | M001 evidence ledger/assessment | ready | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | Foundation M002 conditionally closed at 7be1fba; caveat documented |
 
 ## Registered blocked implementation plans
 
 | Subsystem | Milestone | Status | Implementation plan | Blocker |
 |---|---|---|---|---|
-| Evidence | M001 evidence ledger/assessment | blocked | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | Foundation M002 closure |
+
+## Roadmap-level blocked work
+
+| Subsystem | Milestone | Blocker |
+|---|---|---|
+| Projection/CLI | M001 CLI control surface and derived registry | Evidence M001 closure |
+| CodeGG integration | M001 golden parity and adapter seam | Evidence M001 closure |
 
 Later roadmap milestones intentionally do not yet have implementation plans.
 Write those only after their prerequisite interfaces are concrete.
@@ -78,7 +85,7 @@ Write those only after their prerequisite interfaces are concrete.
 
 1. Foundation M001 — closed at 08a9cdb with domain/bounds/graph/schema evidence.
 2. Foundation M002 — conditionally closed at d154234; Windows/macOS runtime evidence outstanding.
-3. Evidence M001 — ready for handoff after M002 closure baseline is recorded.
+3. Evidence M001 — ready at baseline 7be1fba; implement immutable ledger and assessment.
 4. After Evidence M001, Projection/CLI M001 and CodeGG Integration M001 may be
    planned/executed independently.
 7. Stabilize CodeGG parity before staged CodeGG ownership migration.

@@ -1,6 +1,6 @@
 # Foundation Core M002 — Repository Store, CAS, and Subject Identity
 
-Status: active
+Status: conditionally closed
 
 Repository baseline: e459c1b (`plans: close foundation core M001`),
 re-established after Foundation M001 closure on 2026-09-23.

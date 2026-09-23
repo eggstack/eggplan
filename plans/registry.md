@@ -64,7 +64,7 @@ Planning-system bootstrap:
 | Subsystem | Milestone | Status | Implementation plan | Handoff |
 |---|---|---|---|---|
 | Foundation | M002 repository store/CAS/Git subject | conditionally closed | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | Linux qualified; Windows/macOS platform evidence outstanding |
-| Evidence | M001 evidence ledger/assessment | ready | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | Foundation M002 conditionally closed at 7be1fba; caveat documented |
+| Evidence | M001 evidence ledger/assessment | active | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | baseline 79dcf41; Foundation M002 caveat carried |
 
 ## Registered blocked implementation plans
 

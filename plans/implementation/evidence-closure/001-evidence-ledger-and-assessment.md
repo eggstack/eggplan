@@ -1,10 +1,9 @@
 # Evidence and Closure M001 — Evidence Ledger and Deterministic Assessment
 
-Status: ready for handoff
+Status: active
 
-Repository baseline: 7be1fba (Foundation M002 conditional closure and
-Evidence M001 handoff), re-established after Foundation M002 closure on
-2026-09-23.
+Repository baseline: 79dcf41 (`plans: unblock evidence M001`), re-established
+after Foundation M002 conditional closure on 2026-09-23.
 
 Source roadmap:
 

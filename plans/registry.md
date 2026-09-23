@@ -63,7 +63,7 @@ Planning-system bootstrap:
 
 | Subsystem | Milestone | Status | Implementation plan | Handoff |
 |---|---|---|---|---|
-| Foundation | M002 repository store/CAS/Git subject | ready | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | M001 closed at 08a9cdb |
+| Foundation | M002 repository store/CAS/Git subject | active | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | baseline e459c1b |
 
 ## Registered blocked implementation plans
 

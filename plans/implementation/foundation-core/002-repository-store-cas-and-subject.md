@@ -1,8 +1,8 @@
 # Foundation Core M002 — Repository Store, CAS, and Subject Identity
 
-Status: ready for handoff
+Status: active
 
-Repository baseline: 08a9cdb (`feat(core): bootstrap typed planning domain`),
+Repository baseline: e459c1b (`plans: close foundation core M001`),
 re-established after Foundation M001 closure on 2026-09-23.
 
 Source roadmap:

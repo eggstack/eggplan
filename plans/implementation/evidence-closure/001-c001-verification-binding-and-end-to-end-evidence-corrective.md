@@ -1,9 +1,8 @@
 # Evidence M001 C001 — Verification Binding and End-to-End Evidence Corrective
 
-Status: ready for handoff
+Status: active
 
-Repository baseline: c1fa03b697d68a53eb8d11648e67946f66fe3875; rebase to the
-Foundation M003 closure commit before execution.
+Repository baseline: ff5f60c (Foundation M003 closure and C001 handoff).
 
 Source roadmap:
 

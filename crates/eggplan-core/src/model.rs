@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
-use crate::{CriterionId, EvidenceProviderId, PlanId, PlanItemId, bounds::*};
+use crate::{CriterionId, EvidenceProviderId, PlanId, PlanItemId, VerificationDigest, bounds::*};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -92,6 +92,8 @@ pub struct EvidenceRequirement {
     pub cardinality: EvidenceCardinality,
     pub min_count: u16,
     pub allow_human_judgment: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_verification_digest: Option<VerificationDigest>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -284,7 +286,7 @@ impl Plan {
         Ok(plan)
     }
     pub fn validate(&self) -> Result<(), ValidationError> {
-        if self.schema_version != crate::SCHEMA_VERSION {
+        if !matches!(self.schema_version, 1 | crate::SCHEMA_VERSION) {
             return Err(ValidationError::UnknownSchema(self.schema_version));
         }
         text(&self.objective, "plan.objective", OBJECTIVE_CHARS)?;
@@ -301,6 +303,25 @@ impl Plan {
         let mut ids = BTreeSet::new();
         for item in &self.items {
             item.validate()?;
+            for criterion in &item.criteria {
+                for requirement in &criterion.requirements {
+                    if self.schema_version == 1
+                        && requirement.expected_verification_digest.is_some()
+                    {
+                        return Err(ValidationError::Invalid(
+                            "schema-v1 requirement cannot carry verification binding",
+                        ));
+                    }
+                    if self.schema_version == crate::SCHEMA_VERSION
+                        && crate::is_execution_evidence(requirement.kind)
+                        && requirement.expected_verification_digest.is_none()
+                    {
+                        return Err(ValidationError::Invalid(
+                            "schema-v2 execution requirement requires verification binding",
+                        ));
+                    }
+                }
+            }
             if !ids.insert(item.id.clone()) {
                 return Err(ValidationError::Duplicate("item id"));
             }
@@ -485,5 +506,55 @@ mod tests {
         p.items[0].dependencies.clear();
         p.items[0].parent = Some(PlanItemId::new("epi_missing").unwrap());
         assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn schema_v2_requires_bindings_for_every_execution_evidence_kind() {
+        for kind in [
+            EvidenceKind::Command,
+            EvidenceKind::Test,
+            EvidenceKind::StaticAnalysis,
+            EvidenceKind::DelegatedRun,
+            EvidenceKind::Benchmark,
+        ] {
+            let mut plan = Plan::new(
+                PlanId::new("ep_binding").unwrap(),
+                "binding",
+                vec![PlanItem {
+                    id: PlanItemId::new("epi_binding").unwrap(),
+                    position: 0,
+                    parent: None,
+                    dependencies: vec![],
+                    status: PlanItemStatus::Pending,
+                    description: "check".into(),
+                    criteria: vec![AcceptanceCriterion {
+                        id: CriterionId::new("epc_binding").unwrap(),
+                        statement: "pass".into(),
+                        human_judgment_allowed: false,
+                        requirements: vec![EvidenceRequirement {
+                            description: "verification".into(),
+                            kind: EvidenceKind::Research,
+                            provider: None,
+                            subject_policy: SubjectPolicy::Exact,
+                            cardinality: EvidenceCardinality::Any,
+                            min_count: 1,
+                            allow_human_judgment: false,
+                            expected_verification_digest: None,
+                        }],
+                    }],
+                    blocker: None,
+                    next_action: None,
+                }],
+            )
+            .unwrap();
+            plan.items[0].criteria[0].requirements[0].kind = kind;
+            assert!(
+                plan.validate().is_err(),
+                "{kind:?} accepted without a binding"
+            );
+            plan.items[0].criteria[0].requirements[0].expected_verification_digest =
+                Some(VerificationDigest::new(format!("sha256:{}", "c".repeat(64))).unwrap());
+            assert!(plan.validate().is_ok(), "{kind:?} rejected with a binding");
+        }
     }
 }

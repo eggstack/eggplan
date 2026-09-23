@@ -1,7 +1,9 @@
 use eggplan_core::{
-    EvidenceKind, EvidenceObservation, EvidenceObservationId, EvidenceObservationInput,
-    EvidenceProviderId, EvidenceStatus, Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus,
-    PlanStatus, SubjectRevision, SubjectState,
+    AcceptanceCriterion, AssessmentStatus, CriterionId, EvidenceCardinality, EvidenceKind,
+    EvidenceObservation, EvidenceObservationId, EvidenceObservationInput, EvidenceProviderId,
+    EvidenceRequirement, EvidenceStatus, Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus,
+    PlanStatus, ProviderDescriptor, ProviderRegistry, SubjectPolicy, SubjectRevision, SubjectState,
+    VerificationDigest, assess_plan,
 };
 use eggplan_repo::{
     GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore, StoreOptions,
@@ -56,6 +58,9 @@ fn observation(id: &str, status: EvidenceStatus) -> EvidenceObservation {
         },
         observed_at_unix_ms: 1_700_000_000_000,
         invocation_ref: Some("cargo test".into()),
+        verification_digest: Some(
+            VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).unwrap(),
+        ),
         result_metadata: Default::default(),
         artifacts: vec![],
     })
@@ -429,6 +434,150 @@ fn repository_reopen_rejects_unknown_nested_plan_fields() {
     value["plan"]["items"][0]["future"] = serde_json::json!("unsupported");
     fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
     assert!(matches!(store.get(&p.id), Err(RepoError::Corrupt { .. })));
+}
+
+#[test]
+fn repository_reopen_rejects_unknown_evidence_artifact_fields() {
+    let dir = tempdir().unwrap();
+    let store = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    let p = plan();
+    store.create(&p).unwrap();
+    let observation = observation("strict_artifact", EvidenceStatus::Passed);
+    store.append_observation(&p.id, &observation).unwrap();
+    let path = store
+        .root()
+        .join("plans/ep_store/evidence/epe_strict_artifact.json");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    value["artifacts"] = serde_json::json!([{"reference":"artifact.bin","future":true}]);
+    fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(matches!(
+        store.list_observations(&p.id),
+        Err(RepoError::Corrupt { .. })
+    ));
+}
+
+#[test]
+fn bound_evidence_persists_recaptures_and_assesses_end_to_end() {
+    let dir = tempdir().unwrap();
+    let repo = init_git_repo(dir.path());
+    let store = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    let verification_x = VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).unwrap();
+    let verification_y = VerificationDigest::new(format!("sha256:{}", "b".repeat(64))).unwrap();
+    let mut plan = Plan::new(
+        PlanId::new("ep_binding").unwrap(),
+        "verify source",
+        vec![PlanItem {
+            id: PlanItemId::new("epi_binding").unwrap(),
+            position: 0,
+            parent: None,
+            dependencies: vec![],
+            status: PlanItemStatus::Pending,
+            description: "run the designated test".into(),
+            criteria: vec![AcceptanceCriterion {
+                id: CriterionId::new("epc_binding").unwrap(),
+                statement: "designated test passed".into(),
+                human_judgment_allowed: false,
+                requirements: vec![EvidenceRequirement {
+                    description: "designated test invocation".into(),
+                    kind: EvidenceKind::Test,
+                    provider: None,
+                    subject_policy: SubjectPolicy::Exact,
+                    cardinality: EvidenceCardinality::Any,
+                    min_count: 1,
+                    allow_human_judgment: false,
+                    expected_verification_digest: Some(verification_x.clone()),
+                }],
+            }],
+            blocker: None,
+            next_action: None,
+        }],
+    )
+    .unwrap();
+    store.create(&plan).unwrap();
+    let subject_a = store.subject_source().capture().unwrap();
+    plan.subject = Some(subject_a.clone());
+    plan.revision = 1;
+    plan.status = PlanStatus::Active;
+    plan.items[0].status = PlanItemStatus::Actionable;
+    plan = store.compare_and_swap(&plan.id, 0, &plan).unwrap();
+    plan.revision = 2;
+    plan.items[0].status = PlanItemStatus::InProgress;
+    plan = store.compare_and_swap(&plan.id, 1, &plan).unwrap();
+    plan.revision = 3;
+    plan.items[0].status = PlanItemStatus::Completed;
+    plan = store.compare_and_swap(&plan.id, 2, &plan).unwrap();
+    plan.revision = 4;
+    plan.status = PlanStatus::Closed;
+    plan = store.compare_and_swap(&plan.id, 3, &plan).unwrap();
+
+    let make_observation = |id: &str, binding: VerificationDigest| {
+        EvidenceObservation::finalize(EvidenceObservationInput {
+            id: EvidenceObservationId::new(format!("epe_{id}")).unwrap(),
+            provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+            kind: EvidenceKind::Test,
+            status: EvidenceStatus::Passed,
+            subject: subject_a.clone(),
+            observed_at_unix_ms: 1_700_000_000_000,
+            invocation_ref: Some("test suite alpha".into()),
+            verification_digest: Some(binding),
+            result_metadata: Default::default(),
+            artifacts: vec![],
+        })
+        .unwrap()
+    };
+    let observation_x = make_observation("binding_x", verification_x);
+    store.append_observation(&plan.id, &observation_x).unwrap();
+    let subject_b = store.subject_source().capture().unwrap();
+    assert_eq!(subject_a, subject_b);
+    let observation_y = make_observation("binding_y", verification_y);
+    store.append_observation(&plan.id, &observation_y).unwrap();
+    let replay_changed = make_observation(
+        "binding_x",
+        VerificationDigest::new(format!("sha256:{}", "b".repeat(64))).unwrap(),
+    );
+    assert!(matches!(
+        store.append_observation(&plan.id, &replay_changed),
+        Err(RepoError::ObservationConflict(_))
+    ));
+
+    let mut providers = ProviderRegistry::default();
+    providers
+        .register_trusted(
+            ProviderDescriptor::new(
+                EvidenceProviderId::new("epp_test").unwrap(),
+                "host",
+                [EvidenceKind::Test],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let observations = store.list_observations(&plan.id).unwrap();
+    let result = assess_plan(&plan, &subject_b, &observations, &providers);
+    assert_eq!(result.status, AssessmentStatus::Complete);
+    let satisfying = &result.items[0].criteria[0].requirements[0].satisfying_observation_ids;
+    assert_eq!(
+        satisfying,
+        &[EvidenceObservationId::new("epe_binding_x").unwrap()]
+    );
+
+    fs::write(
+        dir.path().join("tracked.txt"),
+        b"changed after verification\n",
+    )
+    .unwrap();
+    let subject_c = store.subject_source().capture().unwrap();
+    assert_ne!(subject_b, subject_c);
+    let stale_result = assess_plan(&plan, &subject_c, &observations, &providers);
+    assert_ne!(stale_result.status, AssessmentStatus::Complete);
+    let reopened = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    let reopened_result = assess_plan(
+        &reopened.get(&plan.id).unwrap(),
+        &subject_c,
+        &reopened.list_observations(&plan.id).unwrap(),
+        &providers,
+    );
+    assert_eq!(reopened_result, stale_result);
+    drop(repo);
 }
 
 #[test]

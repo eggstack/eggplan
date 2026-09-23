@@ -10,8 +10,9 @@ library with immutable evidence and deterministic assessment, plus
 `eggplan-repo`, the local Plan store, append-only evidence ledger, and Git
 subject adapter. See
 [core architecture](architecture/core.md),
-[repository architecture](architecture/repository.md), and the planning
-registry in `plans/registry.md`.
+[repository architecture](architecture/repository.md), the
+[evidence architecture](architecture/evidence.md), and the planning registry
+in `plans/registry.md`.
 
 Development checks (Rust 1.89 or newer):
 

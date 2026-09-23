@@ -1,12 +1,12 @@
 use crate::{
     ArtifactRef, EvidenceKind, EvidenceObservationId, EvidenceProviderId, SubjectRevision,
-    ValidationError, bounds::*, canonical_json, digest_json,
+    ValidationError, VerificationDigest, bounds::*, canonical_json, digest_json,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
-pub const EVIDENCE_SCHEMA_VERSION: u32 = 1;
+pub const EVIDENCE_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -33,6 +33,8 @@ pub struct EvidenceObservation {
     observed_at_unix_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     invocation_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verification_digest: Option<VerificationDigest>,
     result_metadata: BTreeMap<String, String>,
     artifacts: Vec<ArtifactRef>,
     content_digest: String,
@@ -47,6 +49,7 @@ pub struct EvidenceObservationInput {
     pub subject: SubjectRevision,
     pub observed_at_unix_ms: u64,
     pub invocation_ref: Option<String>,
+    pub verification_digest: Option<VerificationDigest>,
     pub result_metadata: BTreeMap<String, String>,
     pub artifacts: Vec<ArtifactRef>,
 }
@@ -63,6 +66,8 @@ struct ObservationContent {
     observed_at_unix_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     invocation_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    verification_digest: Option<VerificationDigest>,
     result_metadata: BTreeMap<String, String>,
     artifacts: Vec<ArtifactRef>,
 }
@@ -165,6 +170,7 @@ impl EvidenceObservation {
             subject: input.subject,
             observed_at_unix_ms: input.observed_at_unix_ms,
             invocation_ref: input.invocation_ref,
+            verification_digest: input.verification_digest,
             result_metadata: input.result_metadata,
             artifacts: input.artifacts,
             content_digest: String::new(),
@@ -215,6 +221,9 @@ impl EvidenceObservation {
     pub fn invocation_ref(&self) -> Option<&str> {
         self.invocation_ref.as_deref()
     }
+    pub fn verification_digest(&self) -> Option<&VerificationDigest> {
+        self.verification_digest.as_ref()
+    }
     pub fn result_metadata(&self) -> &BTreeMap<String, String> {
         &self.result_metadata
     }
@@ -235,14 +244,28 @@ impl EvidenceObservation {
             subject: self.subject.clone(),
             observed_at_unix_ms: self.observed_at_unix_ms,
             invocation_ref: self.invocation_ref.clone(),
+            verification_digest: self.verification_digest.clone(),
             result_metadata: self.result_metadata.clone(),
             artifacts: self.artifacts.clone(),
         }
     }
 
     fn validate_fields(&self) -> Result<(), EvidenceError> {
-        if self.schema_version != EVIDENCE_SCHEMA_VERSION {
+        if !matches!(self.schema_version, 1 | EVIDENCE_SCHEMA_VERSION) {
             return Err(EvidenceError::UnknownSchema(self.schema_version));
+        }
+        if self.schema_version == 1 && self.verification_digest.is_some() {
+            return Err(EvidenceError::Invalid(
+                "schema-v1 observation cannot carry verification binding".into(),
+            ));
+        }
+        if self.schema_version == EVIDENCE_SCHEMA_VERSION
+            && crate::is_execution_evidence(self.kind)
+            && self.verification_digest.is_none()
+        {
+            return Err(EvidenceError::Invalid(
+                "schema-v2 execution observation requires verification binding".into(),
+            ));
         }
         self.subject
             .validate()
@@ -288,6 +311,28 @@ fn validate_text(value: &str, label: &str, max: usize) -> Result<(), EvidenceErr
     }
 }
 
+#[cfg(test)]
+pub(crate) fn finalize_v1_for_test(mut input: EvidenceObservationInput) -> EvidenceObservation {
+    input.verification_digest = None;
+    let mut observation = EvidenceObservation {
+        schema_version: 1,
+        id: input.id,
+        provider_id: input.provider_id,
+        kind: input.kind,
+        status: input.status,
+        subject: input.subject,
+        observed_at_unix_ms: input.observed_at_unix_ms,
+        invocation_ref: input.invocation_ref,
+        verification_digest: None,
+        result_metadata: input.result_metadata,
+        artifacts: input.artifacts,
+        content_digest: String::new(),
+    };
+    observation.content_digest = digest_json(&observation.content()).unwrap();
+    observation.validate().unwrap();
+    observation
+}
+
 impl From<ValidationError> for EvidenceError {
     fn from(value: ValidationError) -> Self {
         Self::Invalid(value.to_string())
@@ -314,6 +359,9 @@ mod tests {
             },
             observed_at_unix_ms: 1_700_000_000_000,
             invocation_ref: None,
+            verification_digest: Some(
+                VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).unwrap(),
+            ),
             result_metadata: BTreeMap::new(),
             artifacts: vec![],
         }
@@ -335,7 +383,7 @@ mod tests {
             serde_json::from_str(include_str!("../tests/fixtures/evidence-v1-digests.json"))
                 .unwrap();
         for status in statuses {
-            let observation = EvidenceObservation::finalize(input(status)).unwrap();
+            let observation = finalize_v1_for_test(input(status));
             assert_eq!(
                 observation.content_digest(),
                 fixtures[&format!("status:{}", status_name(status))]
@@ -364,10 +412,62 @@ mod tests {
                 format!("{kind:?}").to_lowercase()
             ))
             .unwrap();
-            let observation = EvidenceObservation::finalize(observation_input).unwrap();
+            let observation = finalize_v1_for_test(observation_input);
             assert_eq!(
                 observation.content_digest(),
                 fixtures[&format!("kind:{}", kind_name(kind))]
+            );
+        }
+    }
+
+    #[test]
+    fn schema_v2_evidence_golden_bytes_and_digest() {
+        let observation = EvidenceObservation::finalize(input(EvidenceStatus::Passed)).unwrap();
+        let bytes = observation.canonical_json().unwrap();
+        assert_eq!(
+            std::str::from_utf8(&bytes).unwrap(),
+            include_str!("../tests/fixtures/evidence-v2-observation.json").trim()
+        );
+        assert_eq!(
+            observation.content_digest(),
+            include_str!("../tests/fixtures/evidence-v2-observation.sha256").trim()
+        );
+    }
+
+    #[test]
+    fn legacy_evidence_rejects_unknown_nested_subject_and_artifact_fields() {
+        let observation = finalize_v1_for_test(input(EvidenceStatus::Passed));
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&observation.canonical_json().unwrap()).unwrap();
+        value["subject"]["future"] = serde_json::json!(true);
+        assert!(EvidenceObservation::parse(&serde_json::to_vec(&value).unwrap()).is_err());
+
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&observation.canonical_json().unwrap()).unwrap();
+        value["artifacts"] = serde_json::json!([{"reference":"artifact.bin","future":true}]);
+        assert!(EvidenceObservation::parse(&serde_json::to_vec(&value).unwrap()).is_err());
+
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&observation.canonical_json().unwrap()).unwrap();
+        value["future"] = serde_json::json!("unknown");
+        assert!(EvidenceObservation::parse(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn schema_v2_execution_observations_require_bindings() {
+        for kind in [
+            EvidenceKind::Command,
+            EvidenceKind::Test,
+            EvidenceKind::StaticAnalysis,
+            EvidenceKind::DelegatedRun,
+            EvidenceKind::Benchmark,
+        ] {
+            let mut input = input(EvidenceStatus::Passed);
+            input.kind = kind;
+            input.verification_digest = None;
+            assert!(
+                EvidenceObservation::finalize(input).is_err(),
+                "{kind:?} accepted without a binding"
             );
         }
     }
@@ -389,10 +489,10 @@ mod tests {
         );
         let unknown_schema = String::from_utf8(observation.canonical_json().unwrap())
             .unwrap()
-            .replace("\"schema_version\":1", "\"schema_version\":2");
+            .replace("\"schema_version\":2", "\"schema_version\":3");
         assert!(matches!(
             EvidenceObservation::parse(unknown_schema.as_bytes()),
-            Err(error) if error.to_string().contains("unknown evidence schema version 2")
+            Err(error) if error.to_string().contains("unknown evidence schema version 3")
         ));
     }
 

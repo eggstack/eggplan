@@ -22,11 +22,24 @@ pub use evidence::{
 };
 pub use graph::{GraphError, ItemReadiness, Readiness, readiness};
 pub use identity::EvidenceObservationId;
-pub use identity::{CriterionId, EvidenceProviderId, PlanId, PlanItemId, TypedId};
+pub use identity::{
+    CriterionId, EvidenceProviderId, PlanId, PlanItemId, TypedId, VerificationDigest,
+};
 pub use model::*;
 pub use schema::{SCHEMA_VERSION, canonical_json, digest_json, parse_plan};
 
-/// Explicit resource and text bounds for schema v1. Text counts Unicode scalar
+pub(crate) fn is_execution_evidence(kind: EvidenceKind) -> bool {
+    matches!(
+        kind,
+        EvidenceKind::Command
+            | EvidenceKind::Test
+            | EvidenceKind::StaticAnalysis
+            | EvidenceKind::DelegatedRun
+            | EvidenceKind::Benchmark
+    )
+}
+
+/// Explicit resource and text bounds for schema v1 and v2. Text counts Unicode scalar
 /// values, not UTF-8 bytes. IDs and digests count ASCII bytes.
 pub mod bounds {
     pub const ID_CHARS: usize = 96;

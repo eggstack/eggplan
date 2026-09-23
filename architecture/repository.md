@@ -13,8 +13,8 @@
     closure.json                 # reserved for later closure milestone
 ```
 
-The plan envelope has storage schema version 1, the validated schema-v1 Plan,
-and a SHA-256 digest of that Plan's canonical bytes. Reopen validates the
+The plan envelope has storage schema version 1, a validated schema-v1 or
+schema-v2 Plan, and a SHA-256 digest of that Plan's canonical bytes. Reopen validates the
 envelope, domain schema, directory/object identity, and digest. Unknown or
 malformed objects fail closed. Plan creation starts at revision zero; update
 requires exactly the current revision and a candidate revision one greater.

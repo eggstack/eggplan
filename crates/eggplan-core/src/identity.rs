@@ -1,6 +1,62 @@
 use serde::{Deserialize, Serialize};
 use std::{fmt, str::FromStr};
 use thiserror::Error;
+
+/// Opaque identity of a canonical verification specification.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(try_from = "String", into = "String")]
+pub struct VerificationDigest(String);
+
+impl VerificationDigest {
+    pub fn new(value: impl Into<String>) -> Result<Self, IdError> {
+        let value = value.into();
+        let valid = value.strip_prefix("sha256:").is_some_and(|hex| {
+            hex.len() == 64
+                && hex
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        });
+        if valid {
+            Ok(Self(value))
+        } else {
+            Err(IdError::Invalid("verification digest"))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for VerificationDigest {
+    type Error = IdError;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+impl From<VerificationDigest> for String {
+    fn from(value: VerificationDigest) -> Self {
+        value.0
+    }
+}
+
+#[cfg(test)]
+mod verification_digest_tests {
+    use super::*;
+
+    #[test]
+    fn verification_digest_requires_sha256_lowercase_hex() {
+        assert!(VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).is_ok());
+        assert!(VerificationDigest::new(format!("sha256:{}", "A".repeat(64))).is_err());
+        assert!(VerificationDigest::new("sha256:abc").is_err());
+        assert!(
+            serde_json::from_str::<VerificationDigest>(&format!("\"sha256:{}\"", "G".repeat(64)))
+                .is_err()
+        );
+    }
+}
 use uuid::Uuid;
 
 use crate::bounds::ID_CHARS;
@@ -13,6 +69,8 @@ pub enum IdError {
     Prefix { expected: &'static str },
     #[error("identifier contains an invalid character")]
     Character,
+    #[error("invalid {0}")]
+    Invalid(&'static str),
 }
 
 pub trait TypedId: Sized + Clone + Eq + Ord + fmt::Display {

@@ -53,7 +53,7 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | ready | M001 closed; M002 conditionally closed historically; M003 closed with native Linux/macOS/Windows qualification | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | corrective required | M001 closed historically; C001 ready after Foundation M003; M002 blocked on C001 | plans/subsystems/evidence-closure-roadmap.md |
+| Evidence/closure | corrective required | M001 closed historically; C001 active after Foundation M003; M002 blocked on C001 | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | blocked | M001 waits on Foundation M003 + Evidence C001 so it does not bind to known-incomplete schema/subject semantics | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 waits on Foundation M003 + Evidence C001 before golden parity/adaptation | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | blocked | Provider SPI waits on Evidence C001 corrected matching contract | plans/subsystems/eggstack-integration-roadmap.md |
@@ -67,14 +67,14 @@ Planning-system bootstrap:
 | Foundation | M002 repository store/CAS/Git subject | conditionally closed | plans/implementation/foundation-core/002-repository-store-cas-and-subject.md | historical closure; platform caveat resolved by M003 |
 | Foundation | M003 subject scope + strict schema + platform hardening | closed | plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md | closure plans/closure/foundation-core/003-closed.md |
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
-| Evidence | M001 C001 verification binding + end-to-end evidence corrective | ready | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | Foundation M003 closed |
+| Evidence | M001 C001 verification binding + end-to-end evidence corrective | active | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | Foundation M003 closed |
 
 ## Corrective gate and later roadmap work
 
 The next two handoffs are intentionally serialized:
 
 1. Foundation M003 — closed at 7656aefff9f809f963bba6f4373ac8f1603445e9; hosted native workflow 35860695866 passed.
-2. Evidence M001 C001 — ready and next in execution order.
+2. Evidence M001 C001 — active after Foundation M003 closure.
 
 The following roadmap milestones are temporarily blocked behind that corrective
 gate and intentionally do not yet have implementation plans:

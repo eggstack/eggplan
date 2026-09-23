@@ -30,6 +30,9 @@ pub enum AssessmentReason {
     UntrustedProvider(EvidenceProviderId),
     ProviderKindNotAllowed(EvidenceProviderId),
     ProviderMismatch(EvidenceProviderId),
+    LegacyUnboundExecutionRequirement,
+    ObservationMissingVerificationBinding(EvidenceObservationId),
+    VerificationDigestMismatch(EvidenceObservationId),
     EvidenceStatus(EvidenceObservationId, EvidenceStatus),
     HumanJudgmentNotAllowed,
     InvalidObservation(EvidenceObservationId),
@@ -237,6 +240,16 @@ fn assess_requirement(
     providers: &ProviderRegistry,
 ) -> RequirementAssessment {
     let mut reasons = Vec::new();
+    if crate::is_execution_evidence(requirement.kind)
+        && requirement.expected_verification_digest.is_none()
+    {
+        return RequirementAssessment {
+            status: InvalidOrStale,
+            requirement_kind: requirement.kind,
+            satisfying_observation_ids: vec![],
+            reasons: vec![AssessmentReason::LegacyUnboundExecutionRequirement],
+        };
+    }
     let mut eligible = Vec::new();
     let mut invalid = false;
     for observation in observations
@@ -284,6 +297,23 @@ fn assess_requirement(
         if observation.subject() != current {
             reasons.push(AssessmentReason::StaleSubject(observation.id().clone()));
             continue;
+        }
+        if let Some(expected) = &requirement.expected_verification_digest {
+            match observation.verification_digest() {
+                None => {
+                    reasons.push(AssessmentReason::ObservationMissingVerificationBinding(
+                        observation.id().clone(),
+                    ));
+                    continue;
+                }
+                Some(actual) if actual != expected => {
+                    reasons.push(AssessmentReason::VerificationDigestMismatch(
+                        observation.id().clone(),
+                    ));
+                    continue;
+                }
+                Some(_) => {}
+            }
         }
         eligible.push(observation);
     }
@@ -410,11 +440,14 @@ mod tests {
             cardinality,
             min_count,
             allow_human_judgment: false,
+            expected_verification_digest: Some(
+                crate::VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).unwrap(),
+            ),
         }
     }
     fn plan(status: PlanItemStatus, requirements: Vec<EvidenceRequirement>, human: bool) -> Plan {
         Plan {
-            schema_version: 1,
+            schema_version: crate::SCHEMA_VERSION,
             id: PlanId::new("ep_assess").unwrap(),
             revision: 0,
             objective: "assess".into(),
@@ -446,6 +479,16 @@ mod tests {
         subject: SubjectRevision,
         provider: &str,
     ) -> EvidenceObservation {
+        observation_with_digest(id, kind, status, subject, provider, "a")
+    }
+    fn observation_with_digest(
+        id: &str,
+        kind: EvidenceKind,
+        status: EvidenceStatus,
+        subject: SubjectRevision,
+        provider: &str,
+        digest_byte: &str,
+    ) -> EvidenceObservation {
         EvidenceObservation::finalize(EvidenceObservationInput {
             id: EvidenceObservationId::new(format!("epe_{id}")).unwrap(),
             provider_id: EvidenceProviderId::new(format!("epp_{provider}")).unwrap(),
@@ -454,10 +497,159 @@ mod tests {
             subject,
             observed_at_unix_ms: 1,
             invocation_ref: None,
+            verification_digest: Some(
+                crate::VerificationDigest::new(format!("sha256:{}", digest_byte.repeat(64)))
+                    .unwrap(),
+            ),
             result_metadata: BTreeMap::new(),
             artifacts: vec![],
         })
         .unwrap()
+    }
+
+    #[test]
+    fn execution_evidence_requires_exact_verification_binding() {
+        let current = subject(SubjectState::Clean, "bound");
+        let p = plan(
+            PlanItemStatus::Completed,
+            vec![requirement(EvidenceKind::Test, EvidenceCardinality::Any, 1)],
+            false,
+        );
+        let providers = registry("host", "host", &[EvidenceKind::Test]);
+        let wrong = observation_with_digest(
+            "wrong",
+            EvidenceKind::Test,
+            EvidenceStatus::Passed,
+            current.clone(),
+            "host",
+            "b",
+        );
+        let wrong_result = assess_plan(&p, &current, &[wrong], &providers);
+        let requirement_result = &wrong_result.items[0].criteria[0].requirements[0];
+        assert_ne!(wrong_result.status, AssessmentStatus::Complete);
+        assert!(requirement_result.satisfying_observation_ids.is_empty());
+        assert!(
+            requirement_result
+                .reasons
+                .iter()
+                .any(|r| matches!(r, AssessmentReason::VerificationDigestMismatch(_)))
+        );
+
+        let exact = observation(
+            "exact",
+            EvidenceKind::Test,
+            EvidenceStatus::Passed,
+            current.clone(),
+            "host",
+        );
+        assert_eq!(
+            assess_plan(&p, &current, &[exact], &providers).status,
+            AssessmentStatus::Complete
+        );
+    }
+
+    #[test]
+    fn mismatched_observations_are_excluded_from_any_and_all_cardinality() {
+        let current = subject(SubjectState::Clean, "cardinality");
+        let providers = registry("host", "host", &[EvidenceKind::Test]);
+        let passing_x = observation_with_digest(
+            "pass_x",
+            EvidenceKind::Test,
+            EvidenceStatus::Passed,
+            current.clone(),
+            "host",
+            "a",
+        );
+        let failed_y = observation_with_digest(
+            "fail_y",
+            EvidenceKind::Test,
+            EvidenceStatus::Failed,
+            current.clone(),
+            "host",
+            "b",
+        );
+
+        for cardinality in [EvidenceCardinality::Any, EvidenceCardinality::All] {
+            let p = plan(
+                PlanItemStatus::Completed,
+                vec![requirement(EvidenceKind::Test, cardinality, 1)],
+                false,
+            );
+            let result = assess_plan(
+                &p,
+                &current,
+                &[passing_x.clone(), failed_y.clone()],
+                &providers,
+            );
+            assert_eq!(result.status, AssessmentStatus::Complete);
+            assert_eq!(
+                result.items[0].criteria[0].requirements[0].satisfying_observation_ids,
+                vec![EvidenceObservationId::new("epe_pass_x").unwrap()]
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_unbound_execution_requirement_fails_closed() {
+        let mut req = requirement(EvidenceKind::Test, EvidenceCardinality::Any, 1);
+        req.expected_verification_digest = None;
+        let mut p = plan(PlanItemStatus::Completed, vec![req], false);
+        p.schema_version = 1;
+        let current = subject(SubjectState::Clean, "legacy");
+        let observation = observation(
+            "legacy",
+            EvidenceKind::Test,
+            EvidenceStatus::Passed,
+            current.clone(),
+            "host",
+        );
+        let result = assess_plan(
+            &p,
+            &current,
+            &[observation],
+            &registry("host", "host", &[EvidenceKind::Test]),
+        );
+        assert_ne!(result.status, AssessmentStatus::Complete);
+        assert!(
+            result.items[0].criteria[0].requirements[0]
+                .reasons
+                .contains(&AssessmentReason::LegacyUnboundExecutionRequirement)
+        );
+    }
+
+    #[test]
+    fn legacy_unbound_observation_cannot_satisfy_a_v2_requirement() {
+        let current = subject(SubjectState::Clean, "legacy-observation");
+        let p = plan(
+            PlanItemStatus::Completed,
+            vec![requirement(EvidenceKind::Test, EvidenceCardinality::Any, 1)],
+            false,
+        );
+        let legacy = crate::evidence::finalize_v1_for_test(EvidenceObservationInput {
+            id: EvidenceObservationId::new("epe_legacy").unwrap(),
+            provider_id: EvidenceProviderId::new("epp_host").unwrap(),
+            kind: EvidenceKind::Test,
+            status: EvidenceStatus::Passed,
+            subject: current.clone(),
+            observed_at_unix_ms: 1,
+            invocation_ref: Some("cargo test".into()),
+            verification_digest: None,
+            result_metadata: BTreeMap::new(),
+            artifacts: vec![],
+        });
+        let result = assess_plan(
+            &p,
+            &current,
+            &[legacy],
+            &registry("host", "host", &[EvidenceKind::Test]),
+        );
+        let requirement_result = &result.items[0].criteria[0].requirements[0];
+        assert_ne!(result.status, AssessmentStatus::Complete);
+        assert!(requirement_result.satisfying_observation_ids.is_empty());
+        assert!(requirement_result.reasons.iter().any(|r| matches!(
+            r,
+            AssessmentReason::ObservationMissingVerificationBinding(_)
+        )));
     }
     fn registry(provider: &str, class: &str, kinds: &[EvidenceKind]) -> ProviderRegistry {
         let mut registry = ProviderRegistry::default();

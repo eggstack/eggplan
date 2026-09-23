@@ -78,7 +78,7 @@ criterion matching, exact-subject policy, pure assessment, and explanations.
 
 ### M001 C001 — Verification binding and end-to-end evidence corrective
 
-Status: ready after Foundation M003 closure.
+Status: active after Foundation M003 closure.
 
 Plan: plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md
 

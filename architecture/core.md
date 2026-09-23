@@ -5,7 +5,7 @@ filesystem, Git, process, network, database, scheduler, executor, or model
 runtime responsibilities. Repository persistence belongs to `eggplan-repo`;
 external observations belong to provider adapters.
 
-## Schema v1
+## Plan schema v1 and v2
 
 The first schema defines typed `PlanId` (`ep_`), `PlanItemId` (`epi_`),
 `CriterionId` (`epc_`), and `EvidenceProviderId` (`epp_`) values; revisioned
@@ -13,14 +13,17 @@ Plans and PlanItems; criteria and evidence requirements; artifacts; and
 transport-neutral SubjectRevision. IDs are prefix validated, at most 96 ASCII
 characters, and use ASCII letters, digits, `_`, or `-` after the prefix.
 
-Canonical JSON is compact `serde_json` serialization of the schema structs,
-whose declared field order is fixed. `BTreeMap` values serialize in key order.
+Canonical JSON is compact `serde_json` serialization of the versioned schema
+structs, whose declared field order is fixed. `BTreeMap` values serialize in key order.
 Optional `None` values are omitted where annotated. Digests are lowercase
 `sha256:<64 hex>` over those exact bytes. Golden files in
 `crates/eggplan-core/tests/fixtures/` freeze the initial Plan byte sequence and
 digest; pretty JSON is not part of that contract.
 
-All semantic v1 structs reject unknown fields during deserialization,
+Schema v1 is frozen. Newly constructed plans use schema v2, which adds an
+optional expected verification-spec digest to requirements and requires it for
+execution-derived evidence kinds. See [evidence architecture](evidence.md).
+Both versions use the same strict semantic structs and reject unknown fields during deserialization,
 including nested criteria, requirements, subjects, and artifact references.
 Valid v1 serialization remains byte-for-byte stable; unknown fields are not a
 supported extension mechanism.

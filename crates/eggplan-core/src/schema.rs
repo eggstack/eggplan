@@ -2,9 +2,9 @@ use crate::Plan;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 
-/// Serialize a validated object as compact serde_json bytes. Schema-v1 structs
+/// Serialize a validated object as compact serde_json bytes. Versioned structs
 /// have fixed declaration order; maps use serde_json's sorted key order.
 pub fn canonical_json<T: Serialize>(value: &T) -> Result<Vec<u8>, serde_json::Error> {
     serde_json::to_vec(value)
@@ -44,9 +44,32 @@ mod tests {
         )
         .unwrap()
     }
+    fn bound_v2_plan() -> Plan {
+        let mut plan = plan();
+        plan.items[0].criteria.push(crate::AcceptanceCriterion {
+            id: crate::CriterionId::new("epc_fixture").unwrap(),
+            statement: "designated test passed".into(),
+            human_judgment_allowed: false,
+            requirements: vec![crate::EvidenceRequirement {
+                description: "designated test invocation".into(),
+                kind: crate::EvidenceKind::Test,
+                provider: None,
+                subject_policy: crate::SubjectPolicy::Exact,
+                cardinality: crate::EvidenceCardinality::Any,
+                min_count: 1,
+                allow_human_judgment: false,
+                expected_verification_digest: Some(
+                    crate::VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).unwrap(),
+                ),
+            }],
+        });
+        plan.validate().unwrap();
+        plan
+    }
     #[test]
     fn schema_v1_golden_plan_bytes_and_digest() {
-        let p = plan();
+        let mut p = plan();
+        p.schema_version = 1;
         let bytes = canonical_json(&p).unwrap();
         assert_eq!(
             std::str::from_utf8(&bytes).unwrap(),
@@ -56,6 +79,21 @@ mod tests {
             digest_json(&p).unwrap(),
             include_str!("../tests/fixtures/schema-v1-plan.sha256").trim()
         );
+        assert_eq!(parse_plan(&bytes).unwrap(), p);
+    }
+
+    #[test]
+    fn schema_v2_golden_plan_bytes_and_digest() {
+        let p = bound_v2_plan();
+        let bytes = canonical_json(&p).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&bytes).unwrap(),
+            include_str!("../tests/fixtures/schema-v2-plan.json").trim()
+        );
+        assert_eq!(
+            digest_json(&p).unwrap(),
+            include_str!("../tests/fixtures/schema-v2-plan.sha256").trim()
+        );
     }
     #[test]
     fn roundtrip_and_unknown_schema_rejected() {
@@ -64,7 +102,7 @@ mod tests {
         assert_eq!(p, parsed);
         let bad = serde_json::to_vec(&{
             let mut p = p;
-            p.schema_version = 2;
+            p.schema_version = 3;
             p
         })
         .unwrap();

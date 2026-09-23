@@ -88,6 +88,12 @@ impl GitSubjectSource {
                 } else {
                     std::env::current_dir()?.join(path)
                 };
+                // macOS commonly exposes /var as /private/var and Windows
+                // canonicalizes path casing. Compare resolved existing roots
+                // so an administrative exclusion cannot disappear due to an
+                // alias spelling.
+                let absolute = fs::canonicalize(absolute)?;
+                let workdir = fs::canonicalize(workdir)?;
                 absolute.strip_prefix(workdir).ok().map(Path::to_path_buf)
             }
             _ => None,

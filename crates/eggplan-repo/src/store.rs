@@ -540,7 +540,7 @@ fn acquire_lock(root: &Path, timeout: Duration) -> Result<LockGuard, RepoError> 
     loop {
         match file.try_lock_exclusive() {
             Ok(()) => return Ok(LockGuard(file)),
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(error) if is_lock_contention(&error) => {
                 if start.elapsed() >= timeout {
                     return Err(RepoError::LockTimeout);
                 }
@@ -549,6 +549,21 @@ fn acquire_lock(root: &Path, timeout: Duration) -> Result<LockGuard, RepoError> 
             Err(error) => return Err(RepoError::Io(error)),
         }
     }
+}
+
+fn is_lock_contention(error: &std::io::Error) -> bool {
+    if error.kind() == std::io::ErrorKind::WouldBlock {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        // LockFileEx reports ERROR_LOCK_VIOLATION (33) for a conflicting
+        // exclusive range lock; std does not consistently map it to
+        // WouldBlock across Rust/Windows versions.
+        return error.raw_os_error() == Some(33);
+    }
+    #[cfg(not(windows))]
+    false
 }
 
 fn encode_plan(plan: &Plan) -> Result<Vec<u8>, RepoError> {

@@ -1,13 +1,13 @@
 # CodeGG Integration Roadmap
 
-Status: ready for planning
+Status: blocked
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
 Related ADR: ADR-0004.
 
 Reviewed CodeGG baseline:
-2f7d84f88070eee2a4fb9f70b6d7d5d10b01048d.
+6e18304546f29426457eb11410957288384fdec2.
 
 ## 1. Purpose
 
@@ -49,14 +49,15 @@ CodeGG-specific ownership to preserve:
 
 ### M001 — Golden parity and adapter seam
 
-Foundation M003 and Evidence M001 C001 are closed. The corrective dependency
-gate is cleared; re-check current CodeGG interfaces and write a bounded
-implementation plan before implementation. CodeGG parity must target the
-corrected subject-scope, strict-schema, verification-binding, and
-cross-platform contracts.
+Status: blocked on Evidence M002 closure.
 
-After the corrective gate, port representative CodeGG WorkPlan fixtures and semantics to Eggplan and
-define mapping adapters. No production CodeGG ownership change is required.
+Plan: plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md
+
+Current CodeGG interfaces were re-checked at
+6e18304546f29426457eb11410957288384fdec2. After Evidence M002 closes,
+port representative WorkPlan fixtures through a non-circular compatibility
+crate and define explicit identity/status/evidence mapping. No production
+CodeGG ownership change is required.
 
 ### M002 — Staged core adoption
 

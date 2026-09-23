@@ -36,22 +36,17 @@ This roadmap sequences product capability. It does not imply implementation.
         v
       M002 closure records + evidence integrity/recovery
         |
-        +--------------------+
-        |                    |
-        v                    v
-    Projection/CLI       CodeGG integration
-      M001 CLI/status      M001 golden parity/adapters
-      M002 Markdown        M002 staged CodeGG adoption
-      import/render          |
-        |                    |
-        +---------+----------+
-                  v
-          Eggstack integrations
-            M001 provider SPI
-            M002 Eggwork/Eggsearch
-            M003 Eggbench/CI/forge
-                  |
-                  v
+        +----------------------+----------------------+
+        |                      |                      |
+        v                      v                      v
+    Projection/CLI       CodeGG integration     Eggstack integrations
+      M001 CLI/status      M001 golden parity     M001 provider SPI
+      M002 Markdown        M002 staged adoption   M002 Eggwork/Eggsearch
+      import/render                               M003 Eggbench/CI/forge
+        |                      |                      |
+        +----------------------+----------------------+
+                               |
+                               v
           Interoperability/distribution
             M001 attestation export/verify
             M002 packaging/update

@@ -93,14 +93,15 @@ Historical M001 closure remains preserved.
 
 ### M002 — Closure records and integrity/recovery
 
-Ready for implementation planning after M001 C001 closure. Closure records
-must be built on corrected
-subject and verification-binding semantics and must not encode the known broad
-matching behavior as durable closure authority.
+Status: ready.
 
-After C001, add closure candidate snapshots, requirement-to-evidence matrices,
-corrupt observation detection, correction/supersession lineage, and repository
-reopen qualification.
+Plan: plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md
+
+Implement guarded ClosureCandidate/ClosureRecord semantics, exact
+requirement-to-evidence matrices, provider-policy snapshots, append-only
+evidence supersession lineage, corruption detection, and crash/reopen
+qualification. Ordinary Plan CAS must not be able to manufacture a Closed Plan
+without the guarded closure record.
 
 ### M003 — Policy extensions
 

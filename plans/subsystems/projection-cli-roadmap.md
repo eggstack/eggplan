@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: ready for planning
+Status: blocked
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -30,13 +30,14 @@ It does not own canonical domain semantics or execution.
 
 ### M001 — CLI control surface and derived registry
 
-Foundation M003 and Evidence M001 C001 are closed. The corrective dependency
-gate is cleared; write a bounded implementation plan before implementation.
-The CLI and its machine-readable JSON/projection contracts must bind to the
-corrected subject, strict parsing, and verification-matching behavior.
+Status: blocked on Evidence M002 closure.
 
-After the corrective gate, commands should cover init, new, show, status, ready, graph, check, evidence,
-and assess with JSON output and bounded diagnostics.
+Plan: plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md
+
+The plan is written now so its JSON/projection surfaces can target the final
+guarded-closure and supersession contracts. After Evidence M002 closes,
+implement init/new/show/status/ready/graph/check/evidence/assess/close and
+derived registry output with bounded machine JSON.
 
 ### M002 — Markdown import/render
 

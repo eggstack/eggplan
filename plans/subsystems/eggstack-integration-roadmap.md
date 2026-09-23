@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: ready for planning
+Status: blocked
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -50,16 +50,30 @@ do not require MCP.
 
 Role: eventual distribution/update integration, not evidence-core dependency.
 
+## 3.1 Reviewed baselines
+
+Re-checked for M001 planning on 2026-09-23:
+
+- Eggwork: c990ffa2864886c502c1d5581f0d732e26fe56ee
+- Eggsearch: 5db6e1984a1441787f6d6a54754eb4a685766ec2
+- Eggbench: 3b93979a7fd30a08f7e367ffc94f911ae5fb8bec
+- Eggsact: 576f4b0ac09238a42e5561c2da6da8ff4a47bce6
+
+These are research baselines, not dependency pins; re-check before provider
+adapter implementation.
+
 ## 4. Milestones
 
 ### M001 — Evidence provider SPI
 
-Evidence M001 C001 is closed. The corrective dependency gate is cleared;
-re-check sibling provider interfaces and write a bounded implementation plan
-before implementation. Provider adapters must emit the corrected
-verification-spec binding.
+Status: blocked on Evidence M002 closure.
 
-After the corrective gate, freeze adapter traits, capability/failure reporting, sync/async boundary, provider identity construction, and verification-binding handoff.
+Plan: plans/implementation/eggstack-integration/001-evidence-provider-spi.md
+
+Sibling execution/research/bundle interfaces were re-checked at the baselines
+above. After Evidence M002 closes, freeze a normalization-focused SPI,
+capability/failure reporting, host-controlled provider identity, sync/async
+boundary, artifact references, and verification-binding handoff.
 
 ### M002 — Eggwork and Eggsearch
 

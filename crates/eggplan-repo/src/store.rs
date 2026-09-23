@@ -560,7 +560,7 @@ fn is_lock_contention(error: &std::io::Error) -> bool {
         // LockFileEx reports ERROR_LOCK_VIOLATION (33) for a conflicting
         // exclusive range lock; std does not consistently map it to
         // WouldBlock across Rust/Windows versions.
-        return error.raw_os_error() == Some(33);
+        error.raw_os_error() == Some(33)
     }
     #[cfg(not(windows))]
     false

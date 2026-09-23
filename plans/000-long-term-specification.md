@@ -468,3 +468,26 @@ executor dependencies belong in adapters unless a later ADR demonstrates a
 core requirement.
 
 MSRV starts at Rust 1.89 to match current Eggstack distribution targets.
+
+
+## 22. External design basis reviewed at planning bootstrap
+
+These sources informed the initial architecture. They are research references,
+not permanent dependency pins:
+
+- OpenAI Codex ExecPlans / PLANS.md guidance:
+  https://github.com/openai/openai-cookbook/blob/main/articles/codex_exec_plans.md
+- SLSA v1.2 provenance:
+  https://slsa.dev/spec/v1.2/provenance
+- in-toto specifications and Attestation Framework:
+  https://in-toto.io/docs/specs/
+- GitHub artifact attestations:
+  https://docs.github.com/en/actions/concepts/security/artifact-attestations
+- CodeGG WorkPlan architecture at the reviewed baseline:
+  https://github.com/dbowm91/codegg/blob/2f7d84f88070eee2a4fb9f70b6d7d5d10b01048d/architecture/work_plan.md
+- Eggbench evidence bundle design:
+  https://github.com/eggstack/eggbench/blob/cbca21a8b3eb24ec8ecbf58febbc8c505c7c8613/docs/evidence-bundle.md
+
+The design deliberately borrows the useful separation between planned steps,
+observed execution, subject identity, provenance, and verification without
+claiming that Eggplan itself provides SLSA/in-toto authenticity guarantees.

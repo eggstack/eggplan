@@ -1,6 +1,6 @@
 # Evidence and Closure M001 — Evidence Ledger and Deterministic Assessment
 
-Status: active
+Status: closed
 
 Repository baseline: 79dcf41 (`plans: unblock evidence M001`), re-established
 after Foundation M002 conditional closure on 2026-09-23.

@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: blocked
+Status: ready
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -49,7 +49,8 @@ CodeGG-specific ownership to preserve:
 
 ### M001 — Golden parity and adapter seam
 
-Blocked on Foundation M002 plus Evidence M001.
+Ready for planning after Evidence M001 closure. Preserve the Foundation M002
+Windows/macOS qualification caveat; keep it out of CodeGG completion claims.
 
 Port representative CodeGG WorkPlan fixtures and semantics to Eggplan and
 define mapping adapters. No production CodeGG ownership change is required.

@@ -85,7 +85,8 @@ Core must remain usable without Git/repository persistence.
           v
     M003 hardening/property/migration guards
 
-M003 stays roadmap-level until M002 makes the concrete implementation visible.
+M003 is ready for planning now that M002 makes the concrete implementation
+visible. Prioritize Windows/macOS qualification and any corrections it requires.
 
 ## 7. Milestones
 
@@ -117,9 +118,10 @@ deterministically captured.
 
 Class: invariant / polish
 
-Roadmap-level. After M002, add property/fuzz tests, schema migration fixtures,
-static dependency guards, corruption/recovery cases, and any cross-platform
-filesystem corrections revealed by qualification.
+Ready for planning after M002 conditional closure. Add property/fuzz tests,
+schema migration fixtures, static dependency guards, corruption/recovery cases,
+and any cross-platform filesystem corrections revealed by qualification. The
+first plan should prioritize the outstanding Windows/macOS qualification.
 
 ## 8. Cross-cutting requirements
 

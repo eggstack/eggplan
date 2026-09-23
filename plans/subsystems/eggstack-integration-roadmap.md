@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: proposed
+Status: ready
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -54,7 +54,7 @@ Role: eventual distribution/update integration, not evidence-core dependency.
 
 ### M001 — Evidence provider SPI
 
-Proposed after Evidence M001. Freeze adapter traits, capability/failure
+Ready for planning after Evidence M001. Freeze adapter traits, capability/failure
 reporting, sync/async boundary, and provider identity construction.
 
 ### M002 — Eggwork and Eggsearch

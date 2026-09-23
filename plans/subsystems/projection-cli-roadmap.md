@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: blocked
+Status: ready
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -30,7 +30,7 @@ It does not own canonical domain semantics or execution.
 
 ### M001 — CLI control surface and derived registry
 
-Blocked on Evidence M001.
+Ready for planning after Evidence M001 closure.
 
 Commands should cover init, new, show, status, ready, graph, check, evidence,
 and assess with JSON output and bounded diagnostics.

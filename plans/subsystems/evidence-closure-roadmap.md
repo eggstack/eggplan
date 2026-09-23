@@ -1,6 +1,6 @@
 # Evidence and Closure Roadmap
 
-Status: ready
+Status: active
 
 Long-term references: plans/000-long-term-specification.md sections 8-12 and 17-20.
 
@@ -68,8 +68,8 @@ subject identity and repository persistence.
 
 ### M001 — Evidence ledger and assessment
 
-Status: ready after Foundation M002 conditional closure. Preserve the
-Windows/macOS qualification caveat from Foundation M002.
+Status: closed. Preserve the Windows/macOS qualification caveat from
+Foundation M002 in later work.
 
 Plan: plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md
 
@@ -78,7 +78,8 @@ criterion matching, exact-subject policy, pure assessment, and explanations.
 
 ### M002 — Closure records and integrity/recovery
 
-Roadmap-level after M001.
+Ready for planning after M001 closure. Preserve the M002 platform
+qualification caveat; closure records must not overclaim Windows/macOS.
 
 Add closure candidate snapshots, requirement-to-evidence matrices, corrupt
 observation detection, correction/supersession lineage, and repository reopen

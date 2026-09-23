@@ -48,6 +48,7 @@ pub enum SubjectState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SubjectRevision {
     pub subject_kind: String,
     pub repository_id: String,
@@ -58,6 +59,7 @@ pub struct SubjectRevision {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ArtifactRef {
     pub reference: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -80,6 +82,7 @@ pub enum EvidenceCardinality {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceRequirement {
     pub description: String,
     pub kind: EvidenceKind,
@@ -92,6 +95,7 @@ pub struct EvidenceRequirement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AcceptanceCriterion {
     pub id: CriterionId,
     pub statement: String,
@@ -100,6 +104,7 @@ pub struct AcceptanceCriterion {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PlanItem {
     pub id: PlanItemId,
     pub position: u32,
@@ -116,6 +121,7 @@ pub struct PlanItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Plan {
     pub schema_version: u32,
     pub id: PlanId,

@@ -70,4 +70,35 @@ mod tests {
         .unwrap();
         assert!(parse_plan(&bad).is_err());
     }
+
+    #[test]
+    fn nested_unknown_plan_fields_fail_closed() {
+        let base = plan();
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&canonical_json(&base).unwrap()).unwrap();
+        value["future"] = serde_json::json!(true);
+        assert!(parse_plan(&serde_json::to_vec(&value).unwrap()).is_err());
+
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&canonical_json(&base).unwrap()).unwrap();
+        value["items"][0]["future"] = serde_json::json!(true);
+        assert!(parse_plan(&serde_json::to_vec(&value).unwrap()).is_err());
+
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&canonical_json(&base).unwrap()).unwrap();
+        value["items"][0]["criteria"] = serde_json::json!([{
+            "id": "epc_criterion", "statement": "check", "human_judgment_allowed": false,
+            "requirements": [{
+                "description": "test", "kind": "test", "subject_policy": "exact",
+                "cardinality": "any", "min_count": 1, "allow_human_judgment": false,
+                "provider": "epp_test", "future": true
+            }], "future": true
+        }]);
+        assert!(parse_plan(&serde_json::to_vec(&value).unwrap()).is_err());
+
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&canonical_json(&base).unwrap()).unwrap();
+        value["subject"] = serde_json::json!({"subject_kind":"git","repository_id":"epr_test","revision":"abc","state":"clean","future":true});
+        assert!(parse_plan(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
 }

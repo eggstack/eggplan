@@ -20,6 +20,11 @@ Optional `None` values are omitted where annotated. Digests are lowercase
 `crates/eggplan-core/tests/fixtures/` freeze the initial Plan byte sequence and
 digest; pretty JSON is not part of that contract.
 
+All semantic v1 structs reject unknown fields during deserialization,
+including nested criteria, requirements, subjects, and artifact references.
+Valid v1 serialization remains byte-for-byte stable; unknown fields are not a
+supported extension mechanism.
+
 ## Bounds
 
 Text bounds count Unicode scalar values and reject empty strings and NUL:

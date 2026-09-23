@@ -396,6 +396,42 @@ fn git_subject_clean_staged_untracked_and_dirty_fingerprints() {
 }
 
 #[test]
+fn repository_managed_state_does_not_perturb_subject() {
+    let dir = tempdir().unwrap();
+    let repo = init_git_repo(dir.path());
+    let state = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&state).unwrap();
+    let a = store.subject_source().capture().unwrap();
+    store.create(&plan()).unwrap();
+    store
+        .append_observation(
+            &PlanId::new("ep_store").unwrap(),
+            &observation("bound", EvidenceStatus::Passed),
+        )
+        .unwrap();
+    let b = store.subject_source().capture().unwrap();
+    assert_eq!(a, b);
+
+    fs::write(dir.path().join("tracked.txt"), b"changed source\n").unwrap();
+    let c = store.subject_source().capture().unwrap();
+    assert_ne!(b, c);
+    drop(repo);
+}
+
+#[test]
+fn repository_reopen_rejects_unknown_nested_plan_fields() {
+    let dir = tempdir().unwrap();
+    let store = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    let p = plan();
+    store.create(&p).unwrap();
+    let path = store.root().join("plans/ep_store/plan.json");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    value["plan"]["items"][0]["future"] = serde_json::json!("unsupported");
+    fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(matches!(store.get(&p.id), Err(RepoError::Corrupt { .. })));
+}
+
+#[test]
 fn git_subject_non_git_path_is_explicit() {
     let dir = tempdir().unwrap();
     assert!(

@@ -1,6 +1,6 @@
 # Foundation Core M003 — Subject Scope, Strict Schema, and Platform Hardening
 
-Status: ready for handoff
+Status: active
 
 Repository baseline: c1fa03b697d68a53eb8d11648e67946f66fe3875
 

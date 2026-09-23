@@ -45,8 +45,9 @@ contents are synced before replacement; Unix directory entries receive a
 best-effort portable `sync_all`. Windows does not expose a portable directory
 sync through this implementation, and macOS `sync_all` is not a claim of
 hardware-level `F_FULLFSYNC`. Network filesystems may weaken advisory locking
-or rename guarantees. M002 runtime qualification was executed on Linux only;
-Windows/macOS runtime checks remain outstanding.
+or rename guarantees. Foundation M003 adds native Linux, macOS, and Windows
+workflow qualification. Each closure record must cite actual hosted run IDs
+and preserve any platform-specific failures.
 
 ## Git SubjectRevision
 
@@ -63,3 +64,12 @@ incomplete fingerprint. Non-Unicode paths also fail explicitly.
 Dirty fingerprints are integrity identifiers, not redacted storage: the
 fingerprint includes content in its hash calculation, but content is never
 persisted in diagnostics or the subject object.
+
+When created by `RepositoryStore`, the subject source explicitly excludes that
+store's managed root and descendants from the worktree dirty manifest. The
+exclusion is applied to normalized Git status paths, independent of `.gitignore`
+and whether those paths are tracked, staged, ignored, or untracked. A sibling
+whose name merely shares a string prefix remains in scope. Submodule manifests
+are evaluated independently. If the configured state path is outside the
+discovered worktree, no exclusion is applied. The HEAD OID remains part of the
+schema-v1 subject, so committing administrative state still changes identity.

@@ -181,7 +181,7 @@ impl RepositoryStore {
         &self.repository_id
     }
     pub fn subject_source(&self) -> GitSubjectSource {
-        GitSubjectSource::new(&self.root, &self.repository_id)
+        GitSubjectSource::new(&self.root, &self.repository_id).excluding_path(&self.root)
     }
 
     pub fn abandoned_staging_files(&self) -> Result<Vec<PathBuf>, RepoError> {

@@ -48,6 +48,7 @@ pub struct GitSubjectSource {
     root: PathBuf,
     repository_id: String,
     options: GitSubjectOptions,
+    excluded_root: Option<PathBuf>,
 }
 
 impl GitSubjectSource {
@@ -56,10 +57,18 @@ impl GitSubjectSource {
             root: root.as_ref().to_path_buf(),
             repository_id: repository_id.into(),
             options: GitSubjectOptions::default(),
+            excluded_root: None,
         }
     }
     pub fn with_options(mut self, options: GitSubjectOptions) -> Self {
         self.options = options;
+        self
+    }
+
+    /// Exclude one administrative directory, and all descendants, from the
+    /// dirty worktree identity. The path must be lexically inside the worktree.
+    pub fn excluding_path(mut self, path: impl AsRef<Path>) -> Self {
+        self.excluded_root = Some(path.as_ref().to_path_buf());
         self
     }
 
@@ -72,7 +81,18 @@ impl GitSubjectSource {
             bytes: 0,
             options: &self.options,
         };
-        let manifest = dirty_manifest(&repo, &mut budget, 0)?;
+        let exclusion = match (&self.excluded_root, repo.workdir()) {
+            (Some(path), Some(workdir)) => {
+                let absolute = if path.is_absolute() {
+                    path.clone()
+                } else {
+                    std::env::current_dir()?.join(path)
+                };
+                absolute.strip_prefix(workdir).ok().map(Path::to_path_buf)
+            }
+            _ => None,
+        };
+        let manifest = dirty_manifest(&repo, &mut budget, 0, exclusion.as_deref())?;
         let dirty = !manifest.is_empty();
         let digest = dirty.then(|| format!("sha256:{:x}", Sha256::digest(&manifest)));
         let subject = SubjectRevision {
@@ -121,6 +141,7 @@ fn dirty_manifest(
     repo: &Repository,
     budget: &mut Budget<'_>,
     depth: usize,
+    excluded_root: Option<&Path>,
 ) -> Result<Vec<u8>, GitSubjectError> {
     if depth > budget.options.max_submodule_depth {
         return Err(GitSubjectError::BoundExceeded);
@@ -139,6 +160,12 @@ fn dirty_manifest(
             continue;
         }
         let path = entry.path().ok_or(GitSubjectError::NonUnicodePath)?;
+        let relative = Path::new(path);
+        if excluded_root
+            .is_some_and(|excluded| relative == excluded || relative.starts_with(excluded))
+        {
+            continue;
+        }
         budget.add_path()?;
         let workdir = repo
             .workdir()
@@ -179,7 +206,7 @@ fn dirty_manifest(
                         .ok_or(GitSubjectError::Unborn)?
                         .to_string();
                     field(&mut row, subhead.as_bytes());
-                    let nested = dirty_manifest(&subrepo, budget, depth + 1)?;
+                    let nested = dirty_manifest(&subrepo, budget, depth + 1, None)?;
                     field(&mut row, &nested);
                 }
             }

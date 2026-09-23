@@ -45,6 +45,31 @@ item transitions. Closed and completed states are terminal. Readiness is a
 stable position-then-ID ordering and is only a derived statement about
 dependencies; it grants no execution authority.
 
+## Evidence schema v1
+
+Evidence observations have typed `epe_` IDs, provider IDs, a closed evidence
+kind/status vocabulary, exact SubjectRevision, Unix-millisecond observation
+time, bounded optional invocation/result metadata, and bounded artifact refs.
+An observation is finalized by hashing compact canonical JSON for its content
+fields; the `content_digest` field itself is excluded from that digest.
+`evidence-v1-digests.json` freezes status and evidence-kind digest fixtures.
+
+Finalized observation fields are private and have read-only accessors. A
+provider ID in an observation is not authority: pure assessment receives an
+explicit host-constructed `ProviderRegistry`. Only registered descriptors may
+contribute, and each descriptor constrains allowed evidence kinds. This is an
+adapter/host trust boundary, not cryptographic authentication; a digest proves
+recorded content integrity only.
+
+Assessment is a pure function of Plan, current subject, observations, and the
+trusted-provider registry. Exact subject equality is required. It explains
+missing, stale, failed, in-progress, blocked, unavailable/not-run/skipped,
+inconclusive, invalid attribution, and human-judgment cases with closed reason
+codes. Fixed precedence is invalid/stale, failed, blocked, in-flight,
+missing/unavailable, awaiting human judgment, inconclusive, actionable work,
+then complete. Completed item labels without acceptance criteria and passing
+evidence remain incomplete.
+
 ## Verification
 
 Run `scripts/check-core-boundary.sh` and the workspace fmt, check, clippy, and

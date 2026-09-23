@@ -1,5 +1,8 @@
 use crate::GitSubjectSource;
-use eggplan_core::{Plan, PlanId, ValidationError, digest_json};
+use eggplan_core::{
+    EvidenceError, EvidenceObservation, EvidenceObservationId, Plan, PlanId, ValidationError,
+    digest_json,
+};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -15,6 +18,9 @@ use uuid::Uuid;
 
 const CONFIG_VERSION: u32 = 1;
 const PLAN_FILE: &str = "plan.json";
+const EVIDENCE_DIR: &str = "evidence";
+const MAX_PLAN_FILE_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_OBSERVATION_FILE_BYTES: u64 = 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct StoreOptions {
@@ -76,6 +82,14 @@ pub enum RepoError {
     UnsafePath(PathBuf),
     #[error("unknown or corrupt canonical plan at {path}: {reason}")]
     Corrupt { path: PathBuf, reason: String },
+    #[error("evidence observation validation failed: {0}")]
+    Evidence(#[from] EvidenceError),
+    #[error("observation {0} already exists with different content")]
+    ObservationConflict(EvidenceObservationId),
+    #[error("observation {0} does not exist")]
+    ObservationNotFound(EvidenceObservationId),
+    #[error("observation count limit for this plan has been reached")]
+    ObservationLimit,
 }
 
 pub trait PlanStore {
@@ -88,6 +102,17 @@ pub trait PlanStore {
         expected_revision: u64,
         next: &Plan,
     ) -> Result<Plan, RepoError>;
+    fn append_observation(
+        &self,
+        plan_id: &PlanId,
+        observation: &EvidenceObservation,
+    ) -> Result<(), RepoError>;
+    fn get_observation(
+        &self,
+        plan_id: &PlanId,
+        observation_id: &EvidenceObservationId,
+    ) -> Result<EvidenceObservation, RepoError>;
+    fn list_observations(&self, plan_id: &PlanId) -> Result<Vec<EvidenceObservation>, RepoError>;
 }
 
 #[derive(Debug, Clone)]
@@ -189,6 +214,17 @@ impl RepositoryStore {
     fn plan_path(&self, id: &PlanId) -> PathBuf {
         self.plan_dir(id).join(PLAN_FILE)
     }
+    fn evidence_dir(&self, id: &PlanId) -> PathBuf {
+        self.plan_dir(id).join(EVIDENCE_DIR)
+    }
+    fn observation_path(
+        &self,
+        plan_id: &PlanId,
+        observation_id: &EvidenceObservationId,
+    ) -> PathBuf {
+        self.evidence_dir(plan_id)
+            .join(format!("{observation_id}.json"))
+    }
 
     fn lock(&self) -> Result<LockGuard, RepoError> {
         acquire_lock(&self.root, self.options.lock_timeout)
@@ -212,6 +248,12 @@ impl RepositoryStore {
         })?;
         if metadata.file_type().is_symlink() || !metadata.is_file() {
             return Err(RepoError::UnsafePath(path));
+        }
+        if metadata.len() > MAX_PLAN_FILE_BYTES {
+            return Err(RepoError::Corrupt {
+                path,
+                reason: "plan file exceeds 16 MiB storage limit".into(),
+            });
         }
         let bytes = fs::read(&path)?;
         let stored: StoredPlan =
@@ -265,6 +307,12 @@ impl PlanStore for RepositoryStore {
         }
         ensure_dir(&dir)?;
         let bytes = encode_plan(plan)?;
+        if bytes.len() as u64 > MAX_PLAN_FILE_BYTES {
+            let _ = fs::remove_dir(&dir);
+            return Err(RepoError::Config(
+                "plan exceeds 16 MiB storage limit".into(),
+            ));
+        }
         if let Err(error) = atomic_write(&self.plan_path(&plan.id), &bytes) {
             if !matches!(error, RepoError::DurabilityUnknown(_)) {
                 let _ = fs::remove_dir(&dir);
@@ -339,8 +387,132 @@ impl PlanStore for RepositoryStore {
             }
         }
         let bytes = encode_plan(next)?;
+        if bytes.len() as u64 > MAX_PLAN_FILE_BYTES {
+            return Err(RepoError::Config(
+                "plan exceeds 16 MiB storage limit".into(),
+            ));
+        }
         atomic_write(&self.plan_path(id), &bytes)?;
         self.load_unlocked(id)
+    }
+
+    fn append_observation(
+        &self,
+        plan_id: &PlanId,
+        observation: &EvidenceObservation,
+    ) -> Result<(), RepoError> {
+        observation.validate()?;
+        let _guard = self.lock()?;
+        self.load_unlocked(plan_id)?;
+        let dir = self.evidence_dir(plan_id);
+        ensure_dir(&dir)?;
+        if self.list_observations(plan_id)?.len() >= eggplan_core::bounds::MAX_OBSERVATIONS_PER_PLAN
+        {
+            return Err(RepoError::ObservationLimit);
+        }
+        let path = self.observation_path(plan_id, observation.id());
+        match fs::symlink_metadata(&path) {
+            Ok(meta) if meta.file_type().is_symlink() || !meta.is_file() => {
+                return Err(RepoError::UnsafePath(path));
+            }
+            Ok(_) => {
+                let existing = load_observation(&path)?;
+                let incoming_bytes = observation.canonical_json()?;
+                let existing_bytes = existing.canonical_json()?;
+                return if incoming_bytes == existing_bytes {
+                    Ok(())
+                } else {
+                    Err(RepoError::ObservationConflict(observation.id().clone()))
+                };
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(RepoError::Io(error)),
+        }
+        let bytes = observation.canonical_json()?;
+        atomic_write(&path, &bytes)?;
+        let stored = load_observation(&path)?;
+        if stored != *observation {
+            return Err(RepoError::ObservationConflict(observation.id().clone()));
+        }
+        Ok(())
+    }
+
+    fn get_observation(
+        &self,
+        plan_id: &PlanId,
+        observation_id: &EvidenceObservationId,
+    ) -> Result<EvidenceObservation, RepoError> {
+        self.load_unlocked(plan_id)?;
+        let ledger = self.evidence_dir(plan_id);
+        match fs::symlink_metadata(&ledger) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(RepoError::ObservationNotFound(observation_id.clone()));
+            }
+            Err(error) => return Err(RepoError::Io(error)),
+            Ok(meta) if meta.file_type().is_symlink() || !meta.is_dir() => {
+                return Err(RepoError::UnsafePath(ledger));
+            }
+            Ok(_) => {}
+        }
+        let path = self.observation_path(plan_id, observation_id);
+        let meta = fs::symlink_metadata(&path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                RepoError::ObservationNotFound(observation_id.clone())
+            } else {
+                RepoError::Io(error)
+            }
+        })?;
+        if meta.file_type().is_symlink() || !meta.is_file() {
+            return Err(RepoError::UnsafePath(path));
+        }
+        load_observation(&path)
+    }
+
+    fn list_observations(&self, plan_id: &PlanId) -> Result<Vec<EvidenceObservation>, RepoError> {
+        self.load_unlocked(plan_id)?;
+        let dir = self.evidence_dir(plan_id);
+        match fs::symlink_metadata(&dir) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(RepoError::Io(error)),
+            Ok(meta) if meta.file_type().is_symlink() || !meta.is_dir() => {
+                return Err(RepoError::UnsafePath(dir));
+            }
+            Ok(_) => {}
+        }
+        let mut observations = Vec::new();
+        for entry in fs::read_dir(&dir)? {
+            let entry = entry?;
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| RepoError::Config("non-Unicode observation filename".into()))?;
+            if name.starts_with(".tmp-") {
+                continue;
+            }
+            if !name.ends_with(".json") {
+                return Err(RepoError::Config(format!(
+                    "unexpected evidence ledger entry {name}"
+                )));
+            }
+            let file_type = entry.file_type()?;
+            if file_type.is_symlink() || !file_type.is_file() {
+                return Err(RepoError::UnsafePath(entry.path()));
+            }
+            let observation = load_observation(&entry.path())?;
+            let expected = format!("{}.json", observation.id());
+            if name != expected {
+                return Err(RepoError::Corrupt {
+                    path: entry.path(),
+                    reason: "observation ID differs from ledger filename".into(),
+                });
+            }
+            if observations.len() >= eggplan_core::bounds::MAX_OBSERVATIONS_PER_PLAN {
+                return Err(RepoError::ObservationLimit);
+            }
+            observations.push(observation);
+        }
+        observations.sort_by(|a, b| a.id().cmp(b.id()));
+        Ok(observations)
     }
 }
 
@@ -386,6 +558,24 @@ fn encode_plan(plan: &Plan) -> Result<Vec<u8>, RepoError> {
         plan: plan.clone(),
     };
     Ok(serde_json::to_vec(&stored)?)
+}
+
+fn load_observation(path: &Path) -> Result<EvidenceObservation, RepoError> {
+    let meta = fs::symlink_metadata(path)?;
+    if meta.file_type().is_symlink() || !meta.is_file() {
+        return Err(RepoError::UnsafePath(path.to_path_buf()));
+    }
+    if meta.len() > MAX_OBSERVATION_FILE_BYTES {
+        return Err(RepoError::Corrupt {
+            path: path.to_path_buf(),
+            reason: "observation file exceeds 1 MiB storage limit".into(),
+        });
+    }
+    let bytes = fs::read(path)?;
+    EvidenceObservation::parse(&bytes).map_err(|error| RepoError::Corrupt {
+        path: path.to_path_buf(),
+        reason: error.to_string(),
+    })
 }
 
 fn ensure_dir(path: &Path) -> Result<(), RepoError> {

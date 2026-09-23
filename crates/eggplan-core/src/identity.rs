@@ -93,6 +93,7 @@ define_id!(PlanId, "ep_");
 define_id!(PlanItemId, "epi_");
 define_id!(CriterionId, "epc_");
 define_id!(EvidenceProviderId, "epp_");
+define_id!(EvidenceObservationId, "epe_");
 
 #[cfg(test)]
 mod tests {

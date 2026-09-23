@@ -29,7 +29,9 @@ future provider adapters, and assesses closure from structured state. It does
 not schedule or execute work.
 
 The initial Rust workspace contains `eggplan-core`, a dependency-light domain
-library and `eggplan-repo`, the local Plan store and Git subject adapter. See
+library with immutable evidence and deterministic assessment, plus
+`eggplan-repo`, the local Plan store, append-only evidence ledger, and Git
+subject adapter. See
 [core architecture](architecture/core.md),
 [repository architecture](architecture/repository.md), and the planning
 registry in `plans/registry.md`.

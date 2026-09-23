@@ -14,7 +14,7 @@ pub enum PlanStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanItemStatus {
     Pending,
@@ -25,7 +25,7 @@ pub enum PlanItemStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceKind {
     Command,
@@ -40,7 +40,7 @@ pub enum EvidenceKind {
     Attestation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubjectState {
     Clean,
@@ -199,6 +199,11 @@ impl AcceptanceCriterion {
         let mut kinds = BTreeSet::new();
         for req in &self.requirements {
             req.validate()?;
+            if req.kind == EvidenceKind::HumanJudgment && !self.human_judgment_allowed {
+                return Err(ValidationError::Invalid(
+                    "criterion must explicitly allow human judgment",
+                ));
+            }
             // Do not collapse semantically different constraints; exact duplicates are noise.
             let key = serde_json::to_string(req).expect("serializable requirement");
             if !kinds.insert(key) {

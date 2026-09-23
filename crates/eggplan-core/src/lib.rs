@@ -5,12 +5,23 @@
 //! This crate has no filesystem, process, network, database, scheduler, or
 //! model-runtime responsibilities.
 
+mod assessment;
+mod evidence;
 mod graph;
 mod identity;
 mod model;
 mod schema;
 
+pub use assessment::{
+    AssessmentReason, AssessmentStatus, CriterionAssessment, ItemAssessment, PlanAssessment,
+    RequirementAssessment, assess_plan,
+};
+pub use evidence::{
+    EVIDENCE_SCHEMA_VERSION, EvidenceError, EvidenceObservation, EvidenceObservationInput,
+    EvidenceStatus, ProviderDescriptor, ProviderRegistry,
+};
 pub use graph::{GraphError, ItemReadiness, Readiness, readiness};
+pub use identity::EvidenceObservationId;
 pub use identity::{CriterionId, EvidenceProviderId, PlanId, PlanItemId, TypedId};
 pub use model::*;
 pub use schema::{SCHEMA_VERSION, canonical_json, digest_json, parse_plan};
@@ -34,4 +45,8 @@ pub mod bounds {
     pub const MAX_ARTIFACT_REFS: usize = 64;
     pub const MAX_EXTENSION_ENTRIES: usize = 32;
     pub const MAX_EXTENSION_VALUE_CHARS: usize = 2_000;
+    pub const INVOCATION_REF_CHARS: usize = 2_000;
+    pub const MAX_OBSERVATION_METADATA: usize = 32;
+    pub const OBSERVATION_METADATA_VALUE_CHARS: usize = 2_000;
+    pub const MAX_OBSERVATIONS_PER_PLAN: usize = 10_000;
 }

@@ -26,6 +26,15 @@ behavior is verified. Windows/macOS runtime and cross-target evidence remain
 outstanding; this milestone must preserve the documented durability limits and
 must not claim those platforms qualified.
 
+CodeGG interface re-check at handoff (2026-09-23): the available sibling
+checkout is `28b46956` (`codegg-core` WorkPlan architecture/evidence/assessment
+model). Its assessment consumes a bounded host-owned snapshot, treats missing
+refs as unavailable, does not treat owner/run/job provenance alone as
+satisfaction, and keeps explicit user judgment distinct from host evidence.
+Its WorkPlan has host-specific owner and scheduler concepts that remain outside
+Eggplan. These semantics inform the fixture matrix only; no CodeGG dependency or
+runtime ownership is introduced.
+
 ## 1. Objective
 
 Implement immutable EvidenceObservation domain/persistence plus deterministic,

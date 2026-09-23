@@ -1,4 +1,8 @@
-use eggplan_core::{Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus};
+use eggplan_core::{
+    EvidenceKind, EvidenceObservation, EvidenceObservationId, EvidenceObservationInput,
+    EvidenceProviderId, EvidenceStatus, Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus,
+    PlanStatus, SubjectRevision, SubjectState,
+};
 use eggplan_repo::{
     GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore, StoreOptions,
 };
@@ -35,6 +39,27 @@ fn next(mut plan: Plan, objective: &str) -> Plan {
     plan.revision += 1;
     plan.objective = objective.into();
     plan
+}
+
+fn observation(id: &str, status: EvidenceStatus) -> EvidenceObservation {
+    EvidenceObservation::finalize(EvidenceObservationInput {
+        id: EvidenceObservationId::new(format!("epe_{id}")).unwrap(),
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        kind: EvidenceKind::Test,
+        status,
+        subject: SubjectRevision {
+            subject_kind: "git".into(),
+            repository_id: "epr_test".into(),
+            revision: "abc123".into(),
+            state: SubjectState::Clean,
+            dirty_digest: None,
+        },
+        observed_at_unix_ms: 1_700_000_000_000,
+        invocation_ref: Some("cargo test".into()),
+        result_metadata: Default::default(),
+        artifacts: vec![],
+    })
+    .unwrap()
 }
 
 #[test]
@@ -267,6 +292,58 @@ fn unknown_or_corrupt_plan_is_rejected_on_reopen() {
     assert!(matches!(store.get(&p.id), Err(RepoError::Corrupt { .. })));
     fs::write(&stored_path, b"{\"storage_version\":99}").unwrap();
     assert!(matches!(store.get(&p.id), Err(RepoError::Corrupt { .. })));
+}
+
+#[test]
+fn observation_ledger_is_append_only_idempotent_and_reopens() {
+    let dir = tempdir().unwrap();
+    let state = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&state).unwrap();
+    let p = plan();
+    store.create(&p).unwrap();
+    let passed = observation("one", EvidenceStatus::Passed);
+    store.append_observation(&p.id, &passed).unwrap();
+    store.append_observation(&p.id, &passed).unwrap();
+    assert_eq!(store.get_observation(&p.id, passed.id()).unwrap(), passed);
+    assert_eq!(
+        store.list_observations(&p.id).unwrap(),
+        vec![passed.clone()]
+    );
+    assert!(matches!(
+        store.append_observation(&p.id, &observation("one", EvidenceStatus::Failed)),
+        Err(RepoError::ObservationConflict(_))
+    ));
+
+    let reopened = RepositoryStore::open(&state).unwrap();
+    assert_eq!(
+        reopened.list_observations(&p.id).unwrap(),
+        vec![passed.clone()]
+    );
+    let path = state.join("plans/ep_store/evidence/epe_one.json");
+    let json = fs::read_to_string(&path).unwrap();
+    fs::write(&path, json.replace("cargo test", "cargo build")).unwrap();
+    assert!(matches!(
+        reopened.get_observation(&p.id, passed.id()),
+        Err(RepoError::Corrupt { .. })
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn symlinked_observation_ledger_is_rejected() {
+    use std::os::unix::fs::symlink;
+    let dir = tempdir().unwrap();
+    let outside = tempdir().unwrap();
+    let state = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&state).unwrap();
+    let p = plan();
+    store.create(&p).unwrap();
+    symlink(outside.path(), state.join("plans/ep_store/evidence")).unwrap();
+    assert!(matches!(
+        store.append_observation(&p.id, &observation("one", EvidenceStatus::Passed)),
+        Err(RepoError::UnsafePath(_))
+    ));
+    assert!(fs::read_dir(outside.path()).unwrap().next().is_none());
 }
 
 fn init_git_repo(root: &std::path::Path) -> Repository {

@@ -8,7 +8,8 @@
   .lock                          # cooperative process lock
   plans/<plan-id>/
     plan.json                    # canonical versioned envelope and current Plan
-    evidence/                     # reserved for Evidence M001
+    evidence/
+      <observation-id>.json      # immutable finalized observations
     closure.json                 # reserved for later closure milestone
 ```
 
@@ -20,6 +21,15 @@ requires exactly the current revision and a candidate revision one greater.
 Stale calls return a typed conflict. The store checks the persisted revision
 while holding its short-lived lock; the revision remains the explicit CAS
 token callers must reload after conflicts.
+
+Evidence observations are append-only. Replaying the same ID and identical
+canonical bytes is idempotent; the same ID with different content conflicts.
+Reads validate schema and digest before returning. Ledger files are sorted by
+typed ID when listed; `.tmp-*` staging remnants never enter that list.
+Assessment remains pure in `eggplan-core` and does not resolve remote
+providers. The store accepts at most 10,000 observations per plan, with a
+1 MiB encoded-file limit per observation and a 16 MiB encoded-file limit per
+Plan.
 
 The store validates each managed path component with `symlink_metadata`,
 rejects symlinked roots/directories/plan files, uses PlanId's restricted

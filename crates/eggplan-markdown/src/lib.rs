@@ -1174,6 +1174,36 @@ mod tests {
     }
 
     #[test]
+    fn codegg_report_has_exact_warning_codes_and_marks_text_truncation() {
+        let long_description = "x".repeat(bounds::DESCRIPTION_CHARS + 1);
+        let source = format!(
+            "# Example\nStatus: implemented\nRepository baseline: abc123\n\n## 1. Objective\n\nBounded import.\n\n## 2. Ordered work packages\n\n### Work package A — Review\n\n{long_description}\n\n## 3. Acceptance criteria\n\n- Review remains intent only.\n\n## 4. Scope\n\nNot imported.\n"
+        );
+        let imported = import(source.as_bytes(), ImportFormat::Codegg, Some("loss.md")).unwrap();
+        assert_eq!(
+            imported.report.warning_codes,
+            vec![
+                "generated_item_id",
+                "markdown_closure_not_imported",
+                "markdown_evidence_not_imported",
+                "source_lifecycle_not_authoritative",
+                "source_revision_provenance_only",
+                "text_truncated",
+                "unmapped_section",
+            ]
+        );
+        assert_eq!(
+            imported.report.lossy_mappings,
+            vec!["ordered_sections_not_dependency_edges"]
+        );
+        assert!(imported.report.truncated);
+        assert_eq!(
+            imported.plan.items[0].description.chars().count(),
+            bounds::DESCRIPTION_CHARS
+        );
+    }
+
+    #[test]
     fn codegg_explicit_dependency_maps_and_bad_reference_fails() {
         let source = "# Example\n## 1. Objective\n\nDo it.\n## 2. Ordered work packages\n### Work package A — First\nDo first.\n### Work package B — Second\nDependencies: A\nDo second.\n";
         let imported = import(source.as_bytes(), ImportFormat::Codegg, Some("x.md")).unwrap();

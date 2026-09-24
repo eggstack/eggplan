@@ -466,7 +466,7 @@ Record:
   `5f4532659dbf0df2cd9f2b3bdb024217d2ea7868` and cover ordinary, corrective,
   and unmapped-section documents.
 - Local Linux verification passed: formatting, workspace check, clippy,
-  117 workspace tests, 3 doc compile-fail tests, Rust 1.89 check/tests, core,
+  118 workspace tests, 3 doc compile-fail tests, Rust 1.89 check/tests, core,
   projection/CLI and closure-authority boundary guards, and `git diff --check`.
 - Hosted native/MSRV qualification is pending the implementation push and
   will be recorded in the closure record.

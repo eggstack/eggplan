@@ -618,21 +618,37 @@ fn guarded_closure_persists_integrity_and_reopens() {
     active.revision = 3;
     active.items[0].status = PlanItemStatus::Completed;
     let active = store.compare_and_swap(&active.id, 2, &active).unwrap();
-    let mut evidence = observation("close_pass", EvidenceStatus::Passed);
-    evidence = EvidenceObservation::finalize(EvidenceObservationInput {
-        id: evidence.id().clone(),
-        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
-        kind: EvidenceKind::Test,
-        status: EvidenceStatus::Passed,
-        subject: subject.clone(),
-        observed_at_unix_ms: 10,
-        invocation_ref: Some("test suite".into()),
-        verification_digest: Some(binding),
-        result_metadata: Default::default(),
-        artifacts: vec![],
-    })
-    .unwrap();
+    let make_close_observation = |id: &str, status| {
+        EvidenceObservation::finalize(EvidenceObservationInput {
+            id: EvidenceObservationId::new(format!("epe_{id}")).unwrap(),
+            provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+            kind: EvidenceKind::Test,
+            status,
+            subject: subject.clone(),
+            observed_at_unix_ms: 10,
+            invocation_ref: Some("test suite".into()),
+            verification_digest: Some(binding.clone()),
+            result_metadata: Default::default(),
+            artifacts: vec![],
+        })
+        .unwrap()
+    };
+    let old = make_close_observation("close_old", EvidenceStatus::Failed);
+    let evidence = make_close_observation("close_pass", EvidenceStatus::Passed);
+    store.append_observation(&active.id, &old).unwrap();
     store.append_observation(&active.id, &evidence).unwrap();
+    let supersession = eggplan_core::EvidenceSupersessionRecord::new(
+        eggplan_core::EvidenceSupersessionId::new("eps_close").unwrap(),
+        active.id.clone(),
+        old.id().clone(),
+        evidence.id().clone(),
+        "replace failed observation".into(),
+        11,
+    )
+    .unwrap();
+    store
+        .append_supersession(&active.id, &supersession)
+        .unwrap();
     let policy = vec![ProviderPolicyEntry {
         provider_id: EvidenceProviderId::new("epp_test").unwrap(),
         class: "host".into(),
@@ -649,14 +665,21 @@ fn guarded_closure_persists_integrity_and_reopens() {
             .unwrap(),
         )
         .unwrap();
-    let assessment = assess_plan(&active, &subject, &[evidence], &providers);
+    let observations = store.list_observations(&active.id).unwrap();
+    let supersessions = store.list_supersessions(&active.id).unwrap();
+    let effective: Vec<_> = eggplan_core::effective_observations(&observations, &supersessions)
+        .unwrap()
+        .into_iter()
+        .cloned()
+        .collect();
+    let assessment = assess_plan(&active, &subject, &effective, &providers);
     assert_eq!(assessment.status, AssessmentStatus::Complete);
     let candidate = ClosureCandidate::build(
         &active,
         subject.clone(),
         assessment,
-        &store.list_observations(&active.id).unwrap(),
-        &[],
+        &observations,
+        &supersessions,
         policy,
         11,
     )
@@ -692,6 +715,11 @@ fn guarded_closure_persists_integrity_and_reopens() {
         )
         .unwrap();
     assert_eq!(closed.status, PlanStatus::Closed);
+    assert_eq!(store.get_observation(&active.id, old.id()).unwrap(), old);
+    assert_eq!(
+        store.get_observation(&active.id, evidence.id()).unwrap(),
+        evidence
+    );
     assert_eq!(store.get(&active.id).unwrap(), closed);
     record.validate(&closed).unwrap();
     fs::rename(root.join("plans/ep_store/closure.json"), &pending_path).unwrap();

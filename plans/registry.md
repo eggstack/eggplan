@@ -71,7 +71,7 @@ Planning-system bootstrap:
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | historical closure plans/closure/evidence-closure/002-closed.md |
 | Evidence | M002 C001 finalization subject revalidation | closed | plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md | historical closure plans/closure/evidence-closure/002-c001-closed.md |
 | Evidence | M002 C002 finalization test-seam containment + closure evidence reconciliation | closed | plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md | closure plans/closure/evidence-closure/002-c002-closed.md; preserves M002/C001 historical closures |
-| Evidence | M002 C003 closure reference + authority-guard hygiene | ready | plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md | non-blocking maintenance; may execute in parallel with capability wave |
+| Evidence | M002 C003 closure reference + authority-guard hygiene | closing | plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md | non-blocking maintenance; local verification passed; hosted workflow pending |
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | ready | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | handoff authorized |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
@@ -98,7 +98,7 @@ Recorded hosted evidence remains:
   - Windows 107650129154
   - Rust 1.89 107650129645
 
-One non-blocking maintenance handoff is registered:
+One non-blocking maintenance correction is closing:
 
 - Evidence M002 C003 — correct the C002 implementation-SHA citation and
   strengthen the static closure-authority guard/negative proof.

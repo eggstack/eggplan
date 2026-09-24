@@ -546,7 +546,7 @@ consumers bind to it.
 
 Status: closed.
 
-Implementation commit: `0c0484afe5be83ed92e6e4a4fdbcf6af6dbf6f3c`.
+Implementation commit: `0c0484a18d72f58a1face6f5e749630dfa0c182d`.
 
 Closure record: plans/closure/evidence-closure/002-c002-closed.md.
 

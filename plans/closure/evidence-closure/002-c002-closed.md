@@ -55,7 +55,7 @@ was rewritten.
 ## Contained symbols and supported finalization API inventory
 
 Symbols removed from the public `eggplan-repo` surface in commit
-`0c0484afe5be83ed92e6e4a4fdbcf6af6dbf6f3c`:
+`0c0484a18d72f58a1face6f5e749630dfa0c182d`:
 
 - `pub use eggplan_repo::SubjectCapture` (was `#[doc(hidden)] pub`);
 - `pub use eggplan_repo::GitSubjectCapture` (was `#[doc(hidden)] pub`);
@@ -215,7 +215,7 @@ that Eggplan never declared as a stable contract.
 ## Verification executed
 
 Local Linux commands passed at the implementation commit
-`0c0484afe5be83ed92e6e4a4fdbcf6af6dbf6f3c`:
+`0c0484a18d72f58a1face6f5e749630dfa0c182d`:
 
 ```text
 cargo fmt --all -- --check
@@ -314,6 +314,14 @@ Interop / distribution remains deferred.
   implementation plan and a fresh sibling-interface recheck before
   handoff.
 - Registered corrective gate: removed.
+
+### Factual erratum (2026-09-24)
+
+The original C002 implementation SHA cited above was copied incorrectly. The
+correct implementation commit is
+`0c0484a18d72f58a1face6f5e749630dfa0c182d`, matching hosted run
+36004813178. This repairs the citation only; the original closure status,
+findings, hosted job evidence, and acceptance conclusions are unchanged.
 
 ## Plan follow-through summary
 

@@ -1,6 +1,6 @@
 # Evidence and Closure M002 C003 — Closure Reference and Authority-Guard Hygiene
 
-Status: ready for handoff
+Status: closing
 
 Repository baseline: 0904218554c425c30aa6501b58d7fb8bcb839414
 
@@ -200,3 +200,18 @@ C003 closes when:
 
 Do not gate or absorb the three next capability milestones into this pass.
 This is maintenance only.
+
+## 11. Implementation follow-through
+
+- The incorrect C002 implementation SHA was corrected in the active C002 plan
+  and closure record. The closure record retains a dated factual erratum.
+- The closure-authority guard now checks direct/grouped public re-exports,
+  public authority declarations, and all public `finalize_closure_with_*`
+  methods. Each invocation runs deterministic positive and negative synthetic
+  proofs, including crate-private safe forms.
+- No production API or persisted schema changed.
+- Local Linux verification passed: formatting, workspace check, clippy,
+  workspace tests (100 tests), doc tests (3 compile-fail doctests), Rust 1.89
+  check/tests, guard self-proofs, and `git diff --check`.
+- Hosted native/MSRV workflow is triggered by the implementation push and will
+  be recorded in the closure record when available.

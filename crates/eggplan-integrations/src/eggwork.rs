@@ -102,7 +102,7 @@ pub struct ExecutionResult {
     #[serde(default)]
     pub resources: Option<ResourceResult>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArtifactRecord {
     pub artifact_id: String,
@@ -483,5 +483,53 @@ mod tests {
                 assert_eq!(observation.status(), EvidenceStatus::Inconclusive);
             }
         }
+    }
+
+    #[test]
+    fn resource_sandbox_and_duplicate_artifact_outcomes_are_explicit() {
+        let value = serde_json::json!({
+            "schema_version":1,"execution_id":"exe-test","generation":1,"state":"Succeeded",
+            "result":{"state":"Succeeded","exit_code":0,"failure":null,"stdout_bytes":0,"stderr_bytes":0,"stdout_omitted":0,"stderr_omitted":0,"cleanup_warning":null,"finalization_failure":null,"artifact_count":0,
+                "sandbox":{"status":"failed","reason":"private detail"},
+                "resources":{"memory_bytes":"NotRequested","cpu_millis":"NotRequested","pids":"NotRequested"}}
+        });
+        let failed = parse_snapshot(&serde_json::to_vec(&value).unwrap()).unwrap();
+        let observation = normalize(&failed, &[], &context()).unwrap();
+        assert_eq!(observation.status(), EvidenceStatus::Failed);
+        assert_eq!(
+            observation
+                .result_metadata()
+                .get("sandbox_outcome")
+                .map(String::as_str),
+            Some("failed")
+        );
+        assert!(
+            !serde_json::to_string(&observation)
+                .unwrap()
+                .contains("private detail")
+        );
+
+        let input = parse_snapshot(&snapshot("Succeeded", true)).unwrap();
+        let artifact = ArtifactRecord {
+            artifact_id: "art1".into(),
+            execution_id: "exe-test".into(),
+            generation: 1,
+            path: "out/a".into(),
+            kind: "File".into(),
+            digest: "b".repeat(64),
+            size_bytes: 3,
+            executable: false,
+            created_unix_ms: 1,
+            expires_unix_ms: 2,
+        };
+        let mut wrong_generation = artifact.clone();
+        wrong_generation.generation = 2;
+        assert!(normalize(&input, &[wrong_generation], &context()).is_err());
+        let mut input = input;
+        input.result.as_mut().unwrap().artifact_count = 2;
+        assert!(normalize(&input, &[artifact.clone(), artifact], &context()).is_err());
+        let mut unknown = value;
+        unknown["result"]["sandbox"]["status"] = serde_json::json!("future_status");
+        assert!(parse_snapshot(&serde_json::to_vec(&unknown).unwrap()).is_err());
     }
 }

@@ -6,7 +6,12 @@ Source plan: plans/implementation/evidence-closure/002-closure-records-integrity
 
 Source roadmap: plans/subsystems/evidence-closure-roadmap.md
 
-Implementation commit: 24661afe799b745f83ba11a5149af724587b50fe
+Implementation commits:
+
+- 24661afe799b745f83ba11a5149af724587b50fe — guarded closure domain,
+  repository protocol, and integrity verification.
+- 818274ac2998f54717fd3fea6003355e6d95834e — supersession and recovery
+  regression coverage.
 
 ## Executive finding
 
@@ -45,7 +50,8 @@ and Plan digests.
 
 ## Verification executed
 
-Local Linux commands on implementation revision `24661afe799b745f83ba11a5149af724587b50fe`:
+Local Linux commands on implementation revision
+`818274ac2998f54717fd3fea6003355e6d95834e`:
 
 | Command | Result |
 |---|---|
@@ -57,14 +63,14 @@ Local Linux commands on implementation revision `24661afe799b745f83ba11a5149af72
 | `cargo +1.89.0 check --workspace --all-targets --locked` | pass |
 | `cargo +1.89.0 test --workspace --locked` | pass |
 
-Hosted native and MSRV workflow:
+Hosted native and MSRV workflow for the final implementation revision:
 
-- Run: https://github.com/eggstack/eggplan/actions/runs/35953186805
-- Linux job: 107485899223 — pass (format, check, clippy, tests, boundary).
-- macOS job: 107485899119 — pass (check, clippy, tests, boundary).
-- Windows job: 107485899172 — pass (check, clippy, tests; platform-gated steps
+- Run: https://github.com/eggstack/eggplan/actions/runs/35953454768
+- Linux job: 107486683992 — pass (format, check, clippy, tests, boundary).
+- macOS job: 107486683929 — pass (check, clippy, tests, boundary).
+- Windows job: 107486683983 — pass (check, clippy, tests; platform-gated steps
   skipped as specified by workflow).
-- Rust 1.89 job: 107485899004 — pass (check and tests).
+- Rust 1.89 job: 107486683853 — pass (check and tests).
 
 ## Invariants and residual findings
 

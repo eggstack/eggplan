@@ -1,6 +1,6 @@
 # Evidence and Closure Roadmap
 
-Status: active
+Status: closed/current
 
 Long-term references: plans/000-long-term-specification.md sections 8-12 and 17-20.
 
@@ -93,15 +93,15 @@ Historical M001 closure remains preserved.
 
 ### M002 — Closure records and integrity/recovery
 
-Status: ready.
+Status: closed.
 
 Plan: plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md
 
-Implement guarded ClosureCandidate/ClosureRecord semantics, exact
+Implemented guarded ClosureCandidate/ClosureRecord semantics, exact
 requirement-to-evidence matrices, provider-policy snapshots, append-only
 evidence supersession lineage, corruption detection, and crash/reopen
-qualification. Ordinary Plan CAS must not be able to manufacture a Closed Plan
-without the guarded closure record.
+qualification. Ordinary Plan CAS cannot manufacture a Closed Plan without the
+guarded closure record. See plans/closure/evidence-closure/002-closed.md.
 
 ### M003 — Policy extensions
 

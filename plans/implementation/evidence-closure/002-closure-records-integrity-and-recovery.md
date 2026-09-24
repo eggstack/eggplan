@@ -1,6 +1,6 @@
 # Evidence and Closure M002 — Guarded Closure Records, Supersession, and Recovery
 
-Status: active
+Status: closed
 
 Repository baseline: 6b924957fdc37e4266a410803186801db5655e82
 
@@ -383,4 +383,5 @@ The closure record for this development milestone must include:
 
 This milestone is the final prerequisite before the first CLI, CodeGG parity,
 and provider-SPI implementation wave. Do not merge those surfaces into this
-plan.
+plan. See plans/closure/evidence-closure/002-closed.md for the evidence and
+the dependent-plan baseline refresh.

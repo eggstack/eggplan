@@ -53,7 +53,7 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | active | M001/C001 closed; M002 guarded closure/integrity implementation in progress | plans/subsystems/evidence-closure-roadmap.md |
+| Evidence/closure | closed/current | M001/C001 and M002 guarded closure/integrity closed | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | blocked | M001 plan registered; waits on Evidence M002 closure | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 plan registered against current CodeGG baseline; waits on Evidence M002 closure | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | blocked | Provider SPI M001 plan registered against refreshed sibling baselines; waits on Evidence M002 closure | plans/subsystems/eggstack-integration-roadmap.md |
@@ -68,7 +68,7 @@ Planning-system bootstrap:
 | Foundation | M003 subject scope + strict schema + platform hardening | closed | plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md | closure plans/closure/foundation-core/003-closed.md |
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
 | Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
-| Evidence | M002 guarded closure records + supersession + recovery | active | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | implementation in progress |
+| Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | closure plans/closure/evidence-closure/002-closed.md |
 | Projection/CLI | M001 CLI control surface + derived registry | blocked | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | waits on Evidence M002 closure |
 | CodeGG integration | M001 golden parity + adapter seam | blocked | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | waits on Evidence M002 closure; reviewed CodeGG 6e183045 |
 | Eggstack integrations | M001 evidence provider SPI | blocked | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | waits on Evidence M002 closure |
@@ -78,10 +78,11 @@ Planning-system bootstrap:
 The corrective gate is closed. The next implementation wave is intentionally
 sequenced around durable closure authority:
 
-1. Evidence M002 is ready now.
+1. Evidence M002 is closed; see plans/closure/evidence-closure/002-closed.md.
 2. Projection/CLI M001, CodeGG Integration M001, and Eggstack Provider SPI M001
-   are fully planned but remain blocked until Evidence M002 closes.
-3. After Evidence M002 closure, those three M001 handoffs may proceed
+   are fully planned; refresh their repository and sibling baselines before
+   marking them ready.
+3. After baseline refresh, those three M001 handoffs may proceed
    independently because they consume the same stable closure/evidence
    contracts and do not own one another's runtime responsibilities.
 
@@ -92,14 +93,14 @@ Eggstack M002, or interoperability/distribution.
 
 1. Foundation M001/M002/M003 — closed/current foundation.
 2. Evidence M001 + C001 — closed; v2 verification binding is current.
-3. Execute Evidence M002:
+3. Execute and close Evidence M002:
    - append-only evidence supersession lineage;
    - pure ClosureCandidate;
    - immutable ClosureRecord;
    - provider-policy snapshot;
    - raw CAS-to-Closed prohibition;
    - crash-consistent pending/final closure recovery.
-4. Close Evidence M002 with native CI/recovery evidence.
+4. Refresh dependent-plan baselines against the closure commit.
 5. Then independently execute:
    - Projection/CLI M001 — versioned machine/human control surface;
    - CodeGG Integration M001 — golden parity and non-circular adapter seam;

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "source_repository": "codegg",
+  "source_sha": "28b4695661d463dd1675d045ac6299c5fbc9ea31",
+  "source_case": "tests/long_horizon_trajectory_qualification.rs: dependency gating and no hidden reasoning",
+  "snapshot": {
+    "plan_id": "wp_trajectory",
+    "revision": 12,
+    "status": "blocked",
+    "objective": "Qualify the next bounded phase",
+    "current_phase": "qualification",
+    "current_item_id": "wi_gate",
+    "items": [
+      {"item_id":"wi_done","position":0,"parent_item_id":null,"dependencies":[],"status":"completed","description":"Prepare versioned artifacts","acceptance":[{"description":"Artifact is host indexed","disposition":"satisfied","note":null}],"evidence":[{"kind":"artifact","ref_id":"artifact-fixture-1","detail":null}],"owner_run_id":null,"owner_job_id":null,"blocker":null,"next_action":null},
+      {"item_id":"wi_gate","position":1,"parent_item_id":null,"dependencies":["wi_done"],"status":"blocked","description":"Wait for explicit qualification","acceptance":[{"description":"Human review is recorded","disposition":"requires_user_judgment","note":"reviewer must decide"}],"evidence":[],"owner_run_id":null,"owner_job_id":null,"blocker":"awaiting a reviewer","next_action":"request human review"}
+    ]
+  }
+}

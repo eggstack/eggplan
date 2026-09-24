@@ -50,7 +50,7 @@ CodeGG-specific ownership to preserve:
 
 ### M001 — Golden parity and adapter seam
 
-Status: ready.
+Status: active.
 
 Plan: plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md
 

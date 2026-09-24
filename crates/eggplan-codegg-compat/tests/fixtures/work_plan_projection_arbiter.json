@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "source_repository": "codegg",
+  "source_sha": "28b4695661d463dd1675d045ac6299c5fbc9ea31",
+  "source_case": "crates/codegg-core/tests/work_plan_projection_arbiter.rs: bounded current/actionable projection",
+  "snapshot": {
+    "plan_id": "wp_projection",
+    "revision": 3,
+    "status": "active",
+    "objective": "Inspect bounded actionable ordering",
+    "current_phase": "implementation",
+    "current_item_id": "wi_second",
+    "items": [
+      {"item_id":"wi_first","position":0,"parent_item_id":null,"dependencies":[],"status":"actionable","description":"First actionable","acceptance":[],"evidence":[],"owner_run_id":null,"owner_job_id":null,"blocker":null,"next_action":"start first"},
+      {"item_id":"wi_second","position":1,"parent_item_id":null,"dependencies":[],"status":"in_progress","description":"Current in-flight item","acceptance":[],"evidence":[],"owner_run_id":"run-fixture","owner_job_id":null,"blocker":null,"next_action":"reload host result"},
+      {"item_id":"wi_done","position":2,"parent_item_id":null,"dependencies":[],"status":"completed","description":"Completed history is not in default page","acceptance":[],"evidence":[],"owner_run_id":null,"owner_job_id":null,"blocker":null,"next_action":null}
+    ]
+  }
+}

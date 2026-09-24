@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/eggplan-core", "crates/eggplan-repo"]
+members = [
+    "crates/eggplan-core",
+    "crates/eggplan-repo",
+    "crates/eggplan-codegg-compat",
+]
 
 [workspace.package]
 edition = "2024"

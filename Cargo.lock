@@ -82,6 +82,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "eggplan-codegg-compat"
+version = "0.1.0"
+dependencies = [
+ "eggplan-core",
+ "eggplan-repo",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "eggplan-core"
 version = "0.1.0"
 dependencies = [

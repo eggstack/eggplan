@@ -1,10 +1,12 @@
 # Projection and CLI M001 — Control Surface and Derived Registry
 
-Status: active
+Status: closed
 
 Repository baseline: dac415e4e52ba2d3ba8af03c1541a7d5f6e59d76
 
-Implementation commit: cb3a8eb4bceefe7bc5a13fb66b3d638077573cdd (cross-platform snapshot correction in progress)
+Implementation commits: cb3a8eb4bceefe7bc5a13fb66b3d638077573cdd, 26da4449e5f54c64fa6266ce44a22b20df96f2b9
+
+Closure record: plans/closure/projection-cli/001-closed.md
 
 Source roadmap:
 

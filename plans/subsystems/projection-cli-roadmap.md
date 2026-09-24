@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: active
+Status: active/current
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -30,13 +30,13 @@ It does not own canonical domain semantics or execution.
 
 ### M001 — CLI control surface and derived registry
 
-Status: active (cross-platform qualification correction in progress).
+Status: closed.
 
 Plan: plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md
 
 Bounded projections, native CLI, guarded closure, explicit provider policy,
-deep integrity checks, and derived registry output are implemented. Hosted
-Windows snapshot normalization correction and requalification are in progress.
+deep integrity checks, and derived registry output are closed. Evidence:
+plans/closure/projection-cli/001-closed.md.
 
 ### M002 — Markdown import/render
 

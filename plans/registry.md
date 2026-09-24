@@ -54,7 +54,7 @@ Planning-system bootstrap:
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M001/C001 and M002 guarded closure/integrity closed | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | active | M001 CLI control surface and derived registry is undergoing cross-platform qualification correction | plans/subsystems/projection-cli-roadmap.md |
+| Projection/CLI | active/current | M001 CLI control surface and derived registry closed; M002 ready for planning | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001 golden parity and adapter seam closed | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 evidence provider SPI closed; M002 ready for planning, M003 blocked on M002 | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
@@ -69,7 +69,7 @@ Planning-system bootstrap:
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
 | Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | closure plans/closure/evidence-closure/002-closed.md |
-| Projection/CLI | M001 CLI control surface + derived registry | active | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | Evidence M002 and Eggstack M001 closed; implementation cb3a8eb4; Windows snapshot correction in progress |
+| Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 
@@ -88,9 +88,9 @@ sequenced around durable closure authority:
 5. These plans own independent runtime surfaces; execute them in the requested
    order without folding one plan's responsibilities into another.
 
-Projection/CLI M002 has no registered implementation plan and remains gated on
-formal M001 closure. No implementation plan is yet registered for CodeGG M002,
-Eggstack M002, or interoperability/distribution.
+Projection/CLI M002 is ready for planning but has no registered implementation
+plan yet. No implementation plan is yet registered for CodeGG M002, Eggstack
+M002, or interoperability/distribution.
 
 ## Current execution order
 
@@ -101,8 +101,8 @@ Eggstack M002, or interoperability/distribution.
    raw-CAS-to-Closed prohibition, and crash-consistent pending/final recovery.
 4. CodeGG Integration M001 is closed — golden parity and non-circular adapter seam.
 5. Eggstack Provider SPI M001 is closed — normalization/trust boundary only.
-6. Finish Projection/CLI M001 native cross-platform qualification.
-7. Plan Projection/CLI M002 — Markdown import/render, after M001 closure.
+6. Projection/CLI M001 is closed — versioned machine/human control surface.
+7. Plan Projection/CLI M002 — Markdown import/render; handoff is unblocked.
 8. Stabilize CodeGG parity before staged CodeGG ownership migration.
 9. Implement real Eggwork/Eggsearch providers only after Provider SPI closure.
 10. Add attestation/service/distribution work after local contracts are

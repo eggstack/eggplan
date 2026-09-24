@@ -73,23 +73,25 @@ adapter implementation.
 
 ### M001 — Evidence provider SPI
 
-Status: closing.
+Status: closed.
 
 Plan: plans/implementation/eggstack-integration/001-evidence-provider-spi.md
 
 Sibling execution/research/bundle interfaces were re-checked at the execution
-baselines above. Freeze a normalization-focused SPI,
-capability/failure reporting, host-controlled provider identity, sync/async
-boundary, artifact references, and verification-binding handoff.
+baselines above. The normalization-focused SPI, capability/failure reporting,
+host-controlled provider identity, artifact references, and
+verification-binding handoff are qualified in
+plans/closure/eggstack-integration/001-closed.md.
 
 ### M002 — Eggwork and Eggsearch
 
-After M001. Two contrasting providers qualify execution and research trust
-semantics.
+Ready for planning after M001. Two contrasting providers qualify execution
+and research trust semantics. Recheck sibling interfaces at handoff.
 
 ### M003 — Eggbench plus CI/forge
 
-After M002. Add bundle, CI, commit, and artifact evidence and forge adapters.
+Blocked on positive M002. Add bundle, CI, commit, and artifact evidence and
+forge adapters.
 
 ## 5. Verification
 

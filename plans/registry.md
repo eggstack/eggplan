@@ -54,7 +54,7 @@ Planning-system bootstrap:
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M001/C001 and M002 guarded closure/integrity closed | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | active | M001 ready against Evidence M002 closure d669b48 | plans/subsystems/projection-cli-roadmap.md |
+| Projection/CLI | active | M001 CLI control surface and derived registry in progress against Evidence M002 and Eggstack M001 closures | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001 golden parity and adapter seam closed | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 evidence provider SPI closed; M002 ready for planning, M003 blocked on M002 | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
@@ -69,7 +69,7 @@ Planning-system bootstrap:
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
 | Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | closure plans/closure/evidence-closure/002-closed.md |
-| Projection/CLI | M001 CLI control surface + derived registry | ready | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | Evidence M002 closed at d669b48 |
+| Projection/CLI | M001 CLI control surface + derived registry | active | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | Evidence M002 closed; Eggstack M001 closed; repo baseline dac415e4 |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 
@@ -83,7 +83,8 @@ sequenced around durable closure authority:
    plans/closure/codegg-integration/001-closed.md.
 3. Eggstack Provider SPI M001 is closed against its re-checked execution-time
    sibling baselines; M002 is ready for a future planning handoff.
-4. Projection/CLI M001 is ready against the Evidence M002 closure commit.
+4. Execute Projection/CLI M001 against the Evidence M002 and Eggstack M001
+   closure commits.
 5. These plans own independent runtime surfaces; execute them in the requested
    order without folding one plan's responsibilities into another.
 

@@ -94,6 +94,31 @@ fn create_load_list_cas_and_reopen() {
 }
 
 #[test]
+fn read_only_open_reports_pending_closure_without_recovering_or_mutating() {
+    let dir = tempdir().unwrap();
+    let state = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&state).unwrap();
+    let initial = plan();
+    store.create(&initial).unwrap();
+    let pending_path = state
+        .join("plans")
+        .join(initial.id.as_str())
+        .join("closure.pending.json");
+    fs::write(&pending_path, b"pending marker").unwrap();
+
+    let read_only = RepositoryStore::open_read_only(&state).unwrap();
+    assert_eq!(
+        read_only.pending_closures().unwrap(),
+        vec![initial.id.clone()]
+    );
+    assert!(matches!(
+        read_only.get(&initial.id),
+        Err(RepoError::RecoveryRequired(id)) if id == initial.id
+    ));
+    assert_eq!(fs::read(&pending_path).unwrap(), b"pending marker");
+}
+
+#[test]
 fn competing_same_revision_writers_have_exactly_one_winner() {
     let dir = tempdir().unwrap();
     let store = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();

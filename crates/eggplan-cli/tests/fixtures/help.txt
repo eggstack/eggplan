@@ -1,0 +1,2 @@
+eggplan [--state-root PATH] [--json] COMMAND
+Commands: init, new --input PLAN.json, show PLAN_ID, status [PLAN_ID], ready PLAN_ID, graph PLAN_ID, check [PLAN_ID] [--recover-pending], activate PLAN_ID --expected-revision N, item update PLAN_ID ITEM_ID --expected-revision N (--status STATUS | --blocker TEXT | --next-action TEXT), evidence list|show|supersessions, assess PLAN_ID --provider-policy FILE, close PLAN_ID --expected-revision N --provider-policy FILE, closure show PLAN_ID, registry render

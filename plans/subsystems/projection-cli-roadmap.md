@@ -30,7 +30,7 @@ It does not own canonical domain semantics or execution.
 
 ### M001 — CLI control surface and derived registry
 
-Status: ready.
+Status: active.
 
 Plan: plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md
 

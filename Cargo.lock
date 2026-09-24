@@ -82,6 +82,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "eggplan-cli"
+version = "0.1.0"
+dependencies = [
+ "eggplan-core",
+ "eggplan-projection",
+ "eggplan-repo",
+ "git2",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "eggplan-codegg-compat"
 version = "0.1.0"
 dependencies = [
@@ -112,6 +125,15 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+]
+
+[[package]]
+name = "eggplan-projection"
+version = "0.1.0"
+dependencies = [
+ "eggplan-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

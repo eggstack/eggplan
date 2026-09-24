@@ -1,0 +1,10 @@
+{
+  "command": "status",
+  "data": {
+    "status": "active"
+  },
+  "error": null,
+  "ok": true,
+  "schema_version": 1,
+  "warnings": []
+}

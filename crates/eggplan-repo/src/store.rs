@@ -87,6 +87,8 @@ pub enum RepoError {
     UnsafePath(PathBuf),
     #[error("unknown or corrupt canonical plan at {path}: {reason}")]
     Corrupt { path: PathBuf, reason: String },
+    #[error("invalid canonical Plan at {path}: {reason}")]
+    InvalidPlan { path: PathBuf, reason: String },
     #[error("evidence observation validation failed: {0}")]
     Evidence(#[from] EvidenceError),
     #[error("observation {0} already exists with different content")]
@@ -130,6 +132,99 @@ pub struct RepositoryStore {
 }
 
 impl RepositoryStore {
+    /// Open an existing repository without creating files, recovering pending
+    /// closures, or otherwise mutating state. Intended for inspection/check
+    /// commands that must report recovery requirements to the operator.
+    pub fn open_read_only(root: impl AsRef<Path>) -> Result<Self, RepoError> {
+        let root = root.as_ref().to_path_buf();
+        check_dir(&root)?;
+        check_dir(&root.join("plans"))?;
+        let config_path = root.join("config.toml");
+        let metadata = fs::symlink_metadata(&config_path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                RepoError::Config("repository is not initialized".into())
+            } else {
+                RepoError::Io(error)
+            }
+        })?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(RepoError::UnsafePath(config_path));
+        }
+        let mut input = String::new();
+        File::open(&config_path)?.read_to_string(&mut input)?;
+        let config: RepositoryConfig =
+            toml::from_str(&input).map_err(|error| RepoError::Config(error.to_string()))?;
+        validate_repository_config(&config)?;
+        Ok(Self {
+            root,
+            options: StoreOptions::default(),
+            repository_id: config.repository_id,
+        })
+    }
+
+    /// List pending closure transactions without attempting recovery.
+    pub fn pending_closures(&self) -> Result<Vec<PlanId>, RepoError> {
+        check_dir(&self.root)?;
+        let plans_dir = self.root.join("plans");
+        check_dir(&plans_dir)?;
+        let mut pending = Vec::new();
+        for entry in fs::read_dir(&plans_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_symlink() {
+                return Err(RepoError::UnsafePath(entry.path()));
+            }
+            if !entry.file_type()?.is_dir() {
+                continue;
+            }
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| RepoError::Config("non-Unicode plan directory name".into()))?;
+            let id = PlanId::new(name).map_err(|error| RepoError::Config(error.to_string()))?;
+            let path = entry.path().join("closure.pending.json");
+            match fs::symlink_metadata(&path) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(RepoError::Io(error)),
+                Ok(meta) if meta.file_type().is_symlink() || !meta.is_file() => {
+                    return Err(RepoError::UnsafePath(path));
+                }
+                Ok(_) => pending.push(id),
+            }
+        }
+        pending.sort();
+        Ok(pending)
+    }
+
+    /// Return the immutable closure record after the same deep validation
+    /// performed when loading a closed Plan.
+    pub fn closure_record(&self, id: &PlanId) -> Result<Option<ClosureRecord>, RepoError> {
+        let plan = self.get(id)?;
+        if plan.status != PlanStatus::Closed {
+            return Ok(None);
+        }
+        let path = self.plan_dir(id).join("closure.json");
+        let metadata = fs::symlink_metadata(&path)?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(RepoError::UnsafePath(path));
+        }
+        if metadata.len() > 8 * 1024 * 1024 {
+            return Err(RepoError::Corrupt {
+                path,
+                reason: "closure record exceeds size limit".into(),
+            });
+        }
+        let bytes = fs::read(&path)?;
+        let record: ClosureRecord =
+            serde_json::from_slice(&bytes).map_err(|error| RepoError::Corrupt {
+                path: path.clone(),
+                reason: error.to_string(),
+            })?;
+        record
+            .validate(&plan)
+            .map_err(|reason| RepoError::Corrupt { path, reason })?;
+        Ok(Some(record))
+    }
+
     fn recover_pending_closures(&self) -> Result<(), RepoError> {
         let _guard = self.lock()?;
         let root = self.root.join("plans");
@@ -419,18 +514,7 @@ impl RepositoryStore {
             File::open(&config_path)?.read_to_string(&mut input)?;
             let config: RepositoryConfig =
                 toml::from_str(&input).map_err(|e| RepoError::Config(e.to_string()))?;
-            if config.schema_version != CONFIG_VERSION
-                || !config.repository_id.starts_with("epr_")
-                || config.repository_id.len() == 4
-                || config.repository_id.len() > eggplan_core::bounds::ID_CHARS
-                || !config.repository_id[4..]
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-            {
-                return Err(RepoError::Config(
-                    "unknown schema version or empty repository_id".into(),
-                ));
-            }
+            validate_repository_config(&config)?;
             config
         } else {
             let config = RepositoryConfig {
@@ -549,7 +633,7 @@ impl RepositoryStore {
             });
         }
         let plan = stored.plan;
-        plan.validate().map_err(|e| RepoError::Corrupt {
+        plan.validate().map_err(|e| RepoError::InvalidPlan {
             path: path.clone(),
             reason: e.to_string(),
         })?;
@@ -955,6 +1039,22 @@ fn acquire_lock(root: &Path, timeout: Duration) -> Result<LockGuard, RepoError> 
             Err(error) => return Err(RepoError::Io(error)),
         }
     }
+}
+
+fn validate_repository_config(config: &RepositoryConfig) -> Result<(), RepoError> {
+    if config.schema_version != CONFIG_VERSION
+        || !config.repository_id.starts_with("epr_")
+        || config.repository_id.len() == 4
+        || config.repository_id.len() > eggplan_core::bounds::ID_CHARS
+        || !config.repository_id[4..]
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+    {
+        return Err(RepoError::Config(
+            "unknown schema version or empty repository_id".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn is_lock_contention(error: &std::io::Error) -> bool {

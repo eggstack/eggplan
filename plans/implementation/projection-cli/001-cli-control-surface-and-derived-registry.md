@@ -1,8 +1,8 @@
 # Projection and CLI M001 — Control Surface and Derived Registry
 
-Status: ready
+Status: active
 
-Repository baseline: d669b4825d5132e22769ab15afa8f967f84a3123
+Repository baseline: dac415e4e52ba2d3ba8af03c1541a7d5f6e59d76
 
 Source roadmap:
 

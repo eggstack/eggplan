@@ -1,8 +1,8 @@
 # Eggstack Integrations M001 — Evidence Provider SPI
 
-Status: ready
+Status: active
 
-Eggplan repository baseline: d669b4825d5132e22769ab15afa8f967f84a3123
+Eggplan repository baseline: 068b748c4bd5028a27319b9deb201bf2372b795e
 
 Initial planning sibling baselines (historical):
 

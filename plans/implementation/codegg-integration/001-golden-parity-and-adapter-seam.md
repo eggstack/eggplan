@@ -1,8 +1,12 @@
 # CodeGG Integration M001 — Golden Parity and Adapter Seam
 
-Status: active
+Status: closed
 
 Eggplan repository baseline: 62fb29d65ed76d9cbbf6a354a96d393a0303f37f
+
+Implementation commit: 068b748c4bd5028a27319b9deb201bf2372b795e
+
+Closure record: plans/closure/codegg-integration/001-closed.md
 
 Initial reviewed CodeGG baseline: 6e18304546f29426457eb11410957288384fdec2
 

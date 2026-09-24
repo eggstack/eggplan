@@ -73,7 +73,7 @@ adapter implementation.
 
 ### M001 — Evidence provider SPI
 
-Status: ready.
+Status: active.
 
 Plan: plans/implementation/eggstack-integration/001-evidence-provider-spi.md
 

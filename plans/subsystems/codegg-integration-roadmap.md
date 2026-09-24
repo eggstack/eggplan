@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: active
+Status: closed/current
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -50,21 +50,20 @@ CodeGG-specific ownership to preserve:
 
 ### M001 — Golden parity and adapter seam
 
-Status: active.
+Status: closed.
 
 Plan: plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md
 
 Current CodeGG interfaces were re-checked at
 28b4695661d463dd1675d045ac6299c5fbc9ea31. The WorkPlan model, assessment,
 projection, evidence snapshot, and CAS store remain available; later checkpoint
-and context-epoch surfaces remain CodeGG-owned. Port representative WorkPlan
-fixtures through a non-circular compatibility crate and define explicit
-identity/status/evidence mapping. No production CodeGG ownership change is
-required.
+and context-epoch surfaces remain CodeGG-owned. M001 qualification is recorded
+in plans/closure/codegg-integration/001-closed.md. No production CodeGG
+ownership change was required.
 
 ### M002 — Staged core adoption
 
-Blocked on positive M001.
+Ready after positive M001; no M002 implementation plan is registered yet.
 
 Make CodeGG consume Eggplan generic domain/assessment where it reduces
 duplication. Keep CodeGG storage and runtime policy adapters.

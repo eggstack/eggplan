@@ -1,13 +1,14 @@
 # CodeGG Integration Roadmap
 
-Status: blocked
+Status: active
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
 Related ADR: ADR-0004.
 
-Reviewed CodeGG baseline:
-6e18304546f29426457eb11410957288384fdec2.
+Initial reviewed CodeGG baseline: 6e18304546f29426457eb11410957288384fdec2.
+Execution-time baseline re-checked 2026-09-24:
+28b4695661d463dd1675d045ac6299c5fbc9ea31.
 
 ## 1. Purpose
 
@@ -49,15 +50,17 @@ CodeGG-specific ownership to preserve:
 
 ### M001 — Golden parity and adapter seam
 
-Status: blocked on Evidence M002 closure.
+Status: ready.
 
 Plan: plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md
 
 Current CodeGG interfaces were re-checked at
-6e18304546f29426457eb11410957288384fdec2. After Evidence M002 closes,
-port representative WorkPlan fixtures through a non-circular compatibility
-crate and define explicit identity/status/evidence mapping. No production
-CodeGG ownership change is required.
+28b4695661d463dd1675d045ac6299c5fbc9ea31. The WorkPlan model, assessment,
+projection, evidence snapshot, and CAS store remain available; later checkpoint
+and context-epoch surfaces remain CodeGG-owned. Port representative WorkPlan
+fixtures through a non-circular compatibility crate and define explicit
+identity/status/evidence mapping. No production CodeGG ownership change is
+required.
 
 ### M002 — Staged core adoption
 

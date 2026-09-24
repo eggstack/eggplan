@@ -1,12 +1,13 @@
 # CodeGG Integration M001 — Golden Parity and Adapter Seam
 
-Status: blocked on Evidence and Closure M002 closure
+Status: ready
 
-Eggplan repository baseline: 6b924957fdc37e4266a410803186801db5655e82;
-rebase to the Evidence M002 closure commit before execution.
+Eggplan repository baseline: d669b4825d5132e22769ab15afa8f967f84a3123
 
-Reviewed CodeGG baseline:
-6e18304546f29426457eb11410957288384fdec2
+Initial reviewed CodeGG baseline: 6e18304546f29426457eb11410957288384fdec2
+
+Execution-time CodeGG baseline, re-checked 2026-09-24:
+28b4695661d463dd1675d045ac6299c5fbc9ea31
 
 Source roadmap:
 

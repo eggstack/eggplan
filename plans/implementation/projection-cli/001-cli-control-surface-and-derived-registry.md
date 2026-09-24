@@ -1,9 +1,8 @@
 # Projection and CLI M001 — Control Surface and Derived Registry
 
-Status: blocked on Evidence and Closure M002 closure
+Status: ready
 
-Repository baseline: 6b924957fdc37e4266a410803186801db5655e82; rebase to the
-Evidence M002 closure commit before execution.
+Repository baseline: d669b4825d5132e22769ab15afa8f967f84a3123
 
 Source roadmap:
 
@@ -43,7 +42,7 @@ Markdown import/render remains M002 of this subsystem.
 
 ## 2. Dependency gate
 
-Do not implement this plan before Evidence M002 closes.
+Evidence M002 is closed at the recorded repository baseline.
 
 The CLI must expose the guarded closure contract, immutable ClosureRecord,
 supersession lineage, and deep integrity checks rather than inventing a

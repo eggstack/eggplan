@@ -1,16 +1,22 @@
 # Eggstack Integrations M001 — Evidence Provider SPI
 
-Status: blocked on Evidence and Closure M002 closure
+Status: ready
 
-Eggplan repository baseline: 6b924957fdc37e4266a410803186801db5655e82;
-rebase to the Evidence M002 closure commit before execution.
+Eggplan repository baseline: d669b4825d5132e22769ab15afa8f967f84a3123
 
-Reviewed sibling baselines:
+Initial planning sibling baselines (historical):
 
 - Eggwork: c990ffa2864886c502c1d5581f0d732e26fe56ee
 - Eggsearch: 5db6e1984a1441787f6d6a54754eb4a685766ec2
 - Eggbench: 3b93979a7fd30a08f7e367ffc94f911ae5fb8bec
 - Eggsact: 576f4b0ac09238a42e5561c2da6da8ff4a47bce6
+
+Execution-time sibling baselines, re-checked 2026-09-24:
+
+- Eggwork: 128f808c62f176d414dd18a705773e45f5e2891a
+- Eggsearch: dfa90e050c5434f3346902aeb4074901c58e90d1
+- Eggbench: d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9
+- Eggsact: 40959b704431430668e9ca2bfe959a8ef32495d8
 
 Source roadmap:
 
@@ -49,7 +55,10 @@ Relevant stable facts include:
 - content-addressed ArtifactRecord metadata.
 
 Eggplan must normalize these facts; it must not own NodeClient, leases,
-cancellation, process supervision, or workspace materialization.
+cancellation, process supervision, or workspace materialization. The current
+core exposes canonical `request_digest` and a workspace-aware
+`request_digest_with_workspace`; an Eggwork adapter can bind those authoritative
+digests through the provider-namespaced Eggplan verification helper.
 
 ### Eggsearch
 

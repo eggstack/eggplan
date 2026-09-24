@@ -54,9 +54,9 @@ Planning-system bootstrap:
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M001/C001 and M002 guarded closure/integrity closed | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | blocked | M001 plan registered; waits on Evidence M002 closure | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | blocked | M001 plan registered against current CodeGG baseline; waits on Evidence M002 closure | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | blocked | Provider SPI M001 plan registered against refreshed sibling baselines; waits on Evidence M002 closure | plans/subsystems/eggstack-integration-roadmap.md |
+| Projection/CLI | active | M001 ready against Evidence M002 closure d669b48 | plans/subsystems/projection-cli-roadmap.md |
+| CodeGG integration | active | M001 ready; CodeGG re-checked at 28b46956 | plans/subsystems/codegg-integration-roadmap.md |
+| Eggstack integrations | active | M001 ready; four sibling interfaces re-checked 2026-09-24 | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -69,9 +69,9 @@ Planning-system bootstrap:
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
 | Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | closure plans/closure/evidence-closure/002-closed.md |
-| Projection/CLI | M001 CLI control surface + derived registry | blocked | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | waits on Evidence M002 closure |
-| CodeGG integration | M001 golden parity + adapter seam | blocked | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | waits on Evidence M002 closure; reviewed CodeGG 6e183045 |
-| Eggstack integrations | M001 evidence provider SPI | blocked | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | waits on Evidence M002 closure |
+| Projection/CLI | M001 CLI control surface + derived registry | ready | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | Evidence M002 closed at d669b48 |
+| CodeGG integration | M001 golden parity + adapter seam | ready | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | CodeGG 28b46956 re-checked |
+| Eggstack integrations | M001 evidence provider SPI | ready | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | current sibling SHAs re-checked |
 
 ## Registered next implementation wave
 
@@ -79,12 +79,12 @@ The corrective gate is closed. The next implementation wave is intentionally
 sequenced around durable closure authority:
 
 1. Evidence M002 is closed; see plans/closure/evidence-closure/002-closed.md.
-2. Projection/CLI M001, CodeGG Integration M001, and Eggstack Provider SPI M001
-   are fully planned; refresh their repository and sibling baselines before
-   marking them ready.
-3. After baseline refresh, those three M001 handoffs may proceed
-   independently because they consume the same stable closure/evidence
-   contracts and do not own one another's runtime responsibilities.
+2. CodeGG Integration M001 is ready against CodeGG 28b46956.
+3. Eggstack Provider SPI M001 is ready against its re-checked execution-time
+   sibling baselines.
+4. Projection/CLI M001 is ready against the Evidence M002 closure commit.
+5. These plans own independent runtime surfaces; execute them in the requested
+   order without folding one plan's responsibilities into another.
 
 No implementation plan is yet registered for Projection/CLI M002, CodeGG M002,
 Eggstack M002, or interoperability/distribution.
@@ -93,21 +93,15 @@ Eggstack M002, or interoperability/distribution.
 
 1. Foundation M001/M002/M003 — closed/current foundation.
 2. Evidence M001 + C001 — closed; v2 verification binding is current.
-3. Execute and close Evidence M002:
-   - append-only evidence supersession lineage;
-   - pure ClosureCandidate;
-   - immutable ClosureRecord;
-   - provider-policy snapshot;
-   - raw CAS-to-Closed prohibition;
-   - crash-consistent pending/final closure recovery.
-4. Refresh dependent-plan baselines against the closure commit.
-5. Then independently execute:
-   - Projection/CLI M001 — versioned machine/human control surface;
-   - CodeGG Integration M001 — golden parity and non-circular adapter seam;
-   - Eggstack Provider SPI M001 — normalization/trust boundary only.
-6. Stabilize CodeGG parity before staged CodeGG ownership migration.
-7. Implement real Eggwork/Eggsearch providers only after Provider SPI closure.
-8. Add attestation/service/distribution work after local contracts are
+3. Evidence M002 — closed with append-only supersession lineage, pure
+   ClosureCandidate, immutable ClosureRecord, provider-policy snapshot,
+   raw-CAS-to-Closed prohibition, and crash-consistent pending/final recovery.
+4. Execute CodeGG Integration M001 — golden parity and non-circular adapter seam.
+5. Execute Eggstack Provider SPI M001 — normalization/trust boundary only.
+6. Execute Projection/CLI M001 — versioned machine/human control surface.
+7. Stabilize CodeGG parity before staged CodeGG ownership migration.
+8. Implement real Eggwork/Eggsearch providers only after Provider SPI closure.
+9. Add attestation/service/distribution work after local contracts are
    qualified.
 
 ## External interface research baselines
@@ -116,11 +110,11 @@ Reviewed during planning; these are not dependency pins.
 
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
-| CodeGG | 6e18304546f29426457eb11410957288384fdec2 | current work_plan model/store/evidence/assessment/projection re-checked for M001; WorkOrder/Goal/Todo/checkpoints/runtime remain separate |
-| Eggwork | c990ffa2864886c502c1d5581f0d732e26fe56ee | fixed-target execution spec/request digest, execution generations/snapshots, artifacts; executor not scheduler |
-| Eggsearch | 5db6e1984a1441787f6d6a54754eb4a685766ec2 | deterministic evidence bundles with source/provider/trust/gap metadata |
-| Eggbench | 3b93979a7fd30a08f7e367ffc94f911ae5fb8bec | .eggb manifest v2; execution status separated from comparison verdict |
-| Eggsact | 576f4b0ac09238a42e5561c2da6da8ff4a47bce6 | deterministic in-process/preflight utilities |
+| CodeGG | 28b4695661d463dd1675d045ac6299c5fbc9ea31 | current WorkPlan model/store/evidence/assessment/projection; WorkOrder/Goal/Todo/checkpoints/runtime remain separate |
+| Eggwork | 128f808c62f176d414dd18a705773e45f5e2891a | fixed-target execution spec and canonical request/workspace digests, generations/snapshots, artifacts; executor not scheduler |
+| Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic evidence bundles with source/provider/trust/gap metadata |
+| Eggbench | d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9 | .eggb manifest v2; execution status separated from comparison verdict |
+| Eggsact | 40959b704431430668e9ca2bfe959a8ef32495d8 | deterministic in-process/preflight utilities |
 | Eggup | cf5b3d3819c168eb2dbf841daa8332f3eb28c915 | future verified distribution/update consumer |
 | SLSA | v1.2 approved provenance docs reviewed 2026-09-22 | subject + provenance separation |
 | in-toto | attestation framework stable v1.0 reviewed 2026-09-22 | statement/predicate and signed supply-chain evidence model |

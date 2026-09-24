@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: blocked
+Status: active
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -52,12 +52,19 @@ Role: eventual distribution/update integration, not evidence-core dependency.
 
 ## 3.1 Reviewed baselines
 
-Re-checked for M001 planning on 2026-09-23:
+Initial research baselines from 2026-09-23:
 
 - Eggwork: c990ffa2864886c502c1d5581f0d732e26fe56ee
 - Eggsearch: 5db6e1984a1441787f6d6a54754eb4a685766ec2
 - Eggbench: 3b93979a7fd30a08f7e367ffc94f911ae5fb8bec
 - Eggsact: 576f4b0ac09238a42e5561c2da6da8ff4a47bce6
+
+Execution-time re-check on 2026-09-24:
+
+- Eggwork: 128f808c62f176d414dd18a705773e45f5e2891a
+- Eggsearch: dfa90e050c5434f3346902aeb4074901c58e90d1
+- Eggbench: d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9
+- Eggsact: 40959b704431430668e9ca2bfe959a8ef32495d8
 
 These are research baselines, not dependency pins; re-check before provider
 adapter implementation.
@@ -66,12 +73,12 @@ adapter implementation.
 
 ### M001 — Evidence provider SPI
 
-Status: blocked on Evidence M002 closure.
+Status: ready.
 
 Plan: plans/implementation/eggstack-integration/001-evidence-provider-spi.md
 
-Sibling execution/research/bundle interfaces were re-checked at the baselines
-above. After Evidence M002 closes, freeze a normalization-focused SPI,
+Sibling execution/research/bundle interfaces were re-checked at the execution
+baselines above. Freeze a normalization-focused SPI,
 capability/failure reporting, host-controlled provider identity, sync/async
 boundary, artifact references, and verification-binding handoff.
 

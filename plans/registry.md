@@ -53,10 +53,10 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | closed/current | M001/C001 and M002/C001 closed historically; M002 C002 closed and cross-platform qualified | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | ready to plan | M001 closed historically; M002 Markdown import/render unblocked and needs a fresh bounded implementation plan | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | ready to plan | M001 closed historically; M002 staged adoption unblocked and needs a fresh CodeGG interface recheck | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | ready to plan | M001 provider SPI closed historically; live-provider M002 unblocked and needs fresh Eggwork/Eggsearch interface rechecks | plans/subsystems/eggstack-integration-roadmap.md |
+| Evidence/closure | closed/current + maintenance ready | M002 C002 remains qualified; non-blocking C003 reference/guard hygiene registered | plans/subsystems/evidence-closure-roadmap.md |
+| Projection/CLI | ready | M001 closed; M002 loss-aware Markdown import/render registered for handoff | plans/subsystems/projection-cli-roadmap.md |
+| CodeGG integration | ready | M001 closed; M002 staged assessment adoption registered against CodeGG a3c87fc | plans/subsystems/codegg-integration-roadmap.md |
+| Eggstack integrations | ready | M001 provider SPI closed; M002 Eggwork/Eggsearch adapters registered against fresh sibling baselines | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -71,21 +71,21 @@ Planning-system bootstrap:
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | historical closure plans/closure/evidence-closure/002-closed.md |
 | Evidence | M002 C001 finalization subject revalidation | closed | plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md | historical closure plans/closure/evidence-closure/002-c001-closed.md |
 | Evidence | M002 C002 finalization test-seam containment + closure evidence reconciliation | closed | plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md | closure plans/closure/evidence-closure/002-c002-closed.md; preserves M002/C001 historical closures |
+| Evidence | M002 C003 closure reference + authority-guard hygiene | ready | plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md | non-blocking maintenance; may execute in parallel with capability wave |
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
+| Projection/CLI | M002 loss-aware Markdown import + deterministic render | ready | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | handoff authorized |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
+| CodeGG integration | M002 staged Eggplan assessment adoption | ready | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | coordinated Eggplan + CodeGG handoff; fresh CodeGG baseline a3c87fc |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
+| Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | ready | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | handoff authorized; fresh sibling baselines recorded |
 
-## Registered corrective gate
+## Corrective history and current maintenance
 
-Evidence M002 C001 is historically closed. Evidence M002 C002 is now
-closed. The deterministic `SubjectCapture` seam and alternate
-capture-injected finalizer that C001 had marked `#[doc(hidden)] pub` are
-now crate-private / `#[cfg(test)]` only; no downstream crate can reach
-the closure subject authority. Crate-level `compile_fail` doctests in
-`eggplan-repo` and `scripts/check-closure-authority-boundary.sh` (wired
-into the hosted CI native shell guard step) prevent re-publication. The
-historical C001 closure placeholders were reconciled with the actual
-hosted workflow:
+Evidence M002 C001 and C002 are historically closed. C002 made the closure
+subject authority boundary mechanically true in the public API and reconciled
+C001's hosted qualification evidence.
+
+Recorded hosted evidence remains:
 
 - C001 implementation run: 35998715018
   - Linux 107629794960
@@ -98,31 +98,36 @@ hosted workflow:
   - Windows 107650129154
   - Rust 1.89 107650129645
 
-Projection/CLI M002, CodeGG M002, and Eggstack M002 are unblocked; each
-still requires its own bounded implementation plan and a fresh
-sibling-interface recheck before handoff. No other corrective
-implementation plan is currently registered.
+One non-blocking maintenance handoff is registered:
+
+- Evidence M002 C003 — correct the C002 implementation-SHA citation and
+  strengthen the static closure-authority guard/negative proof.
+
+C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
 
 ## Current execution order
 
 1. Foundation M001/M002/M003 — closed/current foundation.
 2. Evidence M001 + C001 — closed; v2 verification binding is current.
-3. Evidence M002 — historically closed with guarded closure, supersession, and
-   crash recovery.
-4. Evidence M002 C001 — historically closed; production S1/S2 recapture path
-   implemented; C002 closed the public test-seam exposure.
-5. Evidence M002 C002 — closed; deterministic test seam is now
-   crate-private; compile-fail doctests and `check-closure-authority-boundary.sh`
-   enforce the boundary; C001 CI placeholders reconciled.
-6. CodeGG Integration M001 — historically closed.
-7. Eggstack Provider SPI M001 — historically closed.
-8. Projection/CLI M001 — historically closed.
-9. Independently plan the next capability wave:
-   - Projection/CLI M002 — Markdown import/render;
-   - CodeGG M002 — staged core adoption after a fresh CodeGG interface check;
-   - Eggstack M002 — real Eggwork/Eggsearch adapters after sibling re-check.
-10. Add attestation/service/distribution work after local contracts and live
-    integrations are qualified.
+3. Evidence M002 + C001 + C002 — closed/current guarded closure and subject
+   authority.
+4. CodeGG Integration M001 — historically closed.
+5. Eggstack Provider SPI M001 — historically closed.
+6. Projection/CLI M001 — historically closed.
+7. The next implementation batch is registered and may execute independently:
+   - Evidence M002 C003 — non-blocking closure-reference/static-guard hygiene.
+   - Projection/CLI M002 — loss-aware Markdown import and deterministic render.
+   - CodeGG M002 — staged Eggplan assessment adoption; coordinated changes in
+     Eggplan and dbowm91/codegg, with both heads rechecked before editing.
+   - Eggstack M002 — real Eggwork/Eggsearch evidence adapters; sibling heads
+     rechecked before editing.
+8. After positive M002 closures:
+   - Projection/CLI M003 ergonomics/performance may be planned from real use;
+   - CodeGG M003 repository Plan binding may be planned;
+   - Eggstack M003 Eggbench/CI/forge adapters may be planned after a fresh
+     Eggbench interface recheck.
+9. Interoperability/distribution remains deferred until the local capability
+   wave is qualified.
 
 ## External interface research baselines
 
@@ -130,9 +135,9 @@ Reviewed during planning; these are not dependency pins.
 
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
-| CodeGG | 28b4695661d463dd1675d045ac6299c5fbc9ea31 | current WorkPlan model/store/evidence/assessment/projection; WorkOrder/Goal/Todo/checkpoints/runtime remain separate |
-| Eggwork | 128f808c62f176d414dd18a705773e45f5e2891a | fixed-target execution spec and canonical request/workspace digests, generations/snapshots, artifacts; executor not scheduler |
-| Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic evidence bundles with source/provider/trust/gap metadata |
+| CodeGG | a3c87fc18ee55aaf630401a562c11bb83112fd82 | current WorkPlan model/store/evidence/assessment/projection; WorkOrder/Goal/Todo/checkpoints/runtime remain separate; M001 fixture baseline was 28b469... |
+| Eggwork | 128f808c62f176d414dd18a705773e45f5e2891a | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
+| Eggsearch | 5db6e1984a1441787f6d6a54754eb4a685766ec2 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
 | Eggbench | d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9 | .eggb manifest v2; execution status separated from comparison verdict |
 | Eggsact | 40959b704431430668e9ca2bfe959a8ef32495d8 | deterministic in-process/preflight utilities |
 | Eggup | cf5b3d3819c168eb2dbf841daa8332f3eb28c915 | future verified distribution/update consumer |
@@ -182,6 +187,17 @@ integration milestone is actually handed off.
     is not an access-control boundary.
 15. Closure records may cite only observed completed verification; placeholder
     workflow/job IDs are not passing evidence.
+16. Markdown import is plan-intent ingestion only: source lifecycle, prose,
+    evidence claims, provider trust, SubjectRevision, and closure are not
+    authority.
+17. CodeGG staged adoption must use a pure Eggplan assessment bridge in
+    production, keep CodeGG storage/runtime ownership, and derive execution
+    VerificationDigest values from authoritative native execution specs rather
+    than prose/reference IDs.
+18. Eggsearch trust labels are content provenance, never Eggplan provider
+    enrollment; Eggwork execution verification binding is host-supplied.
+19. Sibling commit SHAs recorded by compatibility/adapters are fixture/review
+    provenance, not runtime trust or branch dependencies.
 
 ## Planning hygiene
 
@@ -191,3 +207,5 @@ integration milestone is actually handed off.
 - Do not copy Eggwork/Eggsearch/Eggbench responsibilities into eggplan-core.
 - Keep core synchronous/deterministic where practical; async/network belongs in adapters.
 - No hidden model reasoning in persisted schemas.
+- Mark maintenance gates explicitly: non-blocking hygiene must not serialize
+  otherwise independent capability handoffs.

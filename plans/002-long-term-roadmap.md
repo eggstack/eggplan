@@ -42,6 +42,8 @@ This roadmap sequences product capability. It does not imply implementation.
         v
       M002 C002 test-seam containment + closure evidence reconciliation
         |
+        +--> M002 C003 closure-reference/guard hygiene (non-blocking)
+        |
         +----------------------+----------------------+
         |                      |                      |
         v                      v                      v
@@ -167,6 +169,20 @@ Exit: the only supported external repository closure path owns both subject
 captures internally, accidental authority-injection symbols are not public,
 and closure records contain actual rather than placeholder hosted evidence.
 
+### M002 C003 — Closure reference and authority-guard hygiene
+
+Class: non-blocking maintenance / evidence hygiene
+
+Correct the C002 implementation-SHA citation, strengthen the static
+closure-authority source guard to catch ordinary direct/grouped Rust re-export
+shapes, add deterministic negative-proof coverage, and clean stale registry
+wording. C002's compile-fail API boundary remains the primary authority
+evidence.
+
+Exit: active C002 references point at the actual implementation commit, the
+defense-in-depth guard matches its documented scope, and no capability
+milestone is blocked by the maintenance pass.
+
 ## 5. Projection and CLI
 
 ### M001 — CLI control surface and derived registry
@@ -177,13 +193,15 @@ Add eggplan-cli with init/new/show/status/ready/graph/check/assess/evidence
 commands and JSON output. Generate readiness/registry data from canonical
 state; detect inconsistent lifecycle/dependency/evidence references.
 
-### M002 — CodeGG-style Markdown import and projection
+### M002 — Loss-aware Markdown import and deterministic render
 
 Class: capability / compatibility
 
-Render implementation/closure/registry Markdown and import the supported
-subset of CodeGG-style plans. Import must surface information it cannot map and
-must never silently treat prose claims as host evidence.
+Render versioned Eggplan-native Markdown and import it back as plan intent;
+also import a strict documented subset of CodeGG-style implementation-plan
+Markdown with deterministic loss reporting. Imported lifecycle is provenance
+only. Markdown cannot create EvidenceObservation, provider authority,
+SubjectRevision authority, or ClosureRecord state.
 
 ## 6. CodeGG integration
 
@@ -196,15 +214,19 @@ bounds, graph actionability, CAS semantics, evidence states, completion
 assessment, and bounded projection. Define adapters without changing CodeGG
 runtime ownership.
 
-### M002 — Staged CodeGG adoption
+### M002 — Staged Eggplan assessment adoption
 
 Class: integration
 
-Allow CodeGG to consume eggplan-core/repo semantics while retaining its SQLite
-storage, WorkOrder scheduler, Goal/Todo/checkpoint/context-epoch behavior, and
-agent-loop policy in CodeGG-owned adapters.
+Allow CodeGG to consume eggplan-core plus the pure CodeGG compatibility bridge
+for generic plan/evidence assessment while retaining SQLite WorkPlan storage,
+WorkOrder scheduling, Goal/Todo/checkpoint/context-epoch behavior, and
+agent-loop policy in CodeGG-owned adapters. Production CodeGG must not depend
+on eggplan-repo for this milestone.
 
-No circular repo dependency is permitted.
+Execution-derived proof must carry a verification digest derived from the
+authoritative native execution specification; reference IDs and prose are not
+verification identity. No circular repository dependency is permitted.
 
 ## 7. Eggstack integrations
 
@@ -213,10 +235,13 @@ No circular repo dependency is permitted.
 Define stable adapter traits and normalized provider result contracts with
 bounded async/stream-independent core semantics.
 
-### M002 — Eggwork and Eggsearch adapters
+### M002 — Eggwork and Eggsearch evidence adapters
 
-Eggwork produces execution evidence; Eggsearch produces repository/research
-evidence. Their native trust and failure states must survive normalization.
+Normalize real Eggwork execution snapshots/artifacts and Eggsearch evidence
+bundles through the M001 provider SPI. Acquisition remains host-owned:
+eggplan-integrations adds no executor, network client, MCP client, scheduler,
+or search runtime. Eggsearch source/content trust remains provenance and cannot
+self-enroll Eggplan provider authority.
 
 ### M003 — Eggbench, CI, and forge adapters
 

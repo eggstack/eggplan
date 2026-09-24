@@ -1,14 +1,16 @@
 # CodeGG Integration Roadmap
 
-Status: blocked
+Status: active / ready
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
 Related ADR: ADR-0004.
 
 Initial reviewed CodeGG baseline: 6e18304546f29426457eb11410957288384fdec2.
-Execution-time baseline re-checked 2026-09-24:
+M001 execution-time baseline re-checked 2026-09-24:
 28b4695661d463dd1675d045ac6299c5fbc9ea31.
+M002 planning baseline re-checked 2026-09-24:
+a3c87fc18ee55aaf630401a562c11bb83112fd82.
 
 ## 1. Purpose
 
@@ -63,19 +65,20 @@ ownership change was required.
 
 ### M002 — Staged core adoption
 
-Status: ready to plan (Evidence M002 C002 has closed).
+Status: ready for handoff.
 
-M001 remains historically closed. Evidence M002 C002 has closed: production
-adoption may bind to the supported `RepositoryStore::finalize_closure`
-boundary without inheriting a caller-injectable closure subject authority
-seam. The historical C001 closure placeholders have been reconciled with
-the actual hosted workflow.
+Plan: plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md
 
-No M002 implementation plan is registered yet. After re-checking current
-CodeGG interfaces, register and execute a bounded M002 plan.
+M001 remains historically closed. Current CodeGG was re-checked at
+`a3c87fc18ee55aaf630401a562c11bb83112fd82`; relative to the M001 fixture
+baseline, the WorkPlan implementation contract remains stable and only a
+WorkPlan foundation test changed in the reviewed compare range.
 
-Make CodeGG consume Eggplan generic domain/assessment where it reduces
-duplication. Keep CodeGG storage and runtime policy adapters.
+M002 stages Eggplan's pure plan/evidence assessment semantics behind CodeGG's
+existing assessment surface. CodeGG keeps SQLite WorkPlan storage, Goal/Todo,
+checkpoint/context-epoch, scheduler, worktree, and agent-loop ownership. The
+production bridge must not depend on eggplan-repo and must not invent
+verification identity from prose or native reference IDs.
 
 ### M003 — Repository Plan binding
 

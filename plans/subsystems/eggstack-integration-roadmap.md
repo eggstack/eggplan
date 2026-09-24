@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: blocked
+Status: active / ready
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -59,10 +59,10 @@ Initial research baselines from 2026-09-23:
 - Eggbench: 3b93979a7fd30a08f7e367ffc94f911ae5fb8bec
 - Eggsact: 576f4b0ac09238a42e5561c2da6da8ff4a47bce6
 
-Execution-time re-check on 2026-09-24:
+Execution-time / M002 planning re-check on 2026-09-24:
 
 - Eggwork: 128f808c62f176d414dd18a705773e45f5e2891a
-- Eggsearch: dfa90e050c5434f3346902aeb4074901c58e90d1
+- Eggsearch: 5db6e1984a1441787f6d6a54754eb4a685766ec2
 - Eggbench: d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9
 - Eggsact: 40959b704431430668e9ca2bfe959a8ef32495d8
 
@@ -85,16 +85,18 @@ plans/closure/eggstack-integration/001-closed.md.
 
 ### M002 — Eggwork and Eggsearch
 
-Status: ready to plan (Evidence M002 C002 has closed).
+Status: ready for handoff.
 
-M001 remains historically closed. Evidence M002 C002 has closed: live
-provider adapters may bind to the supported `RepositoryStore::finalize_closure`
-boundary. The accidental public capture-injection seam is contained and
-the closure evidence record is reconciled.
+Plan: plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md
 
-After rechecking current Eggwork and Eggsearch sibling interfaces, create
-the bounded M002 handoff. Two contrasting providers qualify execution and
-research trust semantics.
+M001 remains historically closed. Current sibling contracts were rechecked at
+Eggwork `128f808c62f176d414dd18a705773e45f5e2891a` and Eggsearch
+`5db6e1984a1441787f6d6a54754eb4a685766ec2`.
+
+M002 adds real bounded normalizers for Eggwork execution snapshots/artifacts
+and Eggsearch evidence bundles. Eggplan still performs no execution, network
+acquisition, MCP calls, or search. Eggsearch content trust remains provenance
+and cannot self-enroll provider authority.
 
 ### M003 — Eggbench plus CI/forge
 

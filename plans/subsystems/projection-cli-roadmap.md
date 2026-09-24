@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: blocked
+Status: active / ready
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -40,18 +40,18 @@ plans/closure/projection-cli/001-closed.md.
 
 ### M002 — Markdown import/render
 
-Status: ready to plan (Evidence M002 C002 has closed).
+Status: ready for handoff.
 
-M001 remains historically closed. Evidence M002 C002 has closed: the
-finalization subject capture seam is now crate-internal, no downstream crate
-can substitute closure subject authority, the C001 closure evidence is
-reconciled with the actual hosted workflow, and `RepositoryStore::finalize_closure`
-is the only supported external closure entry point.
+Plan: plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md
 
-After registering a bounded M002 implementation plan and re-checking current
-CodeGG sibling interfaces, add support for Eggplan-native implementation /
-closure projections and the documented subset of CodeGG's plans hierarchy.
-Report lossy or unmapped fields.
+M001 remains historically closed. Evidence M002 C002 has closed and the current
+CodeGG planning/document shape was re-checked at
+`a3c87fc18ee55aaf630401a562c11bb83112fd82`.
+
+M002 adds deterministic Eggplan-native Markdown render/import plus a strict,
+loss-aware subset of CodeGG-style implementation-plan Markdown. Markdown
+remains projection/import data only: source lifecycle is provenance and cannot
+manufacture evidence, provider trust, SubjectRevision authority, or closure.
 
 ### M003 — Ergonomics and performance
 

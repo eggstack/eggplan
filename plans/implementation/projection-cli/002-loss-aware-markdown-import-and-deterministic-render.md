@@ -1,8 +1,8 @@
 # Projection and CLI M002 — Loss-Aware Markdown Import and Deterministic Render
 
-Status: ready for handoff
+Status: closing
 
-Repository baseline: 0904218554c425c30aa6501b58d7fb8bcb839414
+Repository baseline: bfbec4a77d1e35e0a422af1edc9c3f358f7ad982
 
 Source roadmap:
 
@@ -15,9 +15,15 @@ Predecessor closure:
 
 Current CodeGG planning baseline reviewed:
 
-- dbowm91/codegg @ a3c87fc18ee55aaf630401a562c11bb83112fd82
+- dbowm91/codegg @ 5f4532659dbf0df2cd9f2b3bdb024217d2ea7868
 - representative implementation-plan shape:
   plans/implementation/long-horizon-work-execution/002-durable-work-plan-foundation.md
+
+The CodeGG head was re-checked at handoff. Its representative document still
+uses H1 title, top-level `Status:`/`Repository baseline:` metadata, numbered
+Objective, Ordered work packages with `### Work package <label> — <title>`
+subsections, and numbered Acceptance criteria. This is an interface review
+baseline, not a runtime dependency.
 
 Primary class: capability / compatibility / projection
 
@@ -441,3 +447,26 @@ Record:
 - implementation SHA;
 - hosted native/MSRV workflow IDs;
 - residual findings and M003 disposition.
+
+## 19. Implementation follow-through
+
+- Added `eggplan-markdown` as a bounded core-facing parser/render crate; the
+  CLI remains the repository adapter. No Markdown AST, network, process, or
+  persistence dependency was added.
+- Added native Markdown v1 with strict canonical JSON intent payloads,
+  deterministic rendering, Draft/revision-zero import, and display-only
+  lifecycle/closure provenance.
+- Added the documented CodeGG subset, deterministic IDs, explicit dependency
+  references, plan-level/scoped acceptance mapping, bounded `ImportReport`,
+  and fail-closed malformed/ambiguous input handling.
+- Added `markdown render|inspect|import`; import requires an explicit state
+  root and creates exactly one new Draft Plan through repository APIs.
+- CodeGG fixtures are pinned in
+  `crates/eggplan-markdown/tests/fixtures/manifest.json` to
+  `5f4532659dbf0df2cd9f2b3bdb024217d2ea7868` and cover ordinary, corrective,
+  and unmapped-section documents.
+- Local Linux verification passed: formatting, workspace check, clippy,
+  117 workspace tests, 3 doc compile-fail tests, Rust 1.89 check/tests, core,
+  projection/CLI and closure-authority boundary guards, and `git diff --check`.
+- Hosted native/MSRV qualification is pending the implementation push and
+  will be recorded in the closure record.

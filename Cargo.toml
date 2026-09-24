@@ -6,6 +6,7 @@ members = [
     "crates/eggplan-codegg-compat",
     "crates/eggplan-integrations",
     "crates/eggplan-projection",
+    "crates/eggplan-markdown",
     "crates/eggplan-cli",
 ]
 

@@ -4,9 +4,16 @@ set -euo pipefail
 projection_manifest="crates/eggplan-projection/Cargo.toml"
 cli_manifest="crates/eggplan-cli/Cargo.toml"
 cli_src="crates/eggplan-cli/src"
+markdown_manifest="crates/eggplan-markdown/Cargo.toml"
+markdown_src="crates/eggplan-markdown/src"
 
 if grep -RInE 'eggplan-cli|eggplan-repo|clap|crossterm|ratatui|std::process|Command::new|tokio::|reqwest::|hyper::|mcp' "$projection_manifest" crates/eggplan-projection/src; then
   echo "projection library must stay reusable and free of CLI, repository, terminal, process, and transport dependencies" >&2
+  exit 1
+fi
+
+if grep -RInE 'eggplan-cli|eggplan-repo|clap|tokio|reqwest|hyper|mcp|std::process|Command::new' "$markdown_manifest" "$markdown_src"; then
+  echo "Markdown interchange must remain a bounded parser library without repository, command, or network authority" >&2
   exit 1
 fi
 

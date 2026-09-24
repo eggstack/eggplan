@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: active / ready
+Status: active
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -40,18 +40,20 @@ plans/closure/projection-cli/001-closed.md.
 
 ### M002 — Markdown import/render
 
-Status: ready for handoff.
+Status: closing.
 
 Plan: plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md
 
 M001 remains historically closed. Evidence M002 C002 has closed and the current
 CodeGG planning/document shape was re-checked at
-`a3c87fc18ee55aaf630401a562c11bb83112fd82`.
+`5f4532659dbf0df2cd9f2b3bdb024217d2ea7868`.
 
 M002 adds deterministic Eggplan-native Markdown render/import plus a strict,
 loss-aware subset of CodeGG-style implementation-plan Markdown. Markdown
 remains projection/import data only: source lifecycle is provenance and cannot
 manufacture evidence, provider trust, SubjectRevision authority, or closure.
+Implementation and local verification have passed; hosted native/MSRV
+qualification is being collected before formal closure.
 
 ### M003 — Ergonomics and performance
 

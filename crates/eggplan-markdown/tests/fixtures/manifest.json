@@ -1,0 +1,21 @@
+{
+  "source_project": "dbowm91/codegg",
+  "reviewed_commit": "5f4532659dbf0df2cd9f2b3bdb024217d2ea7868",
+  "fixtures": [
+    {
+      "path": "ordinary-implementation.md",
+      "source_document": "plans/implementation/long-horizon-work-execution/002-durable-work-plan-foundation.md",
+      "purpose": "ordered work packages and plan-level acceptance"
+    },
+    {
+      "path": "corrective-plan.md",
+      "source_document": "plans/implementation/tool-programs/017-semantic-recovery-confirmation-and-evidence-closure.md",
+      "purpose": "corrective findings and acceptance criteria"
+    },
+    {
+      "path": "unmapped-sections.md",
+      "source_document": "plans/implementation/agent-context-discovery-surface/002-bounded-persistent-memory-retrieval.md",
+      "purpose": "sections outside the supported import subset"
+    }
+  ]
+}

@@ -167,6 +167,120 @@ fn native_cli_smoke_reads_mutates_and_derives_registry() {
 }
 
 #[test]
+fn markdown_cli_render_inspect_import_is_loss_aware_and_collision_safe() {
+    let temp = tempdir().unwrap();
+    let source_state = temp.path().join("source state");
+    let plan_file = temp.path().join("plan.json");
+    fs::write(&plan_file, serde_json::to_vec(&draft_plan()).unwrap()).unwrap();
+    let created = invoke(&[
+        "new",
+        "--input",
+        plan_file.to_str().unwrap(),
+        "--state-root",
+        source_state.to_str().unwrap(),
+        "--json",
+    ]);
+    json_ok(&created);
+
+    let rendered_file = temp.path().join("native plan.md");
+    let rendered = invoke(&[
+        "--state-root",
+        source_state.to_str().unwrap(),
+        "markdown",
+        "render",
+        "ep_cli_plan",
+        "--output",
+        rendered_file.to_str().unwrap(),
+        "--json",
+    ]);
+    let rendered = json_ok(&rendered);
+    let markdown = rendered["data"]["markdown"].as_str().unwrap();
+    assert!(markdown.contains("<!-- eggplan-markdown:v1 -->"));
+    assert_eq!(fs::read_to_string(&rendered_file).unwrap(), markdown);
+
+    let inspected = invoke(&[
+        "markdown",
+        "inspect",
+        rendered_file.to_str().unwrap(),
+        "--format",
+        "eggplan",
+        "--json",
+    ]);
+    let inspected = json_ok(&inspected);
+    assert_eq!(inspected["data"]["plan"]["status"], "draft");
+    assert_eq!(inspected["data"]["plan"]["items"][0]["id"], "epi_cli_step");
+    assert!(
+        inspected["data"]["import_report"]["warning_codes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "markdown_closure_not_imported")
+    );
+
+    let target_state = temp.path().join("target state");
+    let imported = invoke(&[
+        "markdown",
+        "import",
+        rendered_file.to_str().unwrap(),
+        "--state-root",
+        target_state.to_str().unwrap(),
+        "--format",
+        "auto",
+        "--json",
+    ]);
+    let imported = json_ok(&imported);
+    assert_eq!(imported["data"]["status"], "draft");
+    assert_eq!(imported["data"]["revision"], 0);
+    let store = RepositoryStore::open(&target_state).unwrap();
+    let plan = store.get(&PlanId::new("ep_cli_plan").unwrap()).unwrap();
+    assert_eq!(plan.status, PlanStatus::Draft);
+    assert_eq!(plan.revision, 0);
+    assert!(plan.subject.is_none());
+    assert!(store.list_observations(&plan.id).unwrap().is_empty());
+    assert!(store.closure_record(&plan.id).unwrap().is_none());
+
+    let collision = invoke(&[
+        "markdown",
+        "import",
+        rendered_file.to_str().unwrap(),
+        "--state-root",
+        target_state.to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(!collision.status.success());
+    assert_eq!(json_error(&collision)["error"]["code"], "plan_exists");
+    assert_eq!(store.list().unwrap().len(), 1);
+}
+
+#[test]
+fn markdown_import_requires_explicit_state_root_and_inspect_is_read_only() {
+    let temp = tempdir().unwrap();
+    let input = temp.path().join("source.md");
+    fs::write(
+        &input,
+        "# Title\n\n## 1. Objective\n\nA simple objective.\n",
+    )
+    .unwrap();
+    let inspect = invoke(&["markdown", "inspect", input.to_str().unwrap(), "--json"]);
+    let value = json_ok(&inspect);
+    assert_eq!(value["data"]["plan"]["status"], "draft");
+    let human = invoke(&["markdown", "inspect", input.to_str().unwrap()]);
+    assert!(human.status.success());
+    let human = String::from_utf8(human.stdout).unwrap();
+    assert!(human.contains("# A simple objective"));
+    assert!(human.contains("Import report"));
+    assert!(human.contains("markdown_evidence_not_imported"));
+    let no_root = invoke(&["markdown", "import", input.to_str().unwrap(), "--json"]);
+    assert!(!no_root.status.success());
+    assert_eq!(json_error(&no_root)["error"]["code"], "state_root_required");
+    assert!(!temp.path().join(".eggplan").exists());
+}
+
+fn json_error(output: &std::process::Output) -> Value {
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+#[test]
 fn help_snapshot_is_stable_and_human_output_needs_no_ansi() {
     let output = invoke(&["--help"]);
     assert!(output.status.success());

@@ -8,6 +8,7 @@ use eggplan_core::{
     PlanItemId, PlanStatus, ProviderDescriptor, ProviderPolicyEntry, ProviderRegistry,
     SubjectRevision, assess_plan, effective_observations, parse_plan,
 };
+use eggplan_markdown::{ImportFormat, ImportReport};
 use eggplan_projection::{
     OutputEnvelope, PlanDetail, PlanSummary, graph_projection, readiness_projection, reason_code,
     registry_projection, summarize_plan,
@@ -177,6 +178,29 @@ struct NewData {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
+struct MarkdownInspectData {
+    plan: Plan,
+    import_report: ImportReport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct MarkdownImportData {
+    plan_id: PlanId,
+    revision: u64,
+    status: PlanStatus,
+    import_report: ImportReport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct MarkdownRenderData {
+    markdown: String,
+    output_file: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct ClosureCreatedData {
     closure: ClosureSummary,
 }
@@ -313,6 +337,8 @@ fn is_value_option(value: &str) -> bool {
             | "--status"
             | "--blocker"
             | "--next-action"
+            | "--output"
+            | "--format"
     )
 }
 
@@ -455,6 +481,7 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
         "close" => close_command(&args, &state_root),
         "closure" => closure_command(&args, &state_root),
         "registry" => registry_command(&args, &state_root),
+        "markdown" => markdown_command(&args, &state_root),
         "help" | "--help" | "-h" => success(&args, json!({"usage": usage()}), Vec::new(), usage()),
         _ => Err(failure(&command, "usage", usage(), args.json)),
     }
@@ -489,6 +516,18 @@ fn validate_command_options(args: &ParsedArgs) -> Result<(), CliFailure> {
         }
         "close" => {
             allowed.extend(["--expected-revision", "--provider-policy"]);
+        }
+        "markdown" => {
+            let subcommand = args.positional.first().map(String::as_str).unwrap_or("");
+            match subcommand {
+                "render" => {
+                    allowed.insert("--output");
+                }
+                "inspect" | "import" => {
+                    allowed.insert("--format");
+                }
+                _ => {}
+            }
         }
         "help" => {
             allowed_flags.insert("--help");
@@ -666,6 +705,135 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
             ids.len()
         ),
     )
+}
+
+fn markdown_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
+    let command = "markdown";
+    let subcommand = args.positional.first().map(String::as_str).unwrap_or("");
+    match subcommand {
+        "render" => {
+            require_positions(args, 2, 2)?;
+            let id = plan_id(&args.positional[1], command, args.json)?;
+            let store = read_store(root, command, args.json)?;
+            let plan = store
+                .get(&id)
+                .map_err(|error| repo_failure(command, error, args.json))?;
+            let has_closure = store
+                .closure_record(&id)
+                .map_err(|error| repo_failure(command, error, args.json))?
+                .is_some();
+            let markdown = eggplan_markdown::render(&plan, has_closure)
+                .map_err(|error| failure(command, "invalid_plan", error.to_string(), args.json))?;
+            let output_file = args.options.get("--output").cloned();
+            if let Some(path) = &output_file {
+                fs::write(path, markdown.as_bytes()).map_err(|error| {
+                    failure(command, "output_error", error.to_string(), args.json)
+                })?;
+            }
+            let human = if let Some(path) = &output_file {
+                format!("Wrote {}", path)
+            } else {
+                markdown.clone()
+            };
+            success(
+                args,
+                MarkdownRenderData {
+                    markdown,
+                    output_file,
+                },
+                Vec::new(),
+                human,
+            )
+        }
+        "inspect" | "import" => {
+            require_positions(args, 2, 2)?;
+            if subcommand == "import" && !args.options.contains_key("--state-root") {
+                return Err(failure(
+                    command,
+                    "state_root_required",
+                    "markdown import requires explicit --state-root",
+                    args.json,
+                ));
+            }
+            let path = Path::new(&args.positional[1]);
+            let bytes = read_bounded(
+                path,
+                eggplan_markdown::MAX_INPUT_BYTES as u64,
+                command,
+                args.json,
+            )?;
+            let format = match args
+                .options
+                .get("--format")
+                .map(String::as_str)
+                .unwrap_or("auto")
+            {
+                "auto" => ImportFormat::Auto,
+                "eggplan" => ImportFormat::Eggplan,
+                "codegg" => ImportFormat::Codegg,
+                _ => {
+                    return Err(failure(
+                        command,
+                        "usage",
+                        "--format must be auto, eggplan, or codegg",
+                        args.json,
+                    ));
+                }
+            };
+            let source_name = Some(args.positional[1].as_str());
+            let imported =
+                eggplan_markdown::import(&bytes, format, source_name).map_err(|error| {
+                    failure(command, "invalid_markdown", error.to_string(), args.json)
+                })?;
+            if subcommand == "inspect" {
+                let preview = eggplan_markdown::render(&imported.plan, false).map_err(|error| {
+                    failure(command, "invalid_plan", error.to_string(), args.json)
+                })?;
+                let report =
+                    serde_json::to_string_pretty(&imported.report).unwrap_or_else(|_| "{}".into());
+                let human = format!("{preview}\n## Import report\n\n```json\n{report}\n```\n");
+                success(
+                    args,
+                    MarkdownInspectData {
+                        plan: imported.plan,
+                        import_report: imported.report,
+                    },
+                    Vec::new(),
+                    human,
+                )
+            } else {
+                let store = RepositoryStore::open(root)
+                    .map_err(|error| repo_failure(command, error, args.json))?;
+                store
+                    .create(&imported.plan)
+                    .map_err(|error| repo_failure(command, error, args.json))?;
+                let data = MarkdownImportData {
+                    plan_id: imported.plan.id.clone(),
+                    revision: imported.plan.revision,
+                    status: imported.plan.status.clone(),
+                    import_report: imported.report,
+                };
+                let warning_suffix = if data.import_report.warning_codes.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        "; warnings: {}",
+                        data.import_report.warning_codes.join(", ")
+                    )
+                };
+                success(
+                    args,
+                    data,
+                    Vec::new(),
+                    format!(
+                        "Imported {} as Draft revision 0{warning_suffix}",
+                        imported.plan.id
+                    ),
+                )
+            }
+        }
+        _ => Err(failure(command, "usage", usage(), args.json)),
+    }
 }
 
 fn mutate_activate(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
@@ -1430,5 +1598,5 @@ fn now_ms() -> Result<u64, String> {
 }
 
 fn usage() -> String {
-    "eggplan [--state-root PATH] [--json] COMMAND\nCommands: init, new --input PLAN.json, show PLAN_ID, status [PLAN_ID], ready PLAN_ID, graph PLAN_ID, check [PLAN_ID] [--recover-pending], activate PLAN_ID --expected-revision N, item update PLAN_ID ITEM_ID --expected-revision N (--status STATUS | --blocker TEXT | --next-action TEXT), evidence list|show|supersessions, assess PLAN_ID --provider-policy FILE, close PLAN_ID --expected-revision N --provider-policy FILE, closure show PLAN_ID, registry render".into()
+    "eggplan [--state-root PATH] [--json] COMMAND\nCommands: init, new --input PLAN.json, show PLAN_ID, status [PLAN_ID], ready PLAN_ID, graph PLAN_ID, check [PLAN_ID] [--recover-pending], activate PLAN_ID --expected-revision N, item update PLAN_ID ITEM_ID --expected-revision N (--status STATUS | --blocker TEXT | --next-action TEXT), evidence list|show|supersessions, assess PLAN_ID --provider-policy FILE, close PLAN_ID --expected-revision N --provider-policy FILE, closure show PLAN_ID, registry render, markdown render PLAN_ID [--output FILE], markdown inspect FILE [--format eggplan|codegg|auto], markdown import FILE --state-root PATH [--format eggplan|codegg|auto]".into()
 }

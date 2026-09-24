@@ -27,6 +27,11 @@ execute work, acquire evidence, or edit the development planning registry.
   `--recover-pending` is explicit.
 - `registry render` derives a compact view from canonical `.eggplan` Plans. It
   never edits this repository's `plans/registry.md`.
+- `markdown render` emits deterministic Eggplan Markdown v1; `markdown inspect`
+  returns proposed Plan intent and a loss report without mutation; `markdown
+  import` creates one Draft Plan only under an explicit state root. Markdown
+  never imports evidence, provider trust, SubjectRevision, or closure. See
+  [Markdown interchange](markdown-interchange.md) for grammar and bounds.
 
 All commands support the stable JSON envelope via `--json`. Output uses schema
 version 1, stable command/status/reason codes, explicit truncation counts, and

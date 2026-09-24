@@ -9,6 +9,7 @@ rust-version.workspace = true
 eggplan-core = { path = "../eggplan-core" }
 eggplan-repo = { path = "../eggplan-repo" }
 eggplan-projection = { path = "../eggplan-projection" }
+eggplan-markdown = { path = "../eggplan-markdown" }
 serde.workspace = true
 serde_json.workspace = true
 

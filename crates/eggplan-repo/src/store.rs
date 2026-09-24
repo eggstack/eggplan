@@ -110,23 +110,21 @@ pub enum RepoError {
 /// Subject capture seam used by guarded closure finalization.
 ///
 /// Production finalization always wires this to the repository's configured
-/// `GitSubjectSource`. Tests inject a deterministic scripted capture to
-/// exercise drift and stale-before-finalize regressions without exposing a
-/// broad public provider framework. The seam is `#[doc(hidden)]` and must
-/// not be treated as part of the supported API.
-#[doc(hidden)]
-pub trait SubjectCapture: Send + Sync {
+/// `GitSubjectSource`. Crate-internal tests inject a deterministic scripted
+/// capture to exercise drift and stale-before-finalize regressions without
+/// exposing a broad public provider framework. The seam is crate-private:
+/// it is not part of the supported public API and cannot be reached by a
+/// downstream crate.
+pub(crate) trait SubjectCapture: Send + Sync {
     fn capture(&self) -> Result<SubjectRevision, GitSubjectError>;
 }
 
-#[doc(hidden)]
-pub struct GitSubjectCapture<'a> {
+pub(crate) struct GitSubjectCapture<'a> {
     source: &'a GitSubjectSource,
 }
 
 impl<'a> GitSubjectCapture<'a> {
-    #[doc(hidden)]
-    pub fn new(source: &'a GitSubjectSource) -> Self {
+    pub(crate) fn new(source: &'a GitSubjectSource) -> Self {
         Self { source }
     }
 }
@@ -134,30 +132,6 @@ impl<'a> GitSubjectCapture<'a> {
 impl SubjectCapture for GitSubjectCapture<'_> {
     fn capture(&self) -> Result<SubjectRevision, GitSubjectError> {
         self.source.capture()
-    }
-}
-
-#[doc(hidden)]
-pub struct ScriptedSubjectCapture {
-    results: std::sync::Mutex<std::collections::VecDeque<Result<SubjectRevision, GitSubjectError>>>,
-}
-
-impl ScriptedSubjectCapture {
-    #[doc(hidden)]
-    pub fn new(results: Vec<Result<SubjectRevision, GitSubjectError>>) -> Self {
-        Self {
-            results: std::sync::Mutex::new(results.into_iter().collect()),
-        }
-    }
-}
-
-impl SubjectCapture for ScriptedSubjectCapture {
-    fn capture(&self) -> Result<SubjectRevision, GitSubjectError> {
-        self.results
-            .lock()
-            .expect("scripted capture poisoned")
-            .pop_front()
-            .expect("scripted capture sequence exhausted")
     }
 }
 
@@ -377,6 +351,10 @@ impl RepositoryStore {
     /// before the first canonical closure write. Any drift aborts with a
     /// typed error and produces no pending/final closure state and no Closed
     /// Plan.
+    ///
+    /// This is the only supported externally callable guarded closure entry
+    /// point. There is no public alternate finalizer that accepts an injected
+    /// subject capture source.
     pub fn finalize_closure(
         &self,
         candidate: &ClosureCandidate,
@@ -388,12 +366,11 @@ impl RepositoryStore {
         self.finalize_closure_with_capture(candidate, closure_id, finalized_at_unix_ms, &capture)
     }
 
-    /// Crate-private hook that lets tests inject a deterministic subject
-    /// capture sequence. Production `finalize_closure` always wires the
-    /// repository's own `GitSubjectSource`; this method is not part of the
-    /// supported public API.
-    #[doc(hidden)]
-    pub fn finalize_closure_with_capture(
+    /// Crate-private hook that lets crate-internal tests inject a deterministic
+    /// subject capture sequence. Production `finalize_closure` always wires
+    /// the repository's own `GitSubjectSource`. This method is not part of the
+    /// supported public API and is not reachable from a downstream crate.
+    pub(crate) fn finalize_closure_with_capture(
         &self,
         candidate: &ClosureCandidate,
         closure_id: ClosureId,
@@ -1246,4 +1223,256 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), RepoError> {
         .sync_all()
         .map_err(RepoError::DurabilityUnknown)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    //! Crate-internal seam tests for `finalize_closure` S1/S2 recapture.
+    //!
+    //! The `SubjectCapture` seam and the `finalize_closure_with_capture` hook
+    //! are intentionally not part of the public API. These tests live inside
+    //! the crate so they can use deterministic scripted capture sequences to
+    //! prove stale / drift / capture-failure behaviour while remaining invisible
+    /// to downstream crates.
+    use super::*;
+    use crate::GitSubjectError;
+    use eggplan_core::{
+        AcceptanceCriterion, AssessmentStatus, ClosureCandidate, ClosureId, CriterionId,
+        EvidenceCardinality, EvidenceKind, EvidenceObservation, EvidenceObservationId,
+        EvidenceObservationInput, EvidenceProviderId, EvidenceRequirement, EvidenceStatus, Plan,
+        PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus, ProviderDescriptor,
+        ProviderPolicyEntry, ProviderRegistry, SubjectRevision, SubjectState, VerificationDigest,
+        assess_plan, effective_observations,
+    };
+    use git2::{Repository, Signature};
+    use std::collections::VecDeque;
+    use std::sync::Mutex;
+    use tempfile::tempdir;
+
+    /// Deterministic test double for the `SubjectCapture` seam. Each call to
+    /// `capture` returns the next scripted result, panicking when the
+    /// sequence is exhausted. Constructed only from crate-internal tests.
+    pub(crate) struct ScriptedSubjectCapture {
+        results: Mutex<VecDeque<Result<SubjectRevision, GitSubjectError>>>,
+    }
+
+    impl ScriptedSubjectCapture {
+        pub(crate) fn new(results: Vec<Result<SubjectRevision, GitSubjectError>>) -> Self {
+            Self {
+                results: Mutex::new(results.into_iter().collect()),
+            }
+        }
+    }
+
+    impl SubjectCapture for ScriptedSubjectCapture {
+        fn capture(&self) -> Result<SubjectRevision, GitSubjectError> {
+            self.results
+                .lock()
+                .expect("scripted capture poisoned")
+                .pop_front()
+                .expect("scripted capture sequence exhausted")
+        }
+    }
+
+    fn init_git_repo(root: &Path) -> Repository {
+        let repo = Repository::init(root).unwrap();
+        fs::write(root.join("tracked.txt"), b"base\n").unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("tracked.txt")).unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let sig = Signature::now("Eggplan Test", "eggplan@example.invalid").unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "initial", &tree, &[])
+            .unwrap();
+        drop(tree);
+        repo
+    }
+
+    fn close_ready_store(root: &Path) -> (RepositoryStore, Plan, SubjectRevision) {
+        let store = RepositoryStore::open(root).unwrap();
+        let subject = store.subject_source().capture().unwrap();
+        let binding = VerificationDigest::new(format!("sha256:{}", "c".repeat(64))).unwrap();
+        let mut plan = Plan::new(
+            PlanId::new("ep_revalidate").unwrap(),
+            "revalidate closure subject",
+            vec![PlanItem {
+                id: PlanItemId::new("epi_revalidate").unwrap(),
+                position: 0,
+                parent: None,
+                dependencies: vec![],
+                status: PlanItemStatus::Completed,
+                description: "revalidate closure subject".into(),
+                criteria: vec![AcceptanceCriterion {
+                    id: CriterionId::new("epc_revalidate").unwrap(),
+                    statement: "designated test passed".into(),
+                    human_judgment_allowed: false,
+                    requirements: vec![EvidenceRequirement {
+                        description: "designated test invocation".into(),
+                        kind: EvidenceKind::Test,
+                        provider: None,
+                        subject_policy: eggplan_core::SubjectPolicy::Exact,
+                        cardinality: EvidenceCardinality::Any,
+                        min_count: 1,
+                        allow_human_judgment: false,
+                        expected_verification_digest: Some(binding.clone()),
+                    }],
+                }],
+                blocker: None,
+                next_action: None,
+            }],
+        )
+        .unwrap();
+        plan.subject = Some(subject.clone());
+        store.create(&plan).unwrap();
+        plan.revision = 1;
+        plan.status = PlanStatus::Active;
+        let plan = store.compare_and_swap(&plan.id, 0, &plan).unwrap();
+        let observation = EvidenceObservation::finalize(EvidenceObservationInput {
+            id: EvidenceObservationId::new("epe_revalidate_pass").unwrap(),
+            provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+            kind: EvidenceKind::Test,
+            status: EvidenceStatus::Passed,
+            subject: subject.clone(),
+            observed_at_unix_ms: 11,
+            invocation_ref: Some("cargo test".into()),
+            verification_digest: Some(binding),
+            result_metadata: Default::default(),
+            artifacts: vec![],
+        })
+        .unwrap();
+        store.append_observation(&plan.id, &observation).unwrap();
+        (store, plan, subject)
+    }
+
+    fn build_complete_candidate(
+        store: &RepositoryStore,
+        plan: &Plan,
+        subject: &SubjectRevision,
+    ) -> ClosureCandidate {
+        let policy = vec![ProviderPolicyEntry {
+            provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+            class: "host".into(),
+            allowed_kinds: [EvidenceKind::Test].into_iter().collect(),
+        }];
+        let observations = store.list_observations(&plan.id).unwrap();
+        let supersessions = store.list_supersessions(&plan.id).unwrap();
+        let effective: Vec<_> = effective_observations(&observations, &supersessions)
+            .unwrap()
+            .into_iter()
+            .cloned()
+            .collect();
+        let mut providers = ProviderRegistry::default();
+        providers
+            .register_trusted(
+                ProviderDescriptor::new(
+                    EvidenceProviderId::new("epp_test").unwrap(),
+                    String::from("host"),
+                    [EvidenceKind::Test],
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let assessment = assess_plan(plan, subject, &effective, &providers);
+        assert_eq!(assessment.status, AssessmentStatus::Complete);
+        ClosureCandidate::build(
+            plan,
+            subject.clone(),
+            assessment,
+            &observations,
+            &supersessions,
+            policy,
+            12,
+        )
+        .unwrap()
+    }
+
+    fn assert_no_partial_closure_state(store: &RepositoryStore, plan_id: &PlanId) {
+        assert_eq!(store.get(plan_id).unwrap().status, PlanStatus::Active);
+        let plan_dir = store.root().join("plans").join(plan_id.as_str());
+        assert!(!plan_dir.join("closure.json").exists());
+        assert!(!plan_dir.join("closure.pending.json").exists());
+    }
+
+    #[test]
+    fn closure_subject_stable_between_captures_succeeds() {
+        let dir = tempdir().unwrap();
+        let _repo = init_git_repo(dir.path());
+        let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+        let candidate = build_complete_candidate(&store, &plan, &subject);
+        let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
+            Ok(subject.clone()),
+            Ok(subject.clone()),
+        ]));
+        let (closed, record) = store
+            .finalize_closure_with_capture(&candidate, ClosureId::generate(), 13, capture.as_ref())
+            .unwrap();
+        assert_eq!(closed.status, PlanStatus::Closed);
+        assert_eq!(closed.revision, plan.revision + 1);
+        record.validate(&closed).unwrap();
+        assert_eq!(record.candidate.subject, subject);
+    }
+
+    #[test]
+    fn closure_subject_drift_between_captures_aborts_with_no_partial_state() {
+        let dir = tempdir().unwrap();
+        let _repo = init_git_repo(dir.path());
+        let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+        let candidate = build_complete_candidate(&store, &plan, &subject);
+        let drifted = SubjectRevision {
+            subject_kind: subject.subject_kind.clone(),
+            repository_id: subject.repository_id.clone(),
+            revision: subject.revision.clone(),
+            state: SubjectState::Dirty,
+            dirty_digest: Some(format!("sha256:{}", "d".repeat(64))),
+        };
+        let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
+            Ok(subject.clone()),
+            Ok(drifted),
+        ]));
+        let result = store.finalize_closure_with_capture(
+            &candidate,
+            ClosureId::generate(),
+            13,
+            capture.as_ref(),
+        );
+        assert!(matches!(result, Err(RepoError::ClosureSubjectDrift)));
+        assert_eq!(store.get(&plan.id).unwrap().revision, plan.revision);
+        assert_no_partial_closure_state(&store, &plan.id);
+    }
+
+    #[test]
+    fn closure_subject_capture_failure_during_finalizer_aborts_with_no_partial_state() {
+        let dir = tempdir().unwrap();
+        let _repo = init_git_repo(dir.path());
+        let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+        let candidate = build_complete_candidate(&store, &plan, &subject);
+        let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
+            Ok(subject.clone()),
+            Err(GitSubjectError::Unborn),
+        ]));
+        let result = store.finalize_closure_with_capture(
+            &candidate,
+            ClosureId::generate(),
+            13,
+            capture.as_ref(),
+        );
+        assert!(matches!(result, Err(RepoError::ClosureSubjectCapture(_))));
+        assert_eq!(store.get(&plan.id).unwrap().revision, plan.revision);
+        assert_no_partial_closure_state(&store, &plan.id);
+    }
+
+    #[test]
+    fn finalize_closure_does_not_expose_capture_injection_to_external_callers() {
+        let dir = tempdir().unwrap();
+        let _repo = init_git_repo(dir.path());
+        let store = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+        // The crate-internal hook must remain reachable from the crate's own
+        // tests so the deterministic regressions can run. The compiler enforces
+        // the boundary by giving the hook `pub(crate)` visibility only.
+        let _ = ScriptedSubjectCapture::new(Vec::new());
+        let _capture: &dyn SubjectCapture = &GitSubjectCapture::new(&store.subject_source());
+        let _: fn(&RepositoryStore, &ClosureCandidate, ClosureId, u64, &dyn SubjectCapture) -> _ =
+            RepositoryStore::finalize_closure_with_capture;
+    }
 }

@@ -50,6 +50,18 @@ or final closure state or a Closed Plan. Open recovers a matching pending
 transaction: source revision means discard; exact closed target means
 promote. Other combinations fail as corruption.
 
+The supported external closure API is exactly
+`RepositoryStore::finalize_closure`. There is no public alternate finalizer
+that accepts a caller-supplied subject capture source. The internal
+`SubjectCapture` seam, its `GitSubjectCapture` adapter, and the
+`ScriptedSubjectCapture` test double are crate-private; they exist only to
+enable deterministic stale / drift / capture-failure regressions inside
+`eggplan-repo` and are not part of the supported public API. A crate-level
+`compile_fail` doctest in `eggplan-repo` and the
+`scripts/check-closure-authority-boundary.sh` static guard fail if a future
+change re-exports those types as public or reintroduces an alternate
+capture-injected finalizer.
+
 The store validates each managed path component with `symlink_metadata`,
 rejects symlinked roots/directories/plan files, uses PlanId's restricted
 alphabet for directory names, and stages writes in the destination directory.

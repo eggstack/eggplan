@@ -29,6 +29,8 @@ jobs:
         if: runner.os != 'Windows'
       - run: bash scripts/check-projection-cli-boundary.sh
         if: runner.os != 'Windows'
+      - run: bash scripts/check-closure-authority-boundary.sh
+        if: runner.os != 'Windows'
 
   msrv:
     runs-on: ubuntu-latest

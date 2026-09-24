@@ -7,8 +7,7 @@ use eggplan_core::{
     VerificationDigest, assess_plan,
 };
 use eggplan_repo::{
-    GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore,
-    ScriptedSubjectCapture, StoreOptions, SubjectCapture,
+    GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore, StoreOptions,
 };
 use fs2::FileExt;
 use git2::{Repository, Signature};
@@ -940,89 +939,13 @@ fn closure_subject_changed_before_finalizer_aborts_with_no_partial_state() {
 }
 
 #[test]
-fn closure_subject_drift_between_captures_aborts_with_no_partial_state() {
-    let dir = tempdir().unwrap();
-    let _repo = init_git_repo(dir.path());
-    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
-    let candidate = build_complete_candidate(&store, &plan, &subject);
-    let drifted = SubjectRevision {
-        subject_kind: subject.subject_kind.clone(),
-        repository_id: subject.repository_id.clone(),
-        revision: subject.revision.clone(),
-        state: SubjectState::Dirty,
-        dirty_digest: Some(format!("sha256:{}", "d".repeat(64))),
-    };
-    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
-        Ok(subject.clone()),
-        Ok(drifted),
-    ]));
-    let result = store.finalize_closure_with_capture(
-        &candidate,
-        ClosureId::generate(),
-        13,
-        capture.as_ref(),
-    );
-    assert!(matches!(result, Err(RepoError::ClosureSubjectDrift)));
-    assert_eq!(store.get(&plan.id).unwrap().status, PlanStatus::Active);
-    let plan_dir = store.root().join("plans").join(plan.id.as_str());
-    assert!(!plan_dir.join("closure.json").exists());
-    assert!(!plan_dir.join("closure.pending.json").exists());
-}
-
-#[test]
-fn closure_subject_capture_failure_during_finalizer_aborts_with_no_partial_state() {
-    let dir = tempdir().unwrap();
-    let _repo = init_git_repo(dir.path());
-    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
-    let candidate = build_complete_candidate(&store, &plan, &subject);
-    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
-        Ok(subject.clone()),
-        Err(eggplan_repo::GitSubjectError::Unborn),
-    ]));
-    let result = store.finalize_closure_with_capture(
-        &candidate,
-        ClosureId::generate(),
-        13,
-        capture.as_ref(),
-    );
-    assert!(matches!(result, Err(RepoError::ClosureSubjectCapture(_))));
-    assert_eq!(store.get(&plan.id).unwrap().status, PlanStatus::Active);
-    let plan_dir = store.root().join("plans").join(plan.id.as_str());
-    assert!(!plan_dir.join("closure.json").exists());
-    assert!(!plan_dir.join("closure.pending.json").exists());
-}
-
-#[test]
-fn closure_subject_stable_between_captures_succeeds() {
-    let dir = tempdir().unwrap();
-    let _repo = init_git_repo(dir.path());
-    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
-    let candidate = build_complete_candidate(&store, &plan, &subject);
-    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
-        Ok(subject.clone()),
-        Ok(subject.clone()),
-    ]));
-    let (closed, record) = store
-        .finalize_closure_with_capture(&candidate, ClosureId::generate(), 13, capture.as_ref())
-        .unwrap();
-    assert_eq!(closed.status, PlanStatus::Closed);
-    assert_eq!(closed.revision, plan.revision + 1);
-    record.validate(&closed).unwrap();
-    assert_eq!(record.candidate.subject, subject);
-}
-
-#[test]
 fn historical_closure_subject_becomes_stale_after_worktree_change() {
     let dir = tempdir().unwrap();
     let _repo = init_git_repo(dir.path());
     let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
     let candidate = build_complete_candidate(&store, &plan, &subject);
-    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
-        Ok(subject.clone()),
-        Ok(subject.clone()),
-    ]));
     let (closed, _) = store
-        .finalize_closure_with_capture(&candidate, ClosureId::generate(), 13, capture.as_ref())
+        .finalize_closure(&candidate, ClosureId::generate(), 13)
         .unwrap();
     assert_eq!(closed.status, PlanStatus::Closed);
     let reopened = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();

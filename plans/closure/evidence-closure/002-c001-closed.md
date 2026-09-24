@@ -134,15 +134,18 @@ git diff --check
 
 Hosted native and MSRV workflow for the implementation commit:
 
-- Run: https://github.com/eggstack/eggplan/actions/runs/<to-be-filled-by-CI>
-- Linux job: <to-be-filled-by-CI> — pass (format, check, clippy, tests, boundary).
-- macOS job: <to-be-filled-by-CI> — pass (check, clippy, tests, boundary).
-- Windows job: <to-be-filled-by-CI> — pass (check, clippy, tests; platform-gated
+- Run: https://github.com/eggstack/eggplan/actions/runs/35998715018
+- Linux job: 107629794960 — pass (format, check, clippy, tests, boundary).
+- macOS job: 107629795068 — pass (check, clippy, tests, boundary).
+- Windows job: 107629794971 — pass (check, clippy, tests; platform-gated
   steps skipped as specified by workflow).
-- Rust 1.89 job: <to-be-filled-by-CI> — pass (check and tests).
+- Rust 1.89 job: 107629794849 — pass (check and tests).
 
-The hosted run IDs are recorded in the final commit message once the GitHub
-Actions run completes against the merged branch.
+> Factual erratum (recorded under M002 C002): the hosted workflow completed
+> successfully after the closure record was committed. The previous
+> `<to-be-filled-by-CI>` placeholders are replaced with the immutable run and
+> job identifiers above. The C001 implementation finding, acceptance
+> conclusion, and historical timestamps are preserved unchanged.
 
 ## Invariant, failure, and compatibility review
 

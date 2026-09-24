@@ -85,6 +85,15 @@ candidate when the source Plan is still current and promotes it when the
 exact target Plan is present. A Closed Plan without a matching record is
 corruption. Ordinary Plan CAS rejects transitions to Closed.
 
+The closure subject capture authority is repository-owned and is not exposed
+as an injection point in the public API. The `SubjectCapture` abstraction,
+its `GitSubjectCapture` adapter, and the `ScriptedSubjectCapture` test
+double live inside `eggplan-repo` with crate-private visibility; the
+deterministic stale / drift / capture-failure regressions that depend on
+them run as crate-internal tests and never cross the crate boundary. A
+compile-fail doctest and the static closure-authority boundary guard fail
+if a future change reintroduces a public injection seam.
+
 Eggplan does not lock arbitrary external Git/worktree writers. After the
 finalizer's pre-write recapture, any subsequent source-tree change leaves the
 already-finalized closure record structurally valid; current-state surfaces

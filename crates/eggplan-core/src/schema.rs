@@ -1,4 +1,4 @@
-use crate::Plan;
+use crate::{Plan, VerificationDigest};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -14,6 +14,79 @@ pub fn digest_json<T: Serialize>(value: &T) -> Result<String, serde_json::Error>
     let bytes = canonical_json(value)?;
     let digest = Sha256::digest(bytes);
     Ok(format!("sha256:{digest:x}"))
+}
+
+/// Build the shared, domain-separated verification identity used by evidence
+/// providers. Payload values must be canonicalizable JSON and are bounded to
+/// keep host supplied execution descriptions finite.
+pub fn verification_digest(
+    provider_namespace: &str,
+    schema_version: u32,
+    payload: &serde_json::Value,
+) -> Result<VerificationDigest, String> {
+    if provider_namespace.is_empty()
+        || provider_namespace.len() > crate::bounds::ID_CHARS
+        || provider_namespace.contains('\0')
+        || schema_version == 0
+    {
+        return Err("invalid verification namespace or schema version".into());
+    }
+    fn validate(value: &serde_json::Value, depth: usize, nodes: &mut usize) -> Result<(), String> {
+        *nodes += 1;
+        if depth > 32 || *nodes > 4_096 {
+            return Err("verification specification structure exceeds bound".into());
+        }
+        match value {
+            serde_json::Value::String(text)
+                if text.contains('\0') || text.chars().count() > 4_000 =>
+            {
+                Err("verification string contains NUL or exceeds bound".into())
+            }
+            serde_json::Value::Array(values) => {
+                if values.len() > 512 {
+                    return Err("verification array exceeds bound".into());
+                }
+                for value in values {
+                    validate(value, depth + 1, nodes)?;
+                }
+                Ok(())
+            }
+            serde_json::Value::Object(values) => {
+                if values.len() > 512 {
+                    return Err("verification object exceeds bound".into());
+                }
+                for (key, value) in values {
+                    if key.is_empty() || key.len() > crate::bounds::ID_CHARS || key.contains('\0') {
+                        return Err("invalid verification key".into());
+                    }
+                    validate(value, depth + 1, nodes)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+    let mut nodes = 0;
+    validate(payload, 0, &mut nodes)?;
+    #[derive(Serialize)]
+    struct Envelope<'a> {
+        domain: &'static str,
+        provider_namespace: &'a str,
+        schema_version: u32,
+        canonical_payload: &'a serde_json::Value,
+    }
+    let bytes = serde_json::to_vec(&Envelope {
+        domain: "eggplan.provider-verification.v1",
+        provider_namespace,
+        schema_version,
+        canonical_payload: payload,
+    })
+    .map_err(|error| error.to_string())?;
+    if bytes.len() > 65_536 {
+        return Err("verification specification exceeds byte bound".into());
+    }
+    let digest = Sha256::digest(bytes);
+    VerificationDigest::new(format!("sha256:{digest:x}")).map_err(|error| error.to_string())
 }
 
 pub fn parse_plan(bytes: &[u8]) -> Result<Plan, Box<dyn std::error::Error + Send + Sync>> {

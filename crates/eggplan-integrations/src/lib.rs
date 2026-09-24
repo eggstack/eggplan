@@ -14,7 +14,6 @@ use eggplan_core::{
     },
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
@@ -207,15 +206,6 @@ pub enum SpiError {
     InvalidVerificationSpec(String),
 }
 
-#[derive(Debug, Serialize)]
-#[serde(deny_unknown_fields)]
-struct VerificationEnvelope<'a> {
-    domain: &'static str,
-    provider_namespace: &'a str,
-    schema_version: u32,
-    canonical_payload: &'a serde_json::Value,
-}
-
 /// Derive a deterministic, provider-namespaced digest from a bounded,
 /// versioned JSON specification. JSON object key ordering is canonicalized
 /// recursively before domain-separated SHA-256 hashing.
@@ -232,26 +222,8 @@ pub fn verification_digest(
     }
     let mut node_count = 0;
     validate_verification_value(payload, 0, &mut node_count)?;
-    let canonical_payload = canonicalize(payload.clone());
-    let bytes = serde_json::to_vec(&VerificationEnvelope {
-        domain: "eggplan.provider-verification.v1",
-        provider_namespace,
-        schema_version,
-        canonical_payload: &canonical_payload,
-    })
-    .map_err(|error| SpiError::InvalidVerificationSpec(error.to_string()))?;
-    if bytes.len() > MAX_VERIFICATION_SPEC_BYTES {
-        return Err(SpiError::Invalid(
-            "verification specification exceeds byte bound",
-        ));
-    }
-    let digest = Sha256::digest(bytes);
-    let hex = digest
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    VerificationDigest::new(format!("sha256:{hex}"))
-        .map_err(|error| SpiError::InvalidVerificationSpec(error.to_string()))
+    eggplan_core::verification_digest(provider_namespace, schema_version, payload)
+        .map_err(SpiError::InvalidVerificationSpec)
 }
 
 fn deserialize_kinds<'de, D>(deserializer: D) -> Result<BTreeSet<EvidenceKind>, D::Error>
@@ -451,21 +423,5 @@ fn bounded_text(value: &str, _label: &'static str, max: usize) -> Result<(), Spi
         ))
     } else {
         Ok(())
-    }
-}
-
-fn canonicalize(value: serde_json::Value) -> serde_json::Value {
-    match value {
-        serde_json::Value::Object(object) => {
-            let mut sorted = BTreeMap::new();
-            for (key, value) in object {
-                sorted.insert(key, canonicalize(value));
-            }
-            serde_json::Value::Object(sorted.into_iter().collect())
-        }
-        serde_json::Value::Array(values) => {
-            serde_json::Value::Array(values.into_iter().map(canonicalize).collect())
-        }
-        scalar => scalar,
     }
 }

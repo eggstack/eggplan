@@ -7,9 +7,9 @@ rust-version.workspace = true
 
 [dependencies]
 eggplan-core = { path = "../eggplan-core" }
-eggplan-repo = { path = "../eggplan-repo" }
 serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
+eggplan-repo = { path = "../eggplan-repo" }
 tempfile.workspace = true

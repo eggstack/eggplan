@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_repository": "codegg",
-  "source_sha": "28b4695661d463dd1675d045ac6299c5fbc9ea31",
+  "source_sha": "a3c87fc18ee55aaf630401a562c11bb83112fd82",
   "source_case": "crates/codegg-core/tests/work_plan_foundation.rs: satisfied acceptance requires host evidence",
   "snapshot": {
     "plan_id": "wp_foundation",

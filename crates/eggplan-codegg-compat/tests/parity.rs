@@ -1,7 +1,8 @@
 use eggplan_codegg_compat::{
     AcceptanceDisposition, CodeggEvidenceKind, CodeggEvidenceRef, CodeggItemStatus,
     CodeggPlanSnapshot, CodeggPlanStatus, EvidenceResolver, Fixture, ResolvedEvidence,
-    SOURCE_CODEGG_SHA, completion_family, create_snapshot, normalize, project_bounded,
+    SOURCE_CODEGG_SHA, assess_codegg_snapshot, completion_family, normalize_fixture,
+    normalize_snapshot, project_bounded,
 };
 use eggplan_core::{
     AssessmentStatus, ClosureCandidate, ClosureId, EvidenceKind, EvidenceObservation,
@@ -17,6 +18,30 @@ const FOUNDATION: &str = include_str!("fixtures/work_plan_foundation.json");
 const PROJECTION: &str = include_str!("fixtures/work_plan_projection_arbiter.json");
 const TRAJECTORY: &str = include_str!("fixtures/long_horizon_trajectory_qualification.json");
 const FIXTURE_MANIFEST: &str = include_str!("fixtures/manifest.json");
+
+fn create_snapshot(
+    store: &RepositoryStore,
+    mapped: &eggplan_codegg_compat::MappedPlan,
+) -> Result<eggplan_core::Plan, RepoError> {
+    let mut plan = mapped.plan.clone();
+    plan.revision = 0;
+    plan.status = eggplan_core::PlanStatus::Draft;
+    store.create(&plan)?;
+    if mapped.source_status() == CodeggPlanStatus::Cancelled {
+        plan.revision = 1;
+        plan.status = eggplan_core::PlanStatus::Cancelled;
+        return store.compare_and_swap(&plan.id, 0, &plan);
+    }
+    plan.revision = 1;
+    plan.status = eggplan_core::PlanStatus::Active;
+    plan = store.compare_and_swap(&plan.id, 0, &plan)?;
+    if mapped.source_status() == CodeggPlanStatus::Blocked {
+        plan.revision = 2;
+        plan.status = eggplan_core::PlanStatus::Blocked;
+        plan = store.compare_and_swap(&plan.id, 1, &plan)?;
+    }
+    Ok(plan)
+}
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -164,12 +189,41 @@ fn providers() -> ProviderRegistry {
                     EvidenceKind::Test,
                     EvidenceKind::Artifact,
                     EvidenceKind::Revision,
+                    EvidenceKind::Command,
+                    EvidenceKind::DelegatedRun,
                 ],
             )
             .unwrap(),
         )
         .unwrap();
     providers
+}
+
+#[test]
+fn live_snapshot_mapping_does_not_require_fixture_provenance_and_assesses_purely() {
+    let fixture = load(PROJECTION);
+    let mut resolver = Resolver {
+        status: EvidenceStatus::Passed,
+    };
+    let mapped = normalize_snapshot(&fixture.snapshot, subject(), &mut resolver).unwrap();
+    assert_eq!(mapped.manifest.source_plan_id, fixture.snapshot.plan_id);
+
+    let mut resolver = Resolver {
+        status: EvidenceStatus::Passed,
+    };
+    let result =
+        assess_codegg_snapshot(&fixture.snapshot, subject(), &mut resolver, &providers()).unwrap();
+    assert_eq!(result.assessment.plan_id, result.plan.id);
+    assert_eq!(
+        result.completion_family,
+        completion_family(result.assessment.status)
+    );
+    assert!(
+        result
+            .reason_codes
+            .windows(2)
+            .all(|pair| pair[0] <= pair[1])
+    );
 }
 
 #[test]
@@ -190,7 +244,7 @@ fn strict_versioned_fixture_corpus_and_stable_identity_mapping() {
         serde_json::from_str(&FOUNDATION.replace("\"schema_version\": 1", "\"schema_version\": 2"))
             .unwrap();
     assert!(
-        normalize(
+        normalize_fixture(
             &bad_version,
             subject(),
             &mut Resolver {
@@ -205,7 +259,7 @@ fn strict_versioned_fixture_corpus_and_stable_identity_mapping() {
     let mut wrong_sha = foundation.clone();
     wrong_sha.source_sha = "0000000000000000000000000000000000000000".into();
     assert!(
-        normalize(
+        normalize_fixture(
             &wrong_sha,
             subject(),
             &mut Resolver {
@@ -218,11 +272,11 @@ fn strict_versioned_fixture_corpus_and_stable_identity_mapping() {
     let mut first_resolver = Resolver {
         status: EvidenceStatus::Passed,
     };
-    let first = normalize(&foundation, subject(), &mut first_resolver).unwrap();
+    let first = normalize_fixture(&foundation, subject(), &mut first_resolver).unwrap();
     let mut second_resolver = Resolver {
         status: EvidenceStatus::Passed,
     };
-    let second = normalize(&foundation, subject(), &mut second_resolver).unwrap();
+    let second = normalize_fixture(&foundation, subject(), &mut second_resolver).unwrap();
     assert_eq!(first.plan.id, second.plan.id);
     assert_eq!(first.manifest, second.manifest);
     assert_eq!(first.manifest.id_map.len(), 2);
@@ -247,7 +301,7 @@ fn serialized_satisfied_owner_and_completed_labels_do_not_authorize_evidence() {
     let mut resolver = Resolver {
         status: EvidenceStatus::Unavailable,
     };
-    let mapped = normalize(&fixture, subject(), &mut resolver).unwrap();
+    let mapped = normalize_fixture(&fixture, subject(), &mut resolver).unwrap();
     assert!(
         mapped
             .manifest
@@ -274,7 +328,7 @@ fn serialized_satisfied_owner_and_completed_labels_do_not_authorize_evidence() {
     assert_ne!(result.status, AssessmentStatus::Complete);
 
     let mut untrusted = ProviderRegistry::default();
-    let passing = normalize(
+    let passing = normalize_fixture(
         &fixture,
         subject(),
         &mut Resolver {
@@ -309,7 +363,7 @@ fn serialized_satisfied_owner_and_completed_labels_do_not_authorize_evidence() {
 fn completed_acceptance_without_any_host_reference_remains_incomplete() {
     let mut fixture = load(FOUNDATION);
     fixture.snapshot.items[0].evidence.clear();
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &fixture,
         subject(),
         &mut Resolver {
@@ -339,7 +393,7 @@ fn stale_and_unbound_or_mismatched_execution_evidence_fail_closed() {
         ResolverFault::MissingBinding,
         ResolverFault::MismatchedBinding,
     ] {
-        assert!(normalize(&fixture, subject(), &mut FaultyResolver(fault)).is_err());
+        assert!(normalize_fixture(&fixture, subject(), &mut FaultyResolver(fault)).is_err());
     }
 }
 
@@ -356,7 +410,7 @@ fn user_judgment_stays_pending_and_completion_families_are_lossy_only_at_the_edg
         note: Some("explicit reviewer decision".into()),
     }];
     fixture.snapshot.items[0].evidence.clear();
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &fixture,
         subject(),
         &mut Resolver {
@@ -386,7 +440,7 @@ fn user_judgment_stays_pending_and_completion_families_are_lossy_only_at_the_edg
 #[test]
 fn current_projection_is_bounded_stable_and_excludes_completed_history() {
     let fixture = load(PROJECTION);
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &fixture,
         subject(),
         &mut Resolver {
@@ -415,7 +469,7 @@ fn current_projection_is_bounded_stable_and_excludes_completed_history() {
 #[test]
 fn snapshot_creation_uses_cas_and_restart_preserves_mapped_state() {
     let fixture = load(FOUNDATION);
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &fixture,
         subject(),
         &mut Resolver {
@@ -447,7 +501,7 @@ fn snapshot_creation_uses_cas_and_restart_preserves_mapped_state() {
 #[test]
 fn concurrent_cancel_and_guarded_close_have_one_cas_winner() {
     let fixture = load(FOUNDATION);
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &fixture,
         subject(),
         &mut Resolver {
@@ -512,7 +566,7 @@ fn concurrent_cancel_and_guarded_close_have_one_cas_winner() {
 
 #[test]
 fn dependency_mapping_and_input_bounds_are_explicit() {
-    let trajectory = normalize(
+    let trajectory = normalize_fixture(
         &load(TRAJECTORY),
         subject(),
         &mut Resolver {
@@ -536,7 +590,7 @@ fn dependency_mapping_and_input_bounds_are_explicit() {
         },
     );
     assert!(
-        normalize(
+        normalize_fixture(
             &oversized,
             subject(),
             &mut Resolver {
@@ -555,7 +609,7 @@ fn unavailable_artifact_and_empty_acceptance_do_not_become_complete() {
     artifact.snapshot.status = CodeggPlanStatus::Active;
     artifact.snapshot.items.truncate(1);
     artifact.snapshot.current_item_id = Some("wi_done".into());
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &artifact,
         subject(),
         &mut Resolver {
@@ -576,7 +630,7 @@ fn unavailable_artifact_and_empty_acceptance_do_not_become_complete() {
     no_criteria.snapshot.items.truncate(1);
     no_criteria.snapshot.current_item_id = None;
     no_criteria.snapshot.items[0].status = CodeggItemStatus::Completed;
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &no_criteria,
         subject(),
         &mut Resolver {
@@ -596,7 +650,7 @@ fn unavailable_artifact_and_empty_acceptance_do_not_become_complete() {
 #[test]
 fn explicit_status_mapping_does_not_replay_transitions_or_close_completed_snapshot() {
     let fixture = load(FOUNDATION);
-    let mapped = normalize(
+    let mapped = normalize_fixture(
         &fixture,
         subject(),
         &mut Resolver {
@@ -633,7 +687,7 @@ fn item_status_snapshot_mapping_preserves_state_without_transition_replay() {
         fixture.snapshot.items[0].status = source;
         fixture.snapshot.items[0].blocker =
             (source == CodeggItemStatus::Blocked).then(|| "source blocker".into());
-        let mapped = normalize(
+        let mapped = normalize_fixture(
             &fixture,
             subject(),
             &mut Resolver {
@@ -662,7 +716,7 @@ fn plan_status_mapping_keeps_completed_outside_closed_and_preserves_terminal_int
     for (source, expected) in table {
         let mut fixture = load(FOUNDATION);
         fixture.snapshot.status = source;
-        let mapped = normalize(
+        let mapped = normalize_fixture(
             &fixture,
             subject(),
             &mut Resolver {

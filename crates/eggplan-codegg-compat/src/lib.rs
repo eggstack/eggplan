@@ -2,16 +2,16 @@
 //! snapshots. This crate never acquires native evidence or owns CodeGG state.
 
 use eggplan_core::{
-    AcceptanceCriterion, EvidenceCardinality, EvidenceKind, EvidenceObservation,
-    EvidenceRequirement, Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus,
-    SubjectPolicy, SubjectRevision, VerificationDigest, digest_json,
+    AcceptanceCriterion, AssessmentReason, EvidenceCardinality, EvidenceKind, EvidenceObservation,
+    EvidenceRequirement, Plan, PlanAssessment, PlanId, PlanItem, PlanItemId, PlanItemStatus,
+    PlanStatus, ProviderRegistry, SubjectPolicy, SubjectRevision, VerificationDigest, assess_plan,
+    digest_json,
 };
-use eggplan_repo::{PlanStore, RepoError};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const FIXTURE_SCHEMA_VERSION: u32 = 1;
-pub const SOURCE_CODEGG_SHA: &str = "28b4695661d463dd1675d045ac6299c5fbc9ea31";
+pub const SOURCE_CODEGG_SHA: &str = "a3c87fc18ee55aaf630401a562c11bb83112fd82";
 pub const MAX_ITEMS: usize = 64;
 pub const MAX_ACCEPTANCES_PER_ITEM: usize = 16;
 pub const MAX_EVIDENCE_REFS_PER_ITEM: usize = 32;
@@ -292,6 +292,21 @@ pub struct MappedPlan {
     source_current_item_id: Option<String>,
 }
 
+impl MappedPlan {
+    pub fn source_status(&self) -> CodeggPlanStatus {
+        self.source_status
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CodeggAssessmentBridgeResult {
+    pub plan: Plan,
+    pub manifest: MappingManifest,
+    pub assessment: PlanAssessment,
+    pub completion_family: CodeggCompletionFamily,
+    pub reason_codes: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompatProjection {
     pub schema_version: u32,
@@ -393,7 +408,7 @@ fn map_item_status(status: CodeggItemStatus) -> PlanItemStatus {
     }
 }
 
-pub fn normalize<R: EvidenceResolver>(
+pub fn normalize_fixture<R: EvidenceResolver>(
     fixture: &Fixture,
     subject: SubjectRevision,
     resolver: &mut R,
@@ -404,14 +419,23 @@ pub fn normalize<R: EvidenceResolver>(
     {
         return Err("unsupported fixture version, repository, or source SHA".into());
     }
-    let snapshot = &fixture.snapshot;
+    check_text(&fixture.source_repository, "source repository")?;
+    check_text(&fixture.source_case, "source case")?;
+    normalize_snapshot(&fixture.snapshot, subject, resolver)
+}
+
+/// Normalize a live CodeGG snapshot. Fixture provenance is intentionally
+/// absent from this runtime path: source SHA is qualification metadata only.
+pub fn normalize_snapshot<R: EvidenceResolver>(
+    snapshot: &CodeggPlanSnapshot,
+    subject: SubjectRevision,
+    resolver: &mut R,
+) -> Result<MappedPlan, String> {
     if snapshot.revision < 0 || snapshot.items.is_empty() || snapshot.items.len() > MAX_ITEMS {
         return Err("invalid snapshot revision or item count".into());
     }
     check_source_id(&snapshot.plan_id, "plan ID")?;
     check_text(&snapshot.objective, "objective")?;
-    check_text(&fixture.source_repository, "source repository")?;
-    check_text(&fixture.source_case, "source case")?;
     if let Some(current) = &snapshot.current_item_id {
         check_source_id(current, "current item ID")?;
     }
@@ -667,28 +691,77 @@ pub fn normalize<R: EvidenceResolver>(
     })
 }
 
-/// Store a snapshot at revision zero and use ordinary legal CAS transitions
-/// to reproduce its live lifecycle. A CodeGG Completed label maps to Active;
-/// only Eggplan's Evidence M002 operation may close it.
-pub fn create_snapshot<S: PlanStore>(store: &S, mapped: &MappedPlan) -> Result<Plan, RepoError> {
-    let mut plan = mapped.plan.clone();
-    plan.revision = 0;
-    plan.status = PlanStatus::Draft;
-    store.create(&plan)?;
-    if mapped.source_status == CodeggPlanStatus::Cancelled {
-        plan.revision = 1;
-        plan.status = PlanStatus::Cancelled;
-        return store.compare_and_swap(&plan.id, 0, &plan);
+/// Pure live assessment bridge. CodeGG supplies the exact subject, resolves
+/// native evidence and supplies provider policy; this function owns no store.
+pub fn assess_codegg_snapshot<R: EvidenceResolver>(
+    snapshot: &CodeggPlanSnapshot,
+    subject: SubjectRevision,
+    resolver: &mut R,
+    providers: &ProviderRegistry,
+) -> Result<CodeggAssessmentBridgeResult, String> {
+    let mut mapped = normalize_snapshot(snapshot, subject.clone(), resolver)?;
+    mapped.plan.status = match mapped.source_status {
+        CodeggPlanStatus::Active | CodeggPlanStatus::Completed => PlanStatus::Active,
+        CodeggPlanStatus::Blocked => PlanStatus::Blocked,
+        CodeggPlanStatus::Cancelled => PlanStatus::Cancelled,
+    };
+    let assessment = assess_plan(&mapped.plan, &subject, &mapped.observations, providers);
+    let completion_family = completion_family(assessment.status);
+    let mut reason_codes: Vec<String> = assessment
+        .reasons
+        .iter()
+        .map(assessment_reason_code)
+        .collect();
+    for item in &assessment.items {
+        for reason in &item.reasons {
+            reason_codes.push(assessment_reason_code(reason));
+        }
+        for criterion in &item.criteria {
+            for reason in &criterion.reasons {
+                reason_codes.push(assessment_reason_code(reason));
+            }
+        }
     }
-    plan.revision = 1;
-    plan.status = PlanStatus::Active;
-    plan = store.compare_and_swap(&plan.id, 0, &plan)?;
-    if mapped.source_status == CodeggPlanStatus::Blocked {
-        plan.revision = 2;
-        plan.status = PlanStatus::Blocked;
-        plan = store.compare_and_swap(&plan.id, 1, &plan)?;
+    reason_codes.sort();
+    reason_codes.dedup();
+    Ok(CodeggAssessmentBridgeResult {
+        plan: mapped.plan,
+        manifest: mapped.manifest,
+        assessment,
+        completion_family,
+        reason_codes,
+    })
+}
+
+fn assessment_reason_code(reason: &AssessmentReason) -> String {
+    match reason {
+        AssessmentReason::MissingObservation => "missing_observation",
+        AssessmentReason::NoAcceptanceCriteria => "no_acceptance_criteria",
+        AssessmentReason::NoEvidenceRequirement => "no_evidence_requirement",
+        AssessmentReason::HumanJudgmentRequired => "human_judgment_required",
+        AssessmentReason::StaleSubject(_) => "stale_subject",
+        AssessmentReason::UntrustedProvider(_) => "untrusted_provider",
+        AssessmentReason::ProviderKindNotAllowed(_) => "provider_kind_not_allowed",
+        AssessmentReason::ProviderMismatch(_) => "provider_mismatch",
+        AssessmentReason::LegacyUnboundExecutionRequirement => {
+            "legacy_unbound_execution_requirement"
+        }
+        AssessmentReason::ObservationMissingVerificationBinding(_) => {
+            "observation_missing_verification_binding"
+        }
+        AssessmentReason::VerificationDigestMismatch(_) => "verification_digest_mismatch",
+        AssessmentReason::EvidenceStatus(_, _) => "evidence_status",
+        AssessmentReason::HumanJudgmentNotAllowed => "human_judgment_not_allowed",
+        AssessmentReason::InvalidObservation(_) => "invalid_observation",
+        AssessmentReason::DuplicateObservationId(_) => "duplicate_observation_id",
+        AssessmentReason::PlanNotActive => "plan_not_active",
+        AssessmentReason::InvalidPlan => "invalid_plan",
+        AssessmentReason::ItemNotCompleted(_) => "item_not_completed",
+        AssessmentReason::PlanBlocked => "plan_blocked",
+        AssessmentReason::PlanCancelled => "plan_cancelled",
+        AssessmentReason::NoPlanItems => "no_plan_items",
     }
-    Ok(plan)
+    .to_owned()
 }
 
 pub fn project_bounded(

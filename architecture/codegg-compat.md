@@ -1,15 +1,31 @@
 # CodeGG WorkPlan compatibility
 
-`eggplan-codegg-compat` is a fixture-oriented, one-way adapter contract. It
-accepts a strict bounded snapshot DTO and emits an Eggplan Plan, a mapping
-manifest, and observations supplied only by a host `EvidenceResolver`. It has
-no CodeGG dependency and does not change CodeGG production code.
+`eggplan-codegg-compat` is a pure one-way compatibility and assessment bridge.
+It accepts a strict bounded live snapshot DTO and emits an Eggplan Plan, a
+mapping manifest, host-resolved observations, and deterministic assessment.
+Fixture parsing is a separate qualification wrapper; fixtures validate their
+recorded repository/SHA, while live snapshots do not use fixture provenance as
+runtime authority. The production crate depends on `eggplan-core`, serde, and
+serde_json only. Repository persistence remains outside this bridge.
 
-The execution-time source baseline is CodeGG
-`28b4695661d463dd1675d045ac6299c5fbc9ea31`, re-checked 2026-09-24. WorkPlan
-model/statuses, evidence snapshots, assessment, bounded projection, and CAS
-store remain in `codegg-core::work_plan`. Later checkpoint, context-epoch,
-Todo, Goal, WorkOrder, AgentRun/Job, and runtime ownership remain CodeGG-owned.
+The reviewed fixture baseline is CodeGG
+`a3c87fc18ee55aaf630401a562c11bb83112fd82`; current `origin/main`
+`5f4532659dbf0df2cd9f2b3bdb024217d2ea7868` was rechecked and the WorkPlan
+model/assessment/storage interfaces are unchanged in that range. WorkPlan
+model/statuses, bounded projections, CAS storage, and runtime ownership remain
+CodeGG-owned. Later checkpoint, context-epoch, Todo, Goal, WorkOrder,
+AgentRun/Job, and arbiter control flow remain CodeGG-owned.
+
+`normalize_snapshot` is the live mapper; `normalize_fixture` first validates
+fixture provenance and then calls the same mapper. `assess_codegg_snapshot`
+is pure over the snapshot, exact host-supplied SubjectRevision, resolved
+observations, and explicit ProviderRegistry. It writes no Eggplan repository
+state. CodeGG derives verification digests from canonical native execution
+specifications through Eggplan's shared `verification_digest` helper. If a
+native execution specification or exact evidence subject cannot be
+reconstructed, the host must mark that evidence unavailable and retain its
+compatibility fallback; reference IDs, prose, and serialized `Satisfied`
+dispositions never supply a digest.
 
 ## Mapping contract
 

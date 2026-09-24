@@ -28,7 +28,7 @@ pub use identity::{
     CriterionId, EvidenceProviderId, PlanId, PlanItemId, TypedId, VerificationDigest,
 };
 pub use model::*;
-pub use schema::{SCHEMA_VERSION, canonical_json, digest_json, parse_plan};
+pub use schema::{SCHEMA_VERSION, canonical_json, digest_json, parse_plan, verification_digest};
 
 pub(crate) fn is_execution_evidence(kind: EvidenceKind) -> bool {
     matches!(

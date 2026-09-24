@@ -39,6 +39,9 @@ This roadmap sequences product capability. It does not imply implementation.
         v
       M002 C001 finalization subject revalidation
         |
+        v
+      M002 C002 test-seam containment + closure evidence reconciliation
+        |
         +----------------------+----------------------+
         |                      |                      |
         v                      v                      v
@@ -149,6 +152,20 @@ ClosureRecord compatibility and crash recovery.
 Exit: a candidate that becomes stale before finalization, or whose subject
 drifts during finalizer revalidation, cannot produce pending/final closure
 state or a Closed Plan.
+
+### M002 C002 — Finalization test-seam containment and closure evidence reconciliation
+
+Class: invariant / corrective hardening / evidence hygiene
+
+Contain C001's deterministic subject-capture injection seam so it is private
+or test-only and cannot be called by downstream crates. Add compile/public-API
+regressions proving no external alternate finalizer can inject closure subject
+authority. Reconcile the historical C001 closure record with the actual hosted
+CI run/job IDs after that workflow completed.
+
+Exit: the only supported external repository closure path owns both subject
+captures internally, accidental authority-injection symbols are not public,
+and closure records contain actual rather than placeholder hosted evidence.
 
 ## 5. Projection and CLI
 

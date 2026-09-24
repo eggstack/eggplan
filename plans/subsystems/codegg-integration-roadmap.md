@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: active planning baseline
+Status: blocked
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -63,12 +63,12 @@ ownership change was required.
 
 ### M002 — Staged core adoption
 
-Status: ready for implementation planning. M001 remains historically closed;
-production adoption must target the corrected repository-owned closure
-subject authority (Evidence M002 C001, closed).
+Status: blocked on Evidence M002 C002 closure. M001 remains historically
+closed. Production adoption must not bind to a repository API that still
+exposes a caller-injectable closure subject authority seam.
 
-No M002 implementation plan is registered yet. Re-check current CodeGG
-interfaces before planning.
+No M002 implementation plan is registered yet. After C002 closes, re-check
+current CodeGG interfaces before planning.
 
 Make CodeGG consume Eggplan generic domain/assessment where it reduces
 duplication. Keep CodeGG storage and runtime policy adapters.

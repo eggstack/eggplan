@@ -123,8 +123,22 @@ and closure-record compatibility. CLI `close` no longer passes its own
 captured subject to the repository and reports subject drift as a stable
 machine diagnostic.
 
-Historical M002 closure remains preserved. Projection/CLI M002, CodeGG M002,
-and Eggstack M002 are unblocked.
+Historical M002 closure remains preserved.
+
+### M002 C002 — Finalization test-seam containment and closure evidence reconciliation
+
+Status: ready.
+
+Plan: plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md
+
+Post-C001 review found that the deterministic SubjectCapture seam and alternate
+capture-injected finalizer were hidden from docs but remained public Rust API,
+allowing downstream callers to substitute closure subject authority. C002 makes
+that seam truly internal/test-only, adds compile/public-API boundary
+regressions, preserves all C001 S1/S2 runtime semantics, and factually repairs
+the C001 hosted-CI placeholders using the completed workflow evidence.
+
+Historical M002 and C001 closures remain preserved.
 
 ### M003 — Policy extensions
 

@@ -1,0 +1,14 @@
+[
+  {
+    "artifact_id": "art-out-1",
+    "execution_id": "exe-ok",
+    "generation": 1,
+    "path": "out/report.json",
+    "kind": "File",
+    "digest": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    "size_bytes": 3,
+    "executable": false,
+    "created_unix_ms": 1727000000000,
+    "expires_unix_ms": 1727600000000
+  }
+]

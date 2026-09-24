@@ -2,7 +2,7 @@
   "schema_version": 1,
   "fixture_only": true,
   "sources": {
-    "eggwork": "128f808c62f176d414dd18a705773e45f5e2891a",
+    "eggwork": "faaa0b905fa6bc43e46825fdd98530b5533a970f",
     "eggsearch": "dfa90e050c5434f3346902aeb4074901c58e90d1",
     "eggbench": "d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9"
   },
@@ -18,5 +18,10 @@
     "eggbench_comparison_pass",
     "eggbench_comparison_fail",
     "eggbench_comparison_inconclusive"
+  ],
+  "native_fixtures": [
+    "eggwork-snapshots.json",
+    "eggwork-artifacts.json",
+    "eggsearch-bundles.json"
   ]
 }

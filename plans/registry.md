@@ -56,7 +56,7 @@ Planning-system bootstrap:
 | Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 closed; M002 blocked on CodeGG Eggplan-integration M001 execution-subject provenance, now registered upstream | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | ready | M001 provider SPI closed; M002 Eggwork/Eggsearch adapters registered against fresh sibling baselines | plans/subsystems/eggstack-integration-roadmap.md |
+| Eggstack integrations | active | M001 provider SPI closed; M002 Eggwork/Eggsearch DTO adapters in closing | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -77,7 +77,7 @@ Planning-system bootstrap:
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | blocked | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | upstream CodeGG M001 provenance plan registered at af0a3e0; resume after positive closure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
-| Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | ready | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | handoff authorized; fresh sibling baselines recorded |
+| Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closing | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | local implementation and checks; hosted qualification pending |
 
 ## Corrective history and current maintenance
 

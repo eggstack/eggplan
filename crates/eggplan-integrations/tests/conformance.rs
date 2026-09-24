@@ -378,7 +378,7 @@ fn capability_and_artifact_bounds_are_enforced() {
 }
 
 #[test]
-fn external_untrusted_research_cannot_become_passed_by_text() {
+fn external_untrusted_research_operation_status_is_separate_from_content_trust() {
     let d = descriptor(
         "epp_eggsearch",
         ProviderClass::Research,
@@ -407,7 +407,16 @@ fn external_untrusted_research_cannot_become_passed_by_text() {
         Some("1")
     );
     external.status = EvidenceStatus::Passed;
-    assert!(finalize_observation(&d, &context(EvidenceKind::Research, None), &external).is_err());
+    let operation_pass =
+        finalize_observation(&d, &context(EvidenceKind::Research, None), &external).unwrap();
+    assert_eq!(operation_pass.status(), EvidenceStatus::Passed);
+    assert_eq!(
+        operation_pass
+            .result_metadata()
+            .get("source_trust")
+            .map(String::as_str),
+        Some("external_untrusted")
+    );
     external.status = EvidenceStatus::Inconclusive;
     external
         .result_metadata
@@ -505,7 +514,7 @@ fn synthetic_sibling_contract_corpus_has_reviewed_source_metadata() {
     assert_eq!(manifest["fixture_only"], true);
     assert_eq!(
         manifest["sources"]["eggwork"],
-        "128f808c62f176d414dd18a705773e45f5e2891a"
+        "faaa0b905fa6bc43e46825fdd98530b5533a970f"
     );
     assert_eq!(
         manifest["sources"]["eggsearch"],

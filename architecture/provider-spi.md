@@ -33,11 +33,13 @@ facts. Provider-specific mapping belongs to provider adapters, not this
 generic crate. An unavailable result remains unavailable; it is never promoted
 to a pass because of a message or debug string.
 
-Research-class results must preserve an explicit source trust marker.
-External-untrusted results cannot be finalized as Passed, and that trust marker
-is included in immutable observation metadata. The adapter does not decide
-Eggplan host trust: only the caller-supplied registry does. A digest establishes
-content integrity, not authentication.
+Research-class results must preserve an explicit source trust marker. Status
+describes the normalized producer operation; source trust describes content
+provenance. A research operation may be Passed when it produced a valid bundle
+even when that bundle contains external-untrusted sources. This does not assert
+that any source claim is true. The trust marker is included in immutable
+observation metadata, and only the caller-supplied registry decides Eggplan
+provider trust. A digest establishes content integrity, not authentication.
 
 Generic metadata is bounded and rejects sensitive field names, credential-like
 values, and endpoint URLs. Artifact references are bounded control records;

@@ -1,0 +1,173 @@
+[
+  {
+    "case": "external_web",
+    "bundle_id": "bundle_external",
+    "goal": "fixture only",
+    "created_at": "2026-09-24T00:00:00Z",
+    "sources": [
+      {
+        "source_id": "src_external",
+        "url": "https://example.invalid/source",
+        "title": "fixture title",
+        "provider_id": "web",
+        "trust": "external_untrusted",
+        "stable": false
+      }
+    ],
+    "fetched_items": [
+      {
+        "fetch_id": "fetch_external",
+        "source_id": "src_external",
+        "url": "https://example.invalid/source",
+        "fetched": true,
+        "truncated": false,
+        "trust": "external_untrusted",
+        "text": "fixture content omitted"
+      }
+    ],
+    "gaps": [],
+    "limits": {
+      "max_sources": 50,
+      "max_fetched_items": 20,
+      "max_total_chars": 100000,
+      "sources_truncated": false,
+      "fetched_items_truncated": false,
+      "total_chars_exceeded": false
+    },
+    "source_links": [
+      {
+        "source_id": "src_external",
+        "fetch_id": "fetch_external",
+        "link_reason": "explicit"
+      }
+    ]
+  },
+  {
+    "case": "local_trusted_label",
+    "bundle_id": "bundle_local",
+    "created_at": "2026-09-24T00:00:00Z",
+    "sources": [
+      {
+        "source_id": "src_local",
+        "provider_id": "local",
+        "trust": "local_trusted",
+        "stable": true
+      }
+    ],
+    "fetched_items": [],
+    "gaps": [],
+    "limits": {
+      "max_sources": 50,
+      "max_fetched_items": 20,
+      "max_total_chars": 100000,
+      "sources_truncated": false,
+      "fetched_items_truncated": false,
+      "total_chars_exceeded": false
+    }
+  },
+  {
+    "case": "provider_degraded",
+    "bundle_id": "bundle_degraded",
+    "created_at": "2026-09-24T00:00:00Z",
+    "sources": [
+      {
+        "source_id": "src_degraded",
+        "provider_id": "web",
+        "trust": "external_untrusted"
+      }
+    ],
+    "fetched_items": [],
+    "gaps": [
+      {
+        "kind": "provider_degraded",
+        "message": "omitted"
+      }
+    ],
+    "limits": {
+      "max_sources": 50,
+      "max_fetched_items": 20,
+      "max_total_chars": 100000,
+      "sources_truncated": false,
+      "fetched_items_truncated": false,
+      "total_chars_exceeded": false
+    }
+  },
+  {
+    "case": "all_external_untrusted",
+    "bundle_id": "bundle_untrusted",
+    "created_at": "2026-09-24T00:00:00Z",
+    "sources": [
+      {
+        "source_id": "src_untrusted",
+        "provider_id": "web",
+        "trust": "external_untrusted"
+      }
+    ],
+    "fetched_items": [],
+    "gaps": [
+      {
+        "kind": "all_results_external_untrusted",
+        "message": "omitted"
+      }
+    ],
+    "limits": {
+      "max_sources": 50,
+      "max_fetched_items": 20,
+      "max_total_chars": 100000,
+      "sources_truncated": false,
+      "fetched_items_truncated": false,
+      "total_chars_exceeded": false
+    }
+  },
+  {
+    "case": "truncated",
+    "bundle_id": "bundle_truncated",
+    "created_at": "2026-09-24T00:00:00Z",
+    "sources": [
+      {
+        "source_id": "src_truncated",
+        "provider_id": "web",
+        "trust": "external_untrusted"
+      }
+    ],
+    "fetched_items": [
+      {
+        "fetch_id": "fetch_truncated",
+        "source_id": "src_truncated",
+        "fetched": true,
+        "truncated": true,
+        "trust": "external_untrusted"
+      }
+    ],
+    "gaps": [],
+    "limits": {
+      "max_sources": 50,
+      "max_fetched_items": 20,
+      "max_total_chars": 100000,
+      "sources_truncated": false,
+      "fetched_items_truncated": true,
+      "total_chars_exceeded": true
+    }
+  },
+  {
+    "case": "empty_unavailable",
+    "bundle_id": "bundle_empty",
+    "created_at": "2026-09-24T00:00:00Z",
+    "sources": [],
+    "fetched_items": [],
+    "gaps": [
+      {
+        "kind": "no_primary_source_found",
+        "message": "omitted"
+      }
+    ],
+    "limits": {
+      "max_sources": 50,
+      "max_fetched_items": 20,
+      "max_total_chars": 100000,
+      "sources_truncated": false,
+      "fetched_items_truncated": false,
+      "total_chars_exceeded": false
+    }
+  }
+]

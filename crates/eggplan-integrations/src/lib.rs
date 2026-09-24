@@ -5,6 +5,9 @@
 //! This crate acquires no evidence and grants no provider trust. Hosts own
 //! transports, native clients, authentication, and registry membership.
 
+pub mod eggsearch;
+pub mod eggwork;
+
 use eggplan_core::{
     ArtifactRef, EvidenceKind, EvidenceObservation, EvidenceObservationInput, EvidenceProviderId,
     EvidenceStatus, ProviderDescriptor, SubjectRevision, VerificationDigest,
@@ -301,13 +304,6 @@ pub fn finalize_observation(
     if result.source_trust.is_some() && !descriptor.capabilities.research_trust_metadata {
         return Err(SpiError::Invalid(
             "provider does not declare research trust metadata capability",
-        ));
-    }
-    if result.source_trust == Some(SourceTrust::ExternalUntrusted)
-        && result.status == EvidenceStatus::Passed
-    {
-        return Err(SpiError::Invalid(
-            "external-untrusted source cannot normalize as passed evidence",
         ));
     }
     if result.status == EvidenceStatus::InProgress && !descriptor.capabilities.supports_in_progress

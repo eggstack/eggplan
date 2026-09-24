@@ -69,6 +69,15 @@ Execution-time / M002 planning re-check on 2026-09-24:
 These are research baselines, not dependency pins; re-check before provider
 adapter implementation.
 
+M002 handoff re-check on 2026-09-24:
+
+- Eggwork: faaa0b905fa6bc43e46825fdd98530b5533a970f
+- Eggsearch: dfa90e050c5434f3346902aeb4074901c58e90d1
+
+The reviewed execution DTO and EvidenceBundle contracts were unchanged at
+these heads. The commits since the prior review update sibling planning and
+closure records. Eggplan pins these heads as fixture/review provenance only.
+
 ## 4. Milestones
 
 ### M001 — Evidence provider SPI
@@ -93,10 +102,11 @@ M001 remains historically closed. Current sibling contracts were rechecked at
 Eggwork `128f808c62f176d414dd18a705773e45f5e2891a` and Eggsearch
 `5db6e1984a1441787f6d6a54754eb4a685766ec2`.
 
-M002 adds real bounded normalizers for Eggwork execution snapshots/artifacts
+M002 adds bounded DTO normalizers for Eggwork execution snapshots/artifacts
 and Eggsearch evidence bundles. Eggplan still performs no execution, network
 acquisition, MCP calls, or search. Eggsearch content trust remains provenance
-and cannot self-enroll provider authority.
+and cannot self-enroll provider authority. See
+architecture/eggwork-adapter.md and architecture/eggsearch-adapter.md.
 
 ### M003 — Eggbench plus CI/forge
 

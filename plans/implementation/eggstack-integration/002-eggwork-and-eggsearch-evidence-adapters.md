@@ -1,8 +1,8 @@
 # Eggstack Integrations M002 — Eggwork and Eggsearch Evidence Adapters
 
-Status: ready for handoff
+Status: closing
 
-Repository baseline: 0904218554c425c30aa6501b58d7fb8bcb839414
+Repository baseline: cc65a3e3faf9012e9903b68ee9834f937e7cb126
 
 Source roadmap:
 
@@ -15,8 +15,20 @@ Predecessor closure:
 
 Fresh sibling baselines reviewed:
 
-- Eggwork: eggstack/eggwork @ 128f808c62f176d414dd18a705773e45f5e2891a
-- Eggsearch: eggstack/eggsearch @ 5db6e1984a1441787f6d6a54754eb4a685766ec2
+- Eggwork: eggstack/eggwork @ faaa0b905fa6bc43e46825fdd98530b5533a970f
+- Eggsearch: eggstack/eggsearch @ dfa90e050c5434f3346902aeb4074901c58e90d1
+
+At handoff, the Eggwork execution DTO contract and Eggsearch EvidenceBundle
+fields listed below were rechecked at these current heads and remain
+authoritatively unchanged from the previous review. Newer sibling commits
+contain planning/closure documentation; fixture provenance uses these current
+heads.
+
+Implementation uses strict Eggwork DTOs and a bounded whitelisted EvidenceBundle
+subset. Eggwork finalization failure maps to Inconclusive because artifact
+capture may be incomplete. Research status describes bundle production, while
+SourceTrust separately describes content provenance; Passed does not attest to
+source truth or enroll provider trust.
 
 Relevant current contracts:
 

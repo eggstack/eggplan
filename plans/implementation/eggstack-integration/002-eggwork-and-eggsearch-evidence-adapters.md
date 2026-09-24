@@ -1,6 +1,6 @@
 # Eggstack Integrations M002 — Eggwork and Eggsearch Evidence Adapters
 
-Status: closing
+Status: closed
 
 Repository baseline: cc65a3e3faf9012e9903b68ee9834f937e7cb126
 
@@ -576,3 +576,30 @@ Record:
 - implementation SHA;
 - hosted native/MSRV workflow IDs;
 - M003 disposition.
+
+Closure evidence: plans/closure/eggstack-integration/002-closed.md.
+
+## 25. Implementation follow-through
+
+- Added strict, bounded Eggwork snapshot/result/artifact DTOs and the fixed
+  `epp_eggwork` descriptor. No Eggwork crate/runtime dependency was added.
+- Added Eggwork status/state validation, host verification-binding requirement,
+  artifact identity/digest mapping, and omission of output, environment,
+  credential, lease, and arbitrary diagnostic content.
+- Added a bounded Eggsearch EvidenceBundle subset and fixed `epp_eggsearch`
+  descriptor. No Eggsearch runtime, search, network, or MCP dependency was
+  added.
+- Added deterministic provenance/count metadata, gap mapping, bundle handle,
+  and trust non-escalation. `Passed` Research means bundle production succeeded;
+  external content remains marked untrusted and its claims are not endorsed.
+- Added bounded sibling-shaped fixtures pinned to Eggwork
+  `faaa0b905fa6bc43e46825fdd98530b5533a970f` and Eggsearch
+  `dfa90e050c5434f3346902aeb4074901c58e90d1`, adapter architecture docs, and
+  integration boundary guard coverage.
+- Local Linux verification passed at `bf3db0f189db4cde6f219f9ae878d41a6004c990`:
+  workspace format/check/clippy, 126 workspace tests, 3 doc compile-fail
+  tests, Rust 1.89 check/tests, all five boundary guards, and diff check.
+- Hosted run `36039972370` passed: Linux `107769411542`, macOS
+  `107769411593`, Windows `107769411549`, Rust 1.89 `107769411216`.
+- Eggstack M003 is ready for planning after M002 closure and current Eggbench
+  interface recheck at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`.

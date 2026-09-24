@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: active / ready
+Status: active / M002 closed; M003 ready for planning
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -98,9 +98,8 @@ Status: ready for handoff.
 
 Plan: plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md
 
-M001 remains historically closed. Current sibling contracts were rechecked at
-Eggwork `128f808c62f176d414dd18a705773e45f5e2891a` and Eggsearch
-`5db6e1984a1441787f6d6a54754eb4a685766ec2`.
+M001 remains historically closed. M002's current sibling interfaces and
+fixture baselines are recorded in section 3.1 and its closure evidence.
 
 M002 adds bounded DTO normalizers for Eggwork execution snapshots/artifacts
 and Eggsearch evidence bundles. Eggplan still performs no execution, network
@@ -110,9 +109,12 @@ architecture/eggwork-adapter.md and architecture/eggsearch-adapter.md.
 
 ### M003 — Eggbench plus CI/forge
 
-Blocked on positive M002. Add bundle, CI, commit, and artifact evidence and
-forge adapters. After M002 lands, recheck the Eggbench sibling interface
-before planning.
+Status: ready for planning.
+
+Add bundle, CI, commit, and artifact evidence and forge adapters. Eggbench was
+rechecked at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`; its current manifest v2
+keeps execution status separate from comparison verdict. Plan the adapter
+against that current contract before implementation.
 
 ## 5. Verification
 

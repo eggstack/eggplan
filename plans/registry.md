@@ -56,7 +56,7 @@ Planning-system bootstrap:
 | Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 closed; M002 blocked on CodeGG Eggplan-integration M001 execution-subject provenance, now registered upstream | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | active | M001 provider SPI closed; M002 Eggwork/Eggsearch DTO adapters in closing | plans/subsystems/eggstack-integration-roadmap.md |
+| Eggstack integrations | closed/current | M001 provider SPI and M002 Eggwork/Eggsearch adapters closed; M003 ready for planning against rechecked Eggbench contract | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -77,7 +77,7 @@ Planning-system bootstrap:
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | blocked | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | upstream CodeGG M001 provenance plan registered at af0a3e0; resume after positive closure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
-| Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closing | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | local implementation and checks; hosted qualification pending |
+| Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
 ## Corrective history and current maintenance
 
@@ -119,15 +119,15 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
    registered in dbowm91/codegg at `af0a3e0`. That plan captures/persists
    attempt-scoped execution subjects and never backfills legacy evidence from
    the current worktree.
-8. Projection/CLI M002 is closed. Eggstack M002 remains ready and independent
-   of the CodeGG provenance handoff; its sibling interfaces must be rechecked
-   at handoff. Evidence M002 C003 closed as non-blocking hygiene without
-   gating either capability plan.
+8. Projection/CLI M002 and Eggstack M002 are closed, independent of the CodeGG
+   provenance handoff. Eggstack M003 is ready for planning after rechecking
+   Eggbench at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`. Evidence M002 C003
+   closed as non-blocking hygiene without gating either capability plan.
 9. After positive M002 closures:
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - CodeGG M003 repository Plan binding may be planned;
-   - Eggstack M003 Eggbench/CI/forge adapters may be planned after a fresh
-     Eggbench interface recheck.
+   - Eggstack M003 Eggbench/CI/forge adapters are ready for planning after the
+     recheck above.
 10. Interoperability/distribution remains deferred until the local capability
    wave is qualified.
 
@@ -138,9 +138,9 @@ Reviewed during planning; these are not dependency pins.
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
 | CodeGG | f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c (interfaces); af0a3e0fb9b6552f45e3ea5d698e7980582493fd (registered provenance handoff) | WorkPlan runtime ownership remains CodeGG; current blocker is attempt-scoped execution subject provenance; M001 Eggplan fixture baseline remains a3c87fc/28b469 historical |
-| Eggwork | 128f808c62f176d414dd18a705773e45f5e2891a | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
-| Eggsearch | 5db6e1984a1441787f6d6a54754eb4a685766ec2 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
-| Eggbench | d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9 | .eggb manifest v2; execution status separated from comparison verdict |
+| Eggwork | faaa0b905fa6bc43e46825fdd98530b5533a970f | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
+| Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
+| Eggbench | d870512a5a1af16276ff05286ff0b6e2366b7f8f | current .eggb manifest v2; execution status remains separate from comparison verdict |
 | Eggsact | 40959b704431430668e9ca2bfe959a8ef32495d8 | deterministic in-process/preflight utilities |
 | Eggup | cf5b3d3819c168eb2dbf841daa8332f3eb28c915 | future verified distribution/update consumer |
 | SLSA | v1.2 approved provenance docs reviewed 2026-09-22 | subject + provenance separation |

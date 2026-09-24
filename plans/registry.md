@@ -53,7 +53,7 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | ready | M001/C001 closed; M002 guarded closure/integrity plan ready | plans/subsystems/evidence-closure-roadmap.md |
+| Evidence/closure | active | M001/C001 closed; M002 guarded closure/integrity implementation in progress | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | blocked | M001 plan registered; waits on Evidence M002 closure | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 plan registered against current CodeGG baseline; waits on Evidence M002 closure | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | blocked | Provider SPI M001 plan registered against refreshed sibling baselines; waits on Evidence M002 closure | plans/subsystems/eggstack-integration-roadmap.md |
@@ -68,7 +68,7 @@ Planning-system bootstrap:
 | Foundation | M003 subject scope + strict schema + platform hardening | closed | plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md | closure plans/closure/foundation-core/003-closed.md |
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
 | Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
-| Evidence | M002 guarded closure records + supersession + recovery | ready | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | next implementation handoff |
+| Evidence | M002 guarded closure records + supersession + recovery | active | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | implementation in progress |
 | Projection/CLI | M001 CLI control surface + derived registry | blocked | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | waits on Evidence M002 closure |
 | CodeGG integration | M001 golden parity + adapter seam | blocked | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | waits on Evidence M002 closure; reviewed CodeGG 6e183045 |
 | Eggstack integrations | M001 evidence provider SPI | blocked | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | waits on Evidence M002 closure |

@@ -61,6 +61,23 @@ Observations are append-only in repository storage. Replaying identical
 canonical content is idempotent; reusing an ID for different content conflicts.
 Assessment is pure and performs no network or process side effects.
 
+## Supersession and closure
+
+Evidence corrections are represented by append-only, digest-protected
+`EvidenceSupersessionRecord` links. Assessment's effective view contains only
+terminal observations that have not been superseded; old observation files
+remain available for audit. Self-links, dangling references, cycles, duplicate
+successors, and corrupt digests fail closed.
+
+A `ClosureCandidate` snapshots one exact Plan revision, subject, assessment,
+provider-policy digest, satisfying observation digests, and supersession
+lineage. `RepositoryStore::finalize_closure` reloads and reassesses these inputs
+under the repository lock, then writes a pending closure record, replaces the
+Plan with its next Closed revision, and promotes the record. Repository open
+discards a pending candidate when the source Plan is still current and promotes
+it when the exact target Plan is present. A Closed Plan without a matching
+record is corruption. Ordinary Plan CAS rejects transitions to Closed.
+
 ## Non-goals
 
 Eggplan does not execute verification, schedule work, fetch evidence, define a

@@ -1,7 +1,9 @@
 use crate::GitSubjectSource;
 use eggplan_core::{
-    EvidenceError, EvidenceObservation, EvidenceObservationId, Plan, PlanId, ValidationError,
-    digest_json,
+    AssessmentStatus, ClosureCandidate, ClosureId, ClosureRecord, EvidenceError,
+    EvidenceObservation, EvidenceObservationId, EvidenceSupersessionRecord, Plan, PlanId,
+    PlanStatus, ProviderDescriptor, ProviderRegistry, SubjectRevision, ValidationError,
+    assess_plan, digest_json, effective_observations,
 };
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
@@ -19,6 +21,7 @@ use uuid::Uuid;
 const CONFIG_VERSION: u32 = 1;
 const PLAN_FILE: &str = "plan.json";
 const EVIDENCE_DIR: &str = "evidence";
+const SUPERSESSIONS_DIR: &str = "supersessions";
 const MAX_PLAN_FILE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_OBSERVATION_FILE_BYTES: u64 = 1024 * 1024;
 
@@ -74,6 +77,8 @@ pub enum RepoError {
     InvalidUpdate,
     #[error("plan or item state transition is not allowed")]
     InvalidTransition,
+    #[error("plans may only enter Closed through guarded closure finalization")]
+    GuardedClosureRequired,
     #[error("cooperative repository lock timed out")]
     LockTimeout,
     #[error("replacement succeeded but directory durability could not be confirmed: {0}")]
@@ -90,6 +95,8 @@ pub enum RepoError {
     ObservationNotFound(EvidenceObservationId),
     #[error("observation count limit for this plan has been reached")]
     ObservationLimit,
+    #[error("closure recovery is required for plan {0}")]
+    RecoveryRequired(PlanId),
 }
 
 pub trait PlanStore {
@@ -123,6 +130,273 @@ pub struct RepositoryStore {
 }
 
 impl RepositoryStore {
+    fn recover_pending_closures(&self) -> Result<(), RepoError> {
+        let _guard = self.lock()?;
+        let root = self.root.join("plans");
+        for entry in fs::read_dir(&root)? {
+            let entry = entry?;
+            if entry.file_type()?.is_symlink() {
+                return Err(RepoError::UnsafePath(entry.path()));
+            }
+            if !entry.file_type()?.is_dir() {
+                continue;
+            }
+            let dir = entry.path();
+            check_dir(&dir)?;
+            let pending = dir.join("closure.pending.json");
+            match fs::symlink_metadata(&pending) {
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(RepoError::Io(e)),
+                Ok(meta) if meta.file_type().is_symlink() || !meta.is_file() => {
+                    return Err(RepoError::UnsafePath(pending));
+                }
+                Ok(_) => {}
+            }
+            let record: ClosureRecord =
+                serde_json::from_slice(&fs::read(&pending)?).map_err(|e| RepoError::Corrupt {
+                    path: pending.clone(),
+                    reason: e.to_string(),
+                })?;
+            let plan_path = dir.join(PLAN_FILE);
+            if fs::symlink_metadata(&plan_path)?.file_type().is_symlink() {
+                return Err(RepoError::UnsafePath(plan_path));
+            }
+            let stored: StoredPlan =
+                serde_json::from_slice(&fs::read(&plan_path)?).map_err(|e| RepoError::Corrupt {
+                    path: plan_path.clone(),
+                    reason: e.to_string(),
+                })?;
+            let plan = stored.plan;
+            if digest_json(&plan)? != stored.plan_digest {
+                return Err(RepoError::Corrupt {
+                    path: plan_path,
+                    reason: "plan content digest mismatch during closure recovery".into(),
+                });
+            }
+            let final_path = dir.join("closure.json");
+            if fs::symlink_metadata(&final_path).is_ok() {
+                return Err(RepoError::Corrupt {
+                    path: final_path,
+                    reason: "both pending and final closure records exist".into(),
+                });
+            }
+            if plan.status == PlanStatus::Closed
+                && plan.revision == record.final_plan_revision
+                && digest_json(&plan)? == record.final_plan_digest
+            {
+                record
+                    .validate(&plan)
+                    .map_err(|reason| RepoError::Corrupt {
+                        path: pending.clone(),
+                        reason,
+                    })?;
+                fs::rename(&pending, &final_path)?;
+                #[cfg(unix)]
+                File::open(&dir)?
+                    .sync_all()
+                    .map_err(RepoError::DurabilityUnknown)?;
+            } else if plan.status != PlanStatus::Closed
+                && plan.revision == record.candidate.source_revision
+                && digest_json(&plan)? == record.candidate.source_plan_digest
+            {
+                fs::remove_file(&pending)?;
+                #[cfg(unix)]
+                File::open(&dir)?
+                    .sync_all()
+                    .map_err(RepoError::DurabilityUnknown)?;
+            } else {
+                return Err(RepoError::Corrupt {
+                    path: pending,
+                    reason: "pending closure does not match source or target plan".into(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Finalize closure after recomputing assessment under the repository lock.
+    pub fn finalize_closure(
+        &self,
+        candidate: &ClosureCandidate,
+        current_subject: &SubjectRevision,
+        closure_id: ClosureId,
+        finalized_at_unix_ms: u64,
+    ) -> Result<(Plan, ClosureRecord), RepoError> {
+        let _guard = self.lock()?;
+        let current = self.load_unlocked(&candidate.plan_id)?;
+        if current.revision != candidate.source_revision
+            || digest_json(&current)? != candidate.source_plan_digest
+        {
+            return Err(RepoError::InvalidUpdate);
+        }
+        if &candidate.subject != current_subject {
+            return Err(RepoError::InvalidUpdate);
+        }
+        let observations = self.list_observations(&candidate.plan_id)?;
+        let supersessions = self.list_supersessions_unlocked(&candidate.plan_id)?;
+        let effective =
+            effective_observations(&observations, &supersessions).map_err(RepoError::Config)?;
+        let effective: Vec<_> = effective.into_iter().cloned().collect();
+        let mut providers = ProviderRegistry::default();
+        for entry in &candidate.provider_policy {
+            providers.register_trusted(ProviderDescriptor::new(
+                entry.provider_id.clone(),
+                entry.class.clone(),
+                entry.allowed_kinds.iter().copied(),
+            )?)?;
+        }
+        let assessment = assess_plan(&current, current_subject, &effective, &providers);
+        if assessment.status != AssessmentStatus::Complete || assessment != candidate.assessment {
+            return Err(RepoError::InvalidUpdate);
+        }
+        for (id, digest) in &candidate.satisfying_observations {
+            if !observations
+                .iter()
+                .any(|o| o.id() == id && o.content_digest() == digest)
+            {
+                return Err(RepoError::InvalidUpdate);
+            }
+        }
+        let mut expected_observations: Vec<_> = candidate
+            .assessment
+            .items
+            .iter()
+            .flat_map(|i| &i.criteria)
+            .flat_map(|c| &c.requirements)
+            .flat_map(|r| &r.satisfying_observation_ids)
+            .map(|id| {
+                let digest = observations
+                    .iter()
+                    .find(|o| o.id() == id)
+                    .map(|o| o.content_digest().to_string())
+                    .ok_or(RepoError::InvalidUpdate)?;
+                Ok((id.clone(), digest))
+            })
+            .collect::<Result<_, RepoError>>()?;
+        expected_observations.sort();
+        if expected_observations != candidate.satisfying_observations {
+            return Err(RepoError::InvalidUpdate);
+        }
+        if digest_json(&candidate.provider_policy)? != candidate.provider_policy_digest {
+            return Err(RepoError::InvalidUpdate);
+        }
+        let lineage: Vec<_> = supersessions
+            .iter()
+            .map(|r| (r.id.clone(), r.content_digest.clone()))
+            .collect();
+        if lineage != candidate.supersession_digests {
+            return Err(RepoError::InvalidUpdate);
+        }
+        let mut closed = current.clone();
+        closed.revision = closed
+            .revision
+            .checked_add(1)
+            .ok_or(RepoError::InvalidUpdate)?;
+        closed.status = PlanStatus::Closed;
+        let record =
+            ClosureRecord::finalize(closure_id, candidate.clone(), &closed, finalized_at_unix_ms)
+                .map_err(RepoError::Config)?;
+        let dir = self.plan_dir(&candidate.plan_id);
+        let pending = dir.join("closure.pending.json");
+        let final_path = dir.join("closure.json");
+        if final_path.exists() || pending.exists() {
+            return Err(RepoError::InvalidUpdate);
+        }
+        atomic_write(&pending, &serde_json::to_vec(&record)?)?;
+        atomic_write(&self.plan_path(&candidate.plan_id), &encode_plan(&closed)?)?;
+        fs::rename(&pending, &final_path)?;
+        #[cfg(unix)]
+        File::open(&dir)?
+            .sync_all()
+            .map_err(RepoError::DurabilityUnknown)?;
+        Ok((closed, record))
+    }
+
+    pub fn append_supersession(
+        &self,
+        plan_id: &PlanId,
+        record: &EvidenceSupersessionRecord,
+    ) -> Result<(), RepoError> {
+        record.validate().map_err(RepoError::Config)?;
+        if &record.plan_id != plan_id {
+            return Err(RepoError::InvalidUpdate);
+        }
+        let _guard = self.lock()?;
+        let plan = self.load_unlocked(plan_id)?;
+        if plan.status == PlanStatus::Closed {
+            return Err(RepoError::InvalidUpdate);
+        }
+        let observations = self.list_observations(plan_id)?;
+        if !observations.iter().any(|o| o.id() == &record.superseded)
+            || !observations.iter().any(|o| o.id() == &record.replacement)
+        {
+            return Err(RepoError::InvalidUpdate);
+        }
+        let dir = self.supersessions_dir(plan_id);
+        ensure_dir(&dir)?;
+        let path = dir.join(format!("{}.json", record.id));
+        if path.exists() {
+            return Err(RepoError::InvalidUpdate);
+        }
+        let mut records = self.list_supersessions_unlocked(plan_id)?;
+        records.push(record.clone());
+        effective_observations(&observations, &records).map_err(RepoError::Config)?;
+        atomic_write(&path, &serde_json::to_vec(record)?)?;
+        Ok(())
+    }
+
+    pub fn list_supersessions(
+        &self,
+        plan_id: &PlanId,
+    ) -> Result<Vec<EvidenceSupersessionRecord>, RepoError> {
+        self.load_unlocked(plan_id)?;
+        self.list_supersessions_unlocked(plan_id)
+    }
+
+    fn list_supersessions_unlocked(
+        &self,
+        plan_id: &PlanId,
+    ) -> Result<Vec<EvidenceSupersessionRecord>, RepoError> {
+        let dir = self.supersessions_dir(plan_id);
+        match fs::symlink_metadata(&dir) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(RepoError::Io(e)),
+            Ok(m) if m.file_type().is_symlink() || !m.is_dir() => {
+                return Err(RepoError::UnsafePath(dir));
+            }
+            Ok(_) => {}
+        }
+        let mut records = Vec::new();
+        for entry in fs::read_dir(&dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_symlink() || !entry.file_type()?.is_file() {
+                return Err(RepoError::UnsafePath(entry.path()));
+            }
+            let record: EvidenceSupersessionRecord =
+                serde_json::from_slice(&fs::read(entry.path())?).map_err(|e| {
+                    RepoError::Corrupt {
+                        path: entry.path(),
+                        reason: e.to_string(),
+                    }
+                })?;
+            record.validate().map_err(|reason| RepoError::Corrupt {
+                path: entry.path(),
+                reason,
+            })?;
+            if record.plan_id != *plan_id
+                || entry.file_name().to_string_lossy() != format!("{}.json", record.id)
+            {
+                return Err(RepoError::Corrupt {
+                    path: entry.path(),
+                    reason: "supersession identity mismatch".into(),
+                });
+            }
+            records.push(record);
+        }
+        records.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(records)
+    }
+
     pub fn open(root: impl AsRef<Path>) -> Result<Self, RepoError> {
         Self::open_with_options(root, StoreOptions::default())
     }
@@ -167,11 +441,15 @@ impl RepositoryStore {
             atomic_write(&config_path, bytes.as_bytes())?;
             config
         };
-        Ok(Self {
+        drop(_init_lock);
+        let store = Self {
             root,
             options,
             repository_id: config.repository_id,
-        })
+        };
+        store.recover_pending_closures()?;
+        store.list()?;
+        Ok(store)
     }
 
     pub fn root(&self) -> &Path {
@@ -216,6 +494,9 @@ impl RepositoryStore {
     }
     fn evidence_dir(&self, id: &PlanId) -> PathBuf {
         self.plan_dir(id).join(EVIDENCE_DIR)
+    }
+    fn supersessions_dir(&self, id: &PlanId) -> PathBuf {
+        self.plan_dir(id).join(SUPERSESSIONS_DIR)
     }
     fn observation_path(
         &self,
@@ -287,6 +568,117 @@ impl RepositoryStore {
                 path,
                 reason: "stored plan ID differs from directory ID".into(),
             });
+        }
+        let closure_path = dir.join("closure.json");
+        let pending_path = dir.join("closure.pending.json");
+        if pending_path.exists() {
+            return Err(RepoError::RecoveryRequired(id.clone()));
+        }
+        match (
+            plan.status == PlanStatus::Closed,
+            fs::symlink_metadata(&closure_path),
+        ) {
+            (true, Ok(meta)) if !meta.file_type().is_symlink() && meta.is_file() => {
+                let record: ClosureRecord = serde_json::from_slice(&fs::read(&closure_path)?)
+                    .map_err(|e| RepoError::Corrupt {
+                        path: closure_path.clone(),
+                        reason: e.to_string(),
+                    })?;
+                record
+                    .validate(&plan)
+                    .map_err(|reason| RepoError::Corrupt {
+                        path: closure_path.clone(),
+                        reason,
+                    })?;
+                let observations = self.list_observations_unlocked(id)?;
+                let supersessions = self.list_supersessions_unlocked(id)?;
+                effective_observations(&observations, &supersessions).map_err(|reason| {
+                    RepoError::Corrupt {
+                        path: closure_path.clone(),
+                        reason,
+                    }
+                })?;
+                for (observation_id, digest) in &record.candidate.satisfying_observations {
+                    if !observations.iter().any(|observation| {
+                        observation.id() == observation_id && observation.content_digest() == digest
+                    }) {
+                        return Err(RepoError::Corrupt {
+                            path: closure_path.clone(),
+                            reason: format!(
+                                "closure observation {observation_id} is missing or changed"
+                            ),
+                        });
+                    }
+                }
+                let lineage: Vec<_> = supersessions
+                    .iter()
+                    .map(|record| (record.id.clone(), record.content_digest.clone()))
+                    .collect();
+                if lineage != record.candidate.supersession_digests {
+                    return Err(RepoError::Corrupt {
+                        path: closure_path.clone(),
+                        reason: "closure supersession lineage is missing or changed".into(),
+                    });
+                }
+                let mut source_plan = plan.clone();
+                source_plan.revision = record.candidate.source_revision;
+                source_plan.status = PlanStatus::Active;
+                if digest_json(&source_plan)? != record.candidate.source_plan_digest {
+                    return Err(RepoError::Corrupt {
+                        path: closure_path.clone(),
+                        reason: "closure source Plan digest cannot be reproduced".into(),
+                    });
+                }
+                let mut providers = ProviderRegistry::default();
+                for entry in &record.candidate.provider_policy {
+                    providers
+                        .register_trusted(ProviderDescriptor::new(
+                            entry.provider_id.clone(),
+                            entry.class.clone(),
+                            entry.allowed_kinds.iter().copied(),
+                        )?)
+                        .map_err(|error| RepoError::Corrupt {
+                            path: closure_path.clone(),
+                            reason: error.to_string(),
+                        })?;
+                }
+                let effective =
+                    effective_observations(&observations, &supersessions).map_err(|reason| {
+                        RepoError::Corrupt {
+                            path: closure_path.clone(),
+                            reason,
+                        }
+                    })?;
+                let effective: Vec<_> = effective.into_iter().cloned().collect();
+                let assessment = assess_plan(
+                    &source_plan,
+                    &record.candidate.subject,
+                    &effective,
+                    &providers,
+                );
+                if assessment.status != AssessmentStatus::Complete
+                    || assessment != record.candidate.assessment
+                {
+                    return Err(RepoError::Corrupt {
+                        path: closure_path.clone(),
+                        reason: "closure assessment cannot be reproduced".into(),
+                    });
+                }
+            }
+            (true, _) => {
+                return Err(RepoError::Corrupt {
+                    path: closure_path,
+                    reason: "closed plan has no valid closure record".into(),
+                });
+            }
+            (false, Ok(_)) => {
+                return Err(RepoError::Corrupt {
+                    path: closure_path,
+                    reason: "closure record exists for non-closed plan".into(),
+                });
+            }
+            (false, Err(error)) if error.kind() == std::io::ErrorKind::NotFound => {}
+            (false, Err(error)) => return Err(RepoError::Io(error)),
         }
         Ok(plan)
     }
@@ -369,6 +761,11 @@ impl PlanStore for RepositoryStore {
                 expected: expected_revision,
                 current: current.revision,
             });
+        }
+        if next.status == eggplan_core::PlanStatus::Closed
+            && current.status != eggplan_core::PlanStatus::Closed
+        {
+            return Err(RepoError::GuardedClosureRequired);
         }
         if next.status != current.status
             && !eggplan_core::plan_transition_allowed(&current.status, &next.status)
@@ -470,6 +867,15 @@ impl PlanStore for RepositoryStore {
 
     fn list_observations(&self, plan_id: &PlanId) -> Result<Vec<EvidenceObservation>, RepoError> {
         self.load_unlocked(plan_id)?;
+        self.list_observations_unlocked(plan_id)
+    }
+}
+
+impl RepositoryStore {
+    fn list_observations_unlocked(
+        &self,
+        plan_id: &PlanId,
+    ) -> Result<Vec<EvidenceObservation>, RepoError> {
         let dir = self.evidence_dir(plan_id);
         match fs::symlink_metadata(&dir) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),

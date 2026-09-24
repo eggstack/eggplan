@@ -1,8 +1,9 @@
 use eggplan_core::{
-    AcceptanceCriterion, AssessmentStatus, CriterionId, EvidenceCardinality, EvidenceKind,
-    EvidenceObservation, EvidenceObservationId, EvidenceObservationInput, EvidenceProviderId,
-    EvidenceRequirement, EvidenceStatus, Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus,
-    PlanStatus, ProviderDescriptor, ProviderRegistry, SubjectPolicy, SubjectRevision, SubjectState,
+    AcceptanceCriterion, AssessmentStatus, ClosureCandidate, ClosureId, ClosureRecord, CriterionId,
+    EvidenceCardinality, EvidenceKind, EvidenceObservation, EvidenceObservationId,
+    EvidenceObservationInput, EvidenceProviderId, EvidenceRequirement, EvidenceStatus, Plan,
+    PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus, ProviderDescriptor,
+    ProviderPolicyEntry, ProviderRegistry, SubjectPolicy, SubjectRevision, SubjectState,
     VerificationDigest, assess_plan,
 };
 use eggplan_repo::{
@@ -273,7 +274,7 @@ fn illegal_lifecycle_updates_are_rejected() {
     closed.status = PlanStatus::Closed;
     assert!(matches!(
         store.compare_and_swap(&p.id, 0, &closed),
-        Err(RepoError::InvalidTransition)
+        Err(RepoError::GuardedClosureRequired)
     ));
     let mut completed = p.clone();
     completed.revision = 1;
@@ -506,10 +507,6 @@ fn bound_evidence_persists_recaptures_and_assesses_end_to_end() {
     plan.revision = 3;
     plan.items[0].status = PlanItemStatus::Completed;
     plan = store.compare_and_swap(&plan.id, 2, &plan).unwrap();
-    plan.revision = 4;
-    plan.status = PlanStatus::Closed;
-    plan = store.compare_and_swap(&plan.id, 3, &plan).unwrap();
-
     let make_observation = |id: &str, binding: VerificationDigest| {
         EvidenceObservation::finalize(EvidenceObservationInput {
             id: EvidenceObservationId::new(format!("epe_{id}")).unwrap(),
@@ -578,6 +575,135 @@ fn bound_evidence_persists_recaptures_and_assesses_end_to_end() {
     );
     assert_eq!(reopened_result, stale_result);
     drop(repo);
+}
+
+#[test]
+fn guarded_closure_persists_integrity_and_reopens() {
+    let dir = tempdir().unwrap();
+    let root = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&root).unwrap();
+    let subject = SubjectRevision {
+        subject_kind: "git".into(),
+        repository_id: "epr_test".into(),
+        revision: "abc123".into(),
+        state: SubjectState::Clean,
+        dirty_digest: None,
+    };
+    let binding = VerificationDigest::new(format!("sha256:{}", "c".repeat(64))).unwrap();
+    let mut initial = plan();
+    initial.items[0].criteria.push(AcceptanceCriterion {
+        id: CriterionId::new("epc_close").unwrap(),
+        statement: "the required test passed".into(),
+        human_judgment_allowed: false,
+        requirements: vec![EvidenceRequirement {
+            description: "required test".into(),
+            kind: EvidenceKind::Test,
+            provider: None,
+            subject_policy: SubjectPolicy::Exact,
+            cardinality: EvidenceCardinality::Any,
+            min_count: 1,
+            allow_human_judgment: false,
+            expected_verification_digest: Some(binding.clone()),
+        }],
+    });
+    store.create(&initial).unwrap();
+    initial.revision = 1;
+    initial.status = PlanStatus::Active;
+    initial.subject = Some(subject.clone());
+    initial.items[0].status = PlanItemStatus::Actionable;
+    let mut active = store.compare_and_swap(&initial.id, 0, &initial).unwrap();
+    active.revision = 2;
+    active.items[0].status = PlanItemStatus::InProgress;
+    active = store.compare_and_swap(&active.id, 1, &active).unwrap();
+    active.revision = 3;
+    active.items[0].status = PlanItemStatus::Completed;
+    let active = store.compare_and_swap(&active.id, 2, &active).unwrap();
+    let mut evidence = observation("close_pass", EvidenceStatus::Passed);
+    evidence = EvidenceObservation::finalize(EvidenceObservationInput {
+        id: evidence.id().clone(),
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        kind: EvidenceKind::Test,
+        status: EvidenceStatus::Passed,
+        subject: subject.clone(),
+        observed_at_unix_ms: 10,
+        invocation_ref: Some("test suite".into()),
+        verification_digest: Some(binding),
+        result_metadata: Default::default(),
+        artifacts: vec![],
+    })
+    .unwrap();
+    store.append_observation(&active.id, &evidence).unwrap();
+    let policy = vec![ProviderPolicyEntry {
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        class: "host".into(),
+        allowed_kinds: [EvidenceKind::Test].into_iter().collect(),
+    }];
+    let mut providers = ProviderRegistry::default();
+    providers
+        .register_trusted(
+            ProviderDescriptor::new(
+                EvidenceProviderId::new("epp_test").unwrap(),
+                "host",
+                [EvidenceKind::Test],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let assessment = assess_plan(&active, &subject, &[evidence], &providers);
+    assert_eq!(assessment.status, AssessmentStatus::Complete);
+    let candidate = ClosureCandidate::build(
+        &active,
+        subject.clone(),
+        assessment,
+        &store.list_observations(&active.id).unwrap(),
+        &[],
+        policy,
+        11,
+    )
+    .unwrap();
+    let mut target = active.clone();
+    target.revision += 1;
+    target.status = PlanStatus::Closed;
+    let interrupted = ClosureRecord::finalize(
+        ClosureId::new("epcl_before_replace").unwrap(),
+        candidate.clone(),
+        &target,
+        12,
+    )
+    .unwrap();
+    let plan_path = root.join("plans/ep_store/plan.json");
+    let pending_path = root.join("plans/ep_store/closure.pending.json");
+    let encoded_source = serde_json::json!({
+        "storage_version": 1,
+        "plan_digest": eggplan_core::digest_json(&active).unwrap(),
+        "plan": active,
+    });
+    fs::write(&pending_path, serde_json::to_vec(&interrupted).unwrap()).unwrap();
+    fs::write(&plan_path, serde_json::to_vec(&encoded_source).unwrap()).unwrap();
+    let store = RepositoryStore::open(&root).unwrap();
+    assert_eq!(store.get(&active.id).unwrap(), active);
+    assert!(!pending_path.exists());
+    let (closed, record) = store
+        .finalize_closure(
+            &candidate,
+            &subject,
+            ClosureId::new("epcl_close").unwrap(),
+            12,
+        )
+        .unwrap();
+    assert_eq!(closed.status, PlanStatus::Closed);
+    assert_eq!(store.get(&active.id).unwrap(), closed);
+    record.validate(&closed).unwrap();
+    fs::rename(root.join("plans/ep_store/closure.json"), &pending_path).unwrap();
+    let reopened = RepositoryStore::open(&root).unwrap();
+    assert_eq!(reopened.get(&active.id).unwrap(), closed);
+    assert!(root.join("plans/ep_store/closure.json").exists());
+    let observation_path = root.join(format!("plans/ep_store/evidence/{}.json", "epe_close_pass"));
+    fs::write(&observation_path, b"{}").unwrap();
+    assert!(matches!(
+        RepositoryStore::open(&root),
+        Err(RepoError::Corrupt { .. })
+    ));
 }
 
 #[test]

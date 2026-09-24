@@ -1,6 +1,6 @@
 # Evidence and Closure M002 — Guarded Closure Records, Supersession, and Recovery
 
-Status: ready for handoff
+Status: active
 
 Repository baseline: 6b924957fdc37e4266a410803186801db5655e82
 

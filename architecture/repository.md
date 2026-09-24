@@ -10,7 +10,10 @@
     plan.json                    # canonical versioned envelope and current Plan
     evidence/
       <observation-id>.json      # immutable finalized observations
-    closure.json                 # reserved for later closure milestone
+    supersessions/
+      <supersession-id>.json     # immutable correction links
+    closure.pending.json         # recoverable close transaction intent
+    closure.json                 # immutable finalized closure record
 ```
 
 The plan envelope has storage schema version 1, a validated schema-v1 or
@@ -30,6 +33,14 @@ Assessment remains pure in `eggplan-core` and does not resolve remote
 providers. The store accepts at most 10,000 observations per plan, with a
 1 MiB encoded-file limit per observation and a 16 MiB encoded-file limit per
 Plan.
+
+Ordinary CAS cannot transition a Plan to Closed. `finalize_closure` acquires
+the repository lock, verifies the exact candidate revision and subject,
+rebuilds trusted provider policy from the candidate's bounded snapshot,
+recomputes assessment over the effective supersession view, then writes the
+pending closure record before replacing the Plan and promoting the record.
+Open recovers a matching pending transaction: source revision means discard;
+exact closed target means promote. Other combinations fail as corruption.
 
 The store validates each managed path component with `symlink_metadata`,
 rejects symlinked roots/directories/plan files, uses PlanId's restricted

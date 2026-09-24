@@ -78,6 +78,22 @@ missing/unavailable, awaiting human judgment, inconclusive, actionable work,
 then complete. Completed item labels without acceptance criteria and passing
 evidence remain incomplete.
 
+## Closure schema v1
+
+Closure IDs (`epcl_`) and evidence-supersession IDs (`eps_`) are distinct typed
+identities. Supersession records are append-only digest-protected links;
+assessment uses only terminal observations in the validated lineage. A pure
+ClosureCandidate snapshots the exact active Plan revision, subject, complete
+assessment, satisfying observation digests, supersession digests, and sorted
+provider-policy authority facts. A ClosureRecord binds that candidate to the
+next Closed Plan revision and its canonical digest. Stored policy is historical
+evidence and does not auto-trust providers in later assessments.
+
+The repository alone finalizes closure. Reopen verifies the source and final
+Plan digests, provider-policy digest, reproducible assessment, exact evidence
+digests, and supersession lineage. Ordinary CAS cannot enter Closed. See
+[repository recovery](repository.md) for the pending-record crash protocol.
+
 ## Verification
 
 Run `scripts/check-core-boundary.sh` and the workspace fmt, check, clippy, and

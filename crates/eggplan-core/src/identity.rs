@@ -152,6 +152,8 @@ define_id!(PlanItemId, "epi_");
 define_id!(CriterionId, "epc_");
 define_id!(EvidenceProviderId, "epp_");
 define_id!(EvidenceObservationId, "epe_");
+define_id!(ClosureId, "epcl_");
+define_id!(EvidenceSupersessionId, "eps_");
 
 #[cfg(test)]
 mod tests {

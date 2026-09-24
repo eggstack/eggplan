@@ -6,6 +6,7 @@
 //! model-runtime responsibilities.
 
 mod assessment;
+mod closure;
 mod evidence;
 mod graph;
 mod identity;
@@ -16,12 +17,13 @@ pub use assessment::{
     AssessmentReason, AssessmentStatus, CriterionAssessment, ItemAssessment, PlanAssessment,
     RequirementAssessment, assess_plan,
 };
+pub use closure::*;
 pub use evidence::{
     EVIDENCE_SCHEMA_VERSION, EvidenceError, EvidenceObservation, EvidenceObservationInput,
     EvidenceStatus, ProviderDescriptor, ProviderRegistry,
 };
 pub use graph::{GraphError, ItemReadiness, Readiness, readiness};
-pub use identity::EvidenceObservationId;
+pub use identity::{ClosureId, EvidenceObservationId, EvidenceSupersessionId};
 pub use identity::{
     CriterionId, EvidenceProviderId, PlanId, PlanItemId, TypedId, VerificationDigest,
 };

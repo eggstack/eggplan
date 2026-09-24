@@ -30,17 +30,18 @@ It does not own canonical domain semantics or execution.
 
 ### M001 — CLI control surface and derived registry
 
-Status: active.
+Status: active (cross-platform qualification correction in progress).
 
 Plan: plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md
 
-The plan targets the closed guarded-closure and supersession contracts.
-Implement init/new/show/status/ready/graph/check/evidence/assess/close and
-derived registry output with bounded machine JSON.
+Bounded projections, native CLI, guarded closure, explicit provider policy,
+deep integrity checks, and derived registry output are implemented. Hosted
+Windows snapshot normalization correction and requalification are in progress.
 
 ### M002 — Markdown import/render
 
-Blocked on M001.
+Ready for planning now that M001 provides native projections and command
+contracts. Create and register a bounded implementation plan before handoff.
 
 Support Eggplan-native implementation/closure projections and the documented
 subset of CodeGG's plans hierarchy. Report lossy or unmapped fields.

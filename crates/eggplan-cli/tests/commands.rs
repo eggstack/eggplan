@@ -170,10 +170,11 @@ fn native_cli_smoke_reads_mutates_and_derives_registry() {
 fn help_snapshot_is_stable_and_human_output_needs_no_ansi() {
     let output = invoke(&["--help"]);
     assert!(output.status.success());
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap(),
-        include_str!("fixtures/help.txt")
-    );
+    let actual = String::from_utf8(output.stdout)
+        .unwrap()
+        .replace("\r\n", "\n");
+    let expected = include_str!("fixtures/help.txt").replace("\r\n", "\n");
+    assert_eq!(actual, expected);
     let temp = tempdir().unwrap();
     let human = invoke(&[
         "init",

@@ -4,6 +4,8 @@ Status: active
 
 Repository baseline: dac415e4e52ba2d3ba8af03c1541a7d5f6e59d76
 
+Implementation commit: cb3a8eb4bceefe7bc5a13fb66b3d638077573cdd (cross-platform snapshot correction in progress)
+
 Source roadmap:
 
 - plans/subsystems/projection-cli-roadmap.md

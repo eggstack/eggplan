@@ -36,6 +36,9 @@ This roadmap sequences product capability. It does not imply implementation.
         v
       M002 closure records + evidence integrity/recovery
         |
+        v
+      M002 C001 finalization subject revalidation
+        |
         +----------------------+----------------------+
         |                      |                      |
         v                      v                      v
@@ -132,6 +135,20 @@ handling of corrupt/dangling observations.
 
 Exit: a Plan cannot close without evidence permitted by its criteria, and
 historical evidence is not rewritten.
+
+### M002 C001 — Finalization subject revalidation
+
+Class: invariant / corrective hardening
+
+Move authoritative Git SubjectRevision recapture into RepositoryStore guarded
+finalization, replay assessment against the internally captured subject, and
+recapture immediately before the first closure write. Caller-owned subject
+snapshots are no longer finalization authority. Preserve existing persisted
+ClosureRecord compatibility and crash recovery.
+
+Exit: a candidate that becomes stale before finalization, or whose subject
+drifts during finalizer revalidation, cannot produce pending/final closure
+state or a Closed Plan.
 
 ## 5. Projection and CLI
 

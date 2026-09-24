@@ -1,6 +1,6 @@
 # Evidence and Closure Roadmap
 
-Status: closed/current
+Status: corrective required
 
 Long-term references: plans/000-long-term-specification.md sections 8-12 and 17-20.
 
@@ -102,6 +102,21 @@ requirement-to-evidence matrices, provider-policy snapshots, append-only
 evidence supersession lineage, corruption detection, and crash/reopen
 qualification. Ordinary Plan CAS cannot manufacture a Closed Plan without the
 guarded closure record. See plans/closure/evidence-closure/002-closed.md.
+
+### M002 C001 — Finalization subject revalidation
+
+Status: ready.
+
+Plan: plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md
+
+Post-closure review found that RepositoryStore finalization recomputes
+assessment under the Eggplan state lock but accepts the caller's previously
+captured SubjectRevision as "current" authority. C001 moves authoritative Git
+subject recapture into finalization, requires a second pre-write recapture,
+adds typed subject-drift failures, and preserves existing M002 crash recovery
+and closure-record compatibility.
+
+Historical M002 closure remains preserved.
 
 ### M003 — Policy extensions
 

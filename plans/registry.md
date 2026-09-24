@@ -53,10 +53,10 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | closed/current | M001/C001 and M002 guarded closure/integrity closed | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | active/current | M001 CLI control surface and derived registry closed; M002 ready for planning | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | closed/current | M001 golden parity and adapter seam closed | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | closed/current | M001 evidence provider SPI closed; M002 ready for planning, M003 blocked on M002 | plans/subsystems/eggstack-integration-roadmap.md |
+| Evidence/closure | corrective required | M001/C001 and M002 closed historically; M002 C001 finalization subject revalidation ready | plans/subsystems/evidence-closure-roadmap.md |
+| Projection/CLI | blocked | M001 closed historically; M002 waits on Evidence M002 C001 | plans/subsystems/projection-cli-roadmap.md |
+| CodeGG integration | blocked | M001 closed historically; M002 staged adoption waits on Evidence M002 C001 | plans/subsystems/codegg-integration-roadmap.md |
+| Eggstack integrations | blocked | M001 provider SPI closed historically; live-provider M002 waits on Evidence M002 C001 | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -68,45 +68,48 @@ Planning-system bootstrap:
 | Foundation | M003 subject scope + strict schema + platform hardening | closed | plans/implementation/foundation-core/003-subject-scope-strict-schema-and-platform-hardening.md | closure plans/closure/foundation-core/003-closed.md |
 | Evidence | M001 evidence ledger/assessment | closed | plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md | historical closure plans/closure/evidence-closure/001-closed.md |
 | Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
-| Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | closure plans/closure/evidence-closure/002-closed.md |
+| Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | historical closure plans/closure/evidence-closure/002-closed.md |
+| Evidence | M002 C001 finalization subject revalidation | ready | plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md | next corrective handoff; preserves M002 historical closure |
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 
-## Registered next implementation wave
+## Registered corrective gate
 
-The corrective gate is closed. The next implementation wave is intentionally
-sequenced around durable closure authority:
+A post-M002 review found one narrow guarded-closure subject-authority gap. The
+historical M002, CodeGG M001, Eggstack M001, and Projection/CLI M001 closures
+remain preserved.
 
-1. Evidence M002 is closed; see plans/closure/evidence-closure/002-closed.md.
-2. CodeGG Integration M001 is closed against CodeGG 28b46956; see
-   plans/closure/codegg-integration/001-closed.md.
-3. Eggstack Provider SPI M001 is closed against its re-checked execution-time
-   sibling baselines; M002 is ready for a future planning handoff.
-4. Execute Projection/CLI M001 against the Evidence M002 and Eggstack M001
-   closure commits.
-5. These plans own independent runtime surfaces; execute them in the requested
-   order without folding one plan's responsibilities into another.
-
-Projection/CLI M002 is ready for planning but has no registered implementation
-plan yet. No implementation plan is yet registered for CodeGG M002, Eggstack
-M002, or interoperability/distribution.
+1. Evidence M002 C001 is ready now.
+2. It removes caller-owned current-subject authority from guarded finalization,
+   recaptures the Git subject inside RepositoryStore under the Eggplan lock,
+   and rechecks the subject immediately before the first closure write.
+3. Projection/CLI M002, CodeGG M002, and Eggstack M002 are temporarily blocked
+   until C001 closes.
+4. No other corrective implementation plan is currently registered.
 
 ## Current execution order
 
 1. Foundation M001/M002/M003 — closed/current foundation.
 2. Evidence M001 + C001 — closed; v2 verification binding is current.
-3. Evidence M002 — closed with append-only supersession lineage, pure
-   ClosureCandidate, immutable ClosureRecord, provider-policy snapshot,
-   raw-CAS-to-Closed prohibition, and crash-consistent pending/final recovery.
-4. CodeGG Integration M001 is closed — golden parity and non-circular adapter seam.
-5. Eggstack Provider SPI M001 is closed — normalization/trust boundary only.
-6. Projection/CLI M001 is closed — versioned machine/human control surface.
-7. Plan Projection/CLI M002 — Markdown import/render; handoff is unblocked.
-8. Stabilize CodeGG parity before staged CodeGG ownership migration.
-9. Implement real Eggwork/Eggsearch providers only after Provider SPI closure.
-10. Add attestation/service/distribution work after local contracts are
-   qualified.
+3. Evidence M002 — historically closed with guarded closure, supersession, and
+   crash recovery.
+4. CodeGG Integration M001 — historically closed.
+5. Eggstack Provider SPI M001 — historically closed.
+6. Projection/CLI M001 — historically closed.
+7. Execute Evidence M002 C001:
+   - repository-owned finalization subject recapture;
+   - second pre-write subject recapture;
+   - typed subject mismatch/drift errors;
+   - deterministic stale/race regressions;
+   - CLI close diagnostic adaptation;
+   - planning/status cleanup.
+8. After C001 closes, independently plan the next capability wave:
+   - Projection/CLI M002 — Markdown import/render;
+   - CodeGG M002 — staged core adoption after a fresh CodeGG interface check;
+   - Eggstack M002 — real Eggwork/Eggsearch adapters after sibling re-check.
+9. Add attestation/service/distribution work after local contracts and live
+   integrations are qualified.
 
 ## External interface research baselines
 
@@ -151,6 +154,13 @@ integration milestone is actually handed off.
     CAS must never be a bypass around closure assessment.
 11. Evidence correction is append-only lineage. Historical observations are
     never rewritten to make a later assessment pass.
+12. Guarded closure finalization owns its current SubjectRevision capture;
+    callers may propose a candidate subject but cannot assert current subject
+    authority at commit time.
+13. The finalizer revalidates subject stability immediately before its first
+    canonical closure write; arbitrary external worktree writers remain
+    outside Eggplan's lock and later changes make closure historical/stale, not
+    corrupt.
 
 ## Planning hygiene
 

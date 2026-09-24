@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: active/current
+Status: blocked
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -40,8 +40,12 @@ plans/closure/projection-cli/001-closed.md.
 
 ### M002 — Markdown import/render
 
-Ready for planning now that M001 provides native projections and command
-contracts. Create and register a bounded implementation plan before handoff.
+Status: blocked on Evidence M002 C001 closure.
+
+M001 remains historically closed. Do not extend the CLI/projection surface
+while its guarded-close finalization dependency has a known subject-authority
+corrective outstanding. After C001 closes, create and register a bounded M002
+implementation plan.
 
 Support Eggplan-native implementation/closure projections and the documented
 subset of CodeGG's plans hierarchy. Report lossy or unmapped fields.

@@ -89,10 +89,15 @@ provider-policy authority facts. A ClosureRecord binds that candidate to the
 next Closed Plan revision and its canonical digest. Stored policy is historical
 evidence and does not auto-trust providers in later assessments.
 
-The repository alone finalizes closure. Reopen verifies the source and final
-Plan digests, provider-policy digest, reproducible assessment, exact evidence
-digests, and supersession lineage. Ordinary CAS cannot enter Closed. See
-[repository recovery](repository.md) for the pending-record crash protocol.
+The repository alone finalizes closure and owns current-subject authority:
+the finalizer recaptures the Git `SubjectRevision` from the configured
+`GitSubjectSource` under its lock and again immediately before the first
+closure write. The caller may build a candidate, but the finalizer decides
+whether the candidate's subject still matches the worktree at the moment of
+closure. Reopen verifies the source and final Plan digests, provider-policy
+digest, reproducible assessment, exact evidence digests, and supersession
+lineage. Ordinary CAS cannot enter Closed. See [repository
+recovery](repository.md) for the pending-record crash protocol.
 
 ## Verification
 

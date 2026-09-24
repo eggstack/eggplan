@@ -35,12 +35,20 @@ providers. The store accepts at most 10,000 observations per plan, with a
 Plan.
 
 Ordinary CAS cannot transition a Plan to Closed. `finalize_closure` acquires
-the repository lock, verifies the exact candidate revision and subject,
-rebuilds trusted provider policy from the candidate's bounded snapshot,
-recomputes assessment over the effective supersession view, then writes the
-pending closure record before replacing the Plan and promoting the record.
-Open recovers a matching pending transaction: source revision means discard;
-exact closed target means promote. Other combinations fail as corruption.
+the repository lock, recaptures the Git `SubjectRevision` from the
+repository's configured `GitSubjectSource` under that lock, requires the
+captured subject to equal the candidate's subject, rebuilds trusted provider
+policy from the candidate's bounded snapshot, recomputes assessment over the
+effective supersession view, recaptures the subject a second time immediately
+before writing the pending closure record, and then writes the pending
+closure record before replacing the Plan and promoting the record. A
+caller-owned current subject is not authoritative. A mismatch before
+assessment is `RepoError::ClosureSubjectStale`; a mismatch between the two
+captures is `RepoError::ClosureSubjectDrift`; a capture failure is
+`RepoError::ClosureSubjectCapture`. None of those outcomes produces pending
+or final closure state or a Closed Plan. Open recovers a matching pending
+transaction: source revision means discard; exact closed target means
+promote. Other combinations fail as corruption.
 
 The store validates each managed path component with `symlink_metadata`,
 rejects symlinked roots/directories/plan files, uses PlanId's restricted

@@ -15,7 +15,11 @@ execute work, acquire evidence, or edit the development planning registry.
   lineage.
 - `assess` requires a versioned provider-policy file for one invocation.
 - `close` requires that policy and an expected Plan revision, then delegates
-  exclusively to guarded Evidence M002 finalization.
+  exclusively to guarded Evidence M002 finalization. The CLI does not pass
+  its own captured subject to the repository; finalization recaptures under
+  its own lock and reports subject-stale / subject-drift / subject-unavailable
+  as stable machine diagnostics (`closure_subject_changed`,
+  `closure_subject_drifted`, `closure_subject_unavailable`).
 - `closure show` returns a bounded summary of the validated immutable closure.
 - `check` validates repository, Plans, evidence, supersessions, closure
   records, pending transactions, and staging state. It opens the repository in

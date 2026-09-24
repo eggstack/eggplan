@@ -944,7 +944,6 @@ fn close_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
     let (_, record) = store
         .finalize_closure(
             &candidate,
-            &candidate.subject,
             ClosureId::generate(),
             now_ms().map_err(|message| failure("close", "clock_error", message, args.json))?,
         )
@@ -1396,6 +1395,18 @@ fn repo_failure(command: &str, error: RepoError, json: bool) -> CliFailure {
         RepoError::InvalidUpdate => (
             "invalid_update",
             "candidate update violates revision or lifecycle constraints".into(),
+        ),
+        RepoError::ClosureSubjectStale => (
+            "closure_subject_changed",
+            "candidate subject was already stale before finalization".into(),
+        ),
+        RepoError::ClosureSubjectDrift => (
+            "closure_subject_drifted",
+            "source subject changed between finalizer recaptures".into(),
+        ),
+        RepoError::ClosureSubjectCapture(_) => (
+            "closure_subject_unavailable",
+            "current subject could not be captured for closure finalization".into(),
         ),
         RepoError::Validation(error) => ("invalid_plan", error.to_string()),
         RepoError::RecoveryRequired(id) => (

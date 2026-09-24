@@ -71,12 +71,25 @@ successors, and corrupt digests fail closed.
 
 A `ClosureCandidate` snapshots one exact Plan revision, subject, assessment,
 provider-policy digest, satisfying observation digests, and supersession
-lineage. `RepositoryStore::finalize_closure` reloads and reassesses these inputs
-under the repository lock, then writes a pending closure record, replaces the
-Plan with its next Closed revision, and promotes the record. Repository open
-discards a pending candidate when the source Plan is still current and promotes
-it when the exact target Plan is present. A Closed Plan without a matching
-record is corruption. Ordinary Plan CAS rejects transitions to Closed.
+lineage. `RepositoryStore::finalize_closure` reloads and reassesses these
+inputs under the repository lock, recaptures the Git `SubjectRevision`
+internally, requires equality with the candidate subject, and recaptures the
+subject a second time immediately before writing the pending closure record.
+The finalizer, not the caller, owns current-subject authority. A stale
+candidate subject before the first capture aborts with a typed failure; a
+drift between the two captures aborts with a typed failure; neither produces
+pending or final closure state. On the second successful capture the finalizer
+writes the pending closure record, replaces the Plan with its next Closed
+revision, and promotes the record. Repository open discards a pending
+candidate when the source Plan is still current and promotes it when the
+exact target Plan is present. A Closed Plan without a matching record is
+corruption. Ordinary Plan CAS rejects transitions to Closed.
+
+Eggplan does not lock arbitrary external Git/worktree writers. After the
+finalizer's pre-write recapture, any subsequent source-tree change leaves the
+already-finalized closure record structurally valid; current-state surfaces
+may report that closure as stale relative to the later worktree, but that is
+distinct from closure-record corruption.
 
 ## Non-goals
 

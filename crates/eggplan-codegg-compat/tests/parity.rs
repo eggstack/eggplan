@@ -482,15 +482,9 @@ fn concurrent_cancel_and_guarded_close_have_one_cas_winner() {
     let close_store = store.clone();
     let close_barrier = barrier.clone();
     let close_candidate = candidate.clone();
-    let close_subject = subject();
     let close = std::thread::spawn(move || {
         close_barrier.wait();
-        close_store.finalize_closure(
-            &close_candidate,
-            &close_subject,
-            ClosureId::new("epcl_race").unwrap(),
-            102,
-        )
+        close_store.finalize_closure(&close_candidate, ClosureId::new("epcl_race").unwrap(), 102)
     });
     let cancel_store = store.clone();
     let cancel_barrier = barrier.clone();

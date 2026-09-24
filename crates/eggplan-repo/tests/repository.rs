@@ -7,7 +7,8 @@ use eggplan_core::{
     VerificationDigest, assess_plan,
 };
 use eggplan_repo::{
-    GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore, StoreOptions,
+    GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore,
+    ScriptedSubjectCapture, StoreOptions, SubjectCapture,
 };
 use fs2::FileExt;
 use git2::{Repository, Signature};
@@ -605,15 +606,10 @@ fn bound_evidence_persists_recaptures_and_assesses_end_to_end() {
 #[test]
 fn guarded_closure_persists_integrity_and_reopens() {
     let dir = tempdir().unwrap();
+    let _repo = init_git_repo(dir.path());
     let root = dir.path().join(".eggplan");
     let store = RepositoryStore::open(&root).unwrap();
-    let subject = SubjectRevision {
-        subject_kind: "git".into(),
-        repository_id: "epr_test".into(),
-        revision: "abc123".into(),
-        state: SubjectState::Clean,
-        dirty_digest: None,
-    };
+    let subject = store.subject_source().capture().unwrap();
     let binding = VerificationDigest::new(format!("sha256:{}", "c".repeat(64))).unwrap();
     let mut initial = plan();
     initial.items[0].criteria.push(AcceptanceCriterion {
@@ -684,7 +680,7 @@ fn guarded_closure_persists_integrity_and_reopens() {
         .register_trusted(
             ProviderDescriptor::new(
                 EvidenceProviderId::new("epp_test").unwrap(),
-                "host",
+                String::from("host"),
                 [EvidenceKind::Test],
             )
             .unwrap(),
@@ -732,12 +728,7 @@ fn guarded_closure_persists_integrity_and_reopens() {
     assert_eq!(store.get(&active.id).unwrap(), active);
     assert!(!pending_path.exists());
     let (closed, record) = store
-        .finalize_closure(
-            &candidate,
-            &subject,
-            ClosureId::new("epcl_close").unwrap(),
-            12,
-        )
+        .finalize_closure(&candidate, ClosureId::new("epcl_close").unwrap(), 12)
         .unwrap();
     assert_eq!(closed.status, PlanStatus::Closed);
     assert_eq!(store.get_observation(&active.id, old.id()).unwrap(), old);
@@ -824,5 +815,239 @@ fn git_subject_includes_submodule_head_and_nested_dirty_content() {
     assert_ne!(
         nested_dirty.dirty_digest,
         source.capture().unwrap().dirty_digest
+    );
+}
+
+fn close_ready_store(root: &std::path::Path) -> (RepositoryStore, Plan, SubjectRevision) {
+    let store = RepositoryStore::open(root).unwrap();
+    let subject = store.subject_source().capture().unwrap();
+    let binding = VerificationDigest::new(format!("sha256:{}", "c".repeat(64))).unwrap();
+    let mut plan = Plan::new(
+        PlanId::new("ep_revalidate").unwrap(),
+        "revalidate closure subject",
+        vec![PlanItem {
+            id: PlanItemId::new("epi_revalidate").unwrap(),
+            position: 0,
+            parent: None,
+            dependencies: vec![],
+            status: PlanItemStatus::Completed,
+            description: "revalidate closure subject".into(),
+            criteria: vec![AcceptanceCriterion {
+                id: CriterionId::new("epc_revalidate").unwrap(),
+                statement: "designated test passed".into(),
+                human_judgment_allowed: false,
+                requirements: vec![EvidenceRequirement {
+                    description: "designated test invocation".into(),
+                    kind: EvidenceKind::Test,
+                    provider: None,
+                    subject_policy: SubjectPolicy::Exact,
+                    cardinality: EvidenceCardinality::Any,
+                    min_count: 1,
+                    allow_human_judgment: false,
+                    expected_verification_digest: Some(binding.clone()),
+                }],
+            }],
+            blocker: None,
+            next_action: None,
+        }],
+    )
+    .unwrap();
+    plan.subject = Some(subject.clone());
+    store.create(&plan).unwrap();
+    plan.revision = 1;
+    plan.status = PlanStatus::Active;
+    plan = store.compare_and_swap(&plan.id, 0, &plan).unwrap();
+    let observation = EvidenceObservation::finalize(EvidenceObservationInput {
+        id: EvidenceObservationId::new("epe_revalidate_pass").unwrap(),
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        kind: EvidenceKind::Test,
+        status: EvidenceStatus::Passed,
+        subject: subject.clone(),
+        observed_at_unix_ms: 11,
+        invocation_ref: Some("cargo test".into()),
+        verification_digest: Some(binding),
+        result_metadata: Default::default(),
+        artifacts: vec![],
+    })
+    .unwrap();
+    store.append_observation(&plan.id, &observation).unwrap();
+    (store, plan, subject)
+}
+
+fn build_complete_candidate(
+    store: &RepositoryStore,
+    plan: &Plan,
+    subject: &SubjectRevision,
+) -> ClosureCandidate {
+    let policy = vec![ProviderPolicyEntry {
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        class: "host".into(),
+        allowed_kinds: [EvidenceKind::Test].into_iter().collect(),
+    }];
+    let observations = store.list_observations(&plan.id).unwrap();
+    let supersessions = store.list_supersessions(&plan.id).unwrap();
+    let effective: Vec<_> = eggplan_core::effective_observations(&observations, &supersessions)
+        .unwrap()
+        .into_iter()
+        .cloned()
+        .collect();
+    let mut providers = ProviderRegistry::default();
+    providers
+        .register_trusted(
+            ProviderDescriptor::new(
+                EvidenceProviderId::new("epp_test").unwrap(),
+                String::from("host"),
+                [EvidenceKind::Test],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let assessment = assess_plan(plan, subject, &effective, &providers);
+    assert_eq!(assessment.status, AssessmentStatus::Complete);
+    ClosureCandidate::build(
+        plan,
+        subject.clone(),
+        assessment,
+        &observations,
+        &supersessions,
+        policy,
+        12,
+    )
+    .unwrap()
+}
+
+#[test]
+fn closure_subject_changed_before_finalizer_aborts_with_no_partial_state() {
+    let dir = tempdir().unwrap();
+    let _repo = init_git_repo(dir.path());
+    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+    let candidate = build_complete_candidate(&store, &plan, &subject);
+    fs::write(dir.path().join("tracked.txt"), b"changed after capture\n").unwrap();
+    let result = store.finalize_closure(&candidate, ClosureId::generate(), 13);
+    assert!(matches!(result, Err(RepoError::ClosureSubjectStale)));
+    assert_eq!(store.get(&plan.id).unwrap().status, PlanStatus::Active);
+    let plan_dir = store.root().join("plans").join(plan.id.as_str());
+    assert!(!plan_dir.join("closure.json").exists());
+    assert!(!plan_dir.join("closure.pending.json").exists());
+    assert_eq!(
+        store.get(&plan.id).unwrap().revision,
+        plan.revision,
+        "closed plan revision must not advance",
+    );
+    let reopened = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    assert_eq!(reopened.get(&plan.id).unwrap().status, PlanStatus::Active);
+    assert_eq!(reopened.get(&plan.id).unwrap().revision, plan.revision);
+}
+
+#[test]
+fn closure_subject_drift_between_captures_aborts_with_no_partial_state() {
+    let dir = tempdir().unwrap();
+    let _repo = init_git_repo(dir.path());
+    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+    let candidate = build_complete_candidate(&store, &plan, &subject);
+    let drifted = SubjectRevision {
+        subject_kind: subject.subject_kind.clone(),
+        repository_id: subject.repository_id.clone(),
+        revision: subject.revision.clone(),
+        state: SubjectState::Dirty,
+        dirty_digest: Some(format!("sha256:{}", "d".repeat(64))),
+    };
+    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
+        Ok(subject.clone()),
+        Ok(drifted),
+    ]));
+    let result = store.finalize_closure_with_capture(
+        &candidate,
+        ClosureId::generate(),
+        13,
+        capture.as_ref(),
+    );
+    assert!(matches!(result, Err(RepoError::ClosureSubjectDrift)));
+    assert_eq!(store.get(&plan.id).unwrap().status, PlanStatus::Active);
+    let plan_dir = store.root().join("plans").join(plan.id.as_str());
+    assert!(!plan_dir.join("closure.json").exists());
+    assert!(!plan_dir.join("closure.pending.json").exists());
+}
+
+#[test]
+fn closure_subject_capture_failure_during_finalizer_aborts_with_no_partial_state() {
+    let dir = tempdir().unwrap();
+    let _repo = init_git_repo(dir.path());
+    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+    let candidate = build_complete_candidate(&store, &plan, &subject);
+    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
+        Ok(subject.clone()),
+        Err(eggplan_repo::GitSubjectError::Unborn),
+    ]));
+    let result = store.finalize_closure_with_capture(
+        &candidate,
+        ClosureId::generate(),
+        13,
+        capture.as_ref(),
+    );
+    assert!(matches!(result, Err(RepoError::ClosureSubjectCapture(_))));
+    assert_eq!(store.get(&plan.id).unwrap().status, PlanStatus::Active);
+    let plan_dir = store.root().join("plans").join(plan.id.as_str());
+    assert!(!plan_dir.join("closure.json").exists());
+    assert!(!plan_dir.join("closure.pending.json").exists());
+}
+
+#[test]
+fn closure_subject_stable_between_captures_succeeds() {
+    let dir = tempdir().unwrap();
+    let _repo = init_git_repo(dir.path());
+    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+    let candidate = build_complete_candidate(&store, &plan, &subject);
+    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
+        Ok(subject.clone()),
+        Ok(subject.clone()),
+    ]));
+    let (closed, record) = store
+        .finalize_closure_with_capture(&candidate, ClosureId::generate(), 13, capture.as_ref())
+        .unwrap();
+    assert_eq!(closed.status, PlanStatus::Closed);
+    assert_eq!(closed.revision, plan.revision + 1);
+    record.validate(&closed).unwrap();
+    assert_eq!(record.candidate.subject, subject);
+}
+
+#[test]
+fn historical_closure_subject_becomes_stale_after_worktree_change() {
+    let dir = tempdir().unwrap();
+    let _repo = init_git_repo(dir.path());
+    let (store, plan, subject) = close_ready_store(&dir.path().join(".eggplan"));
+    let candidate = build_complete_candidate(&store, &plan, &subject);
+    let capture: Box<dyn SubjectCapture> = Box::new(ScriptedSubjectCapture::new(vec![
+        Ok(subject.clone()),
+        Ok(subject.clone()),
+    ]));
+    let (closed, _) = store
+        .finalize_closure_with_capture(&candidate, ClosureId::generate(), 13, capture.as_ref())
+        .unwrap();
+    assert_eq!(closed.status, PlanStatus::Closed);
+    let reopened = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    let reloaded = reopened.get(&plan.id).unwrap();
+    assert_eq!(reloaded.status, PlanStatus::Closed);
+    assert_eq!(
+        reopened
+            .closure_record(&plan.id)
+            .unwrap()
+            .unwrap()
+            .candidate
+            .subject,
+        subject,
+    );
+    fs::write(dir.path().join("tracked.txt"), b"changed after closure\n").unwrap();
+    let after = reopened.subject_source().capture().unwrap();
+    assert_ne!(after, subject);
+    assert_eq!(
+        reopened
+            .closure_record(&plan.id)
+            .unwrap()
+            .unwrap()
+            .candidate
+            .subject,
+        subject,
+        "historical closure subject must not change",
     );
 }

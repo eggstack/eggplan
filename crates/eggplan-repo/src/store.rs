@@ -1,4 +1,4 @@
-use crate::GitSubjectSource;
+use crate::{GitSubjectError, GitSubjectSource};
 use eggplan_core::{
     AssessmentStatus, ClosureCandidate, ClosureId, ClosureRecord, EvidenceError,
     EvidenceObservation, EvidenceObservationId, EvidenceSupersessionRecord, Plan, PlanId,
@@ -99,6 +99,66 @@ pub enum RepoError {
     ObservationLimit,
     #[error("closure recovery is required for plan {0}")]
     RecoveryRequired(PlanId),
+    #[error("closure subject changed before finalization")]
+    ClosureSubjectStale,
+    #[error("closure subject drifted during finalization")]
+    ClosureSubjectDrift,
+    #[error("closure subject capture failed: {0}")]
+    ClosureSubjectCapture(#[source] GitSubjectError),
+}
+
+/// Subject capture seam used by guarded closure finalization.
+///
+/// Production finalization always wires this to the repository's configured
+/// `GitSubjectSource`. Tests inject a deterministic scripted capture to
+/// exercise drift and stale-before-finalize regressions without exposing a
+/// broad public provider framework. The seam is `#[doc(hidden)]` and must
+/// not be treated as part of the supported API.
+#[doc(hidden)]
+pub trait SubjectCapture: Send + Sync {
+    fn capture(&self) -> Result<SubjectRevision, GitSubjectError>;
+}
+
+#[doc(hidden)]
+pub struct GitSubjectCapture<'a> {
+    source: &'a GitSubjectSource,
+}
+
+impl<'a> GitSubjectCapture<'a> {
+    #[doc(hidden)]
+    pub fn new(source: &'a GitSubjectSource) -> Self {
+        Self { source }
+    }
+}
+
+impl SubjectCapture for GitSubjectCapture<'_> {
+    fn capture(&self) -> Result<SubjectRevision, GitSubjectError> {
+        self.source.capture()
+    }
+}
+
+#[doc(hidden)]
+pub struct ScriptedSubjectCapture {
+    results: std::sync::Mutex<std::collections::VecDeque<Result<SubjectRevision, GitSubjectError>>>,
+}
+
+impl ScriptedSubjectCapture {
+    #[doc(hidden)]
+    pub fn new(results: Vec<Result<SubjectRevision, GitSubjectError>>) -> Self {
+        Self {
+            results: std::sync::Mutex::new(results.into_iter().collect()),
+        }
+    }
+}
+
+impl SubjectCapture for ScriptedSubjectCapture {
+    fn capture(&self) -> Result<SubjectRevision, GitSubjectError> {
+        self.results
+            .lock()
+            .expect("scripted capture poisoned")
+            .pop_front()
+            .expect("scripted capture sequence exhausted")
+    }
 }
 
 pub trait PlanStore {
@@ -310,12 +370,45 @@ impl RepositoryStore {
     }
 
     /// Finalize closure after recomputing assessment under the repository lock.
+    ///
+    /// Authoritative Git `SubjectRevision` recapture lives inside this
+    /// boundary. Callers may not pass a caller-owned current subject. The
+    /// finalizer captures S1 before assessment replay and S2 immediately
+    /// before the first canonical closure write. Any drift aborts with a
+    /// typed error and produces no pending/final closure state and no Closed
+    /// Plan.
     pub fn finalize_closure(
         &self,
         candidate: &ClosureCandidate,
-        current_subject: &SubjectRevision,
         closure_id: ClosureId,
         finalized_at_unix_ms: u64,
+    ) -> Result<(Plan, ClosureRecord), RepoError> {
+        let source = self.subject_source();
+        let capture = GitSubjectCapture::new(&source);
+        self.finalize_closure_with_capture(candidate, closure_id, finalized_at_unix_ms, &capture)
+    }
+
+    /// Crate-private hook that lets tests inject a deterministic subject
+    /// capture sequence. Production `finalize_closure` always wires the
+    /// repository's own `GitSubjectSource`; this method is not part of the
+    /// supported public API.
+    #[doc(hidden)]
+    pub fn finalize_closure_with_capture(
+        &self,
+        candidate: &ClosureCandidate,
+        closure_id: ClosureId,
+        finalized_at_unix_ms: u64,
+        capture: &dyn SubjectCapture,
+    ) -> Result<(Plan, ClosureRecord), RepoError> {
+        self.finalize_closure_inner(candidate, closure_id, finalized_at_unix_ms, capture)
+    }
+
+    fn finalize_closure_inner(
+        &self,
+        candidate: &ClosureCandidate,
+        closure_id: ClosureId,
+        finalized_at_unix_ms: u64,
+        capture: &dyn SubjectCapture,
     ) -> Result<(Plan, ClosureRecord), RepoError> {
         let _guard = self.lock()?;
         let current = self.load_unlocked(&candidate.plan_id)?;
@@ -324,8 +417,11 @@ impl RepositoryStore {
         {
             return Err(RepoError::InvalidUpdate);
         }
-        if &candidate.subject != current_subject {
-            return Err(RepoError::InvalidUpdate);
+        let s1 = capture
+            .capture()
+            .map_err(RepoError::ClosureSubjectCapture)?;
+        if s1 != candidate.subject {
+            return Err(RepoError::ClosureSubjectStale);
         }
         let observations = self.list_observations(&candidate.plan_id)?;
         let supersessions = self.list_supersessions_unlocked(&candidate.plan_id)?;
@@ -340,7 +436,7 @@ impl RepositoryStore {
                 entry.allowed_kinds.iter().copied(),
             )?)?;
         }
-        let assessment = assess_plan(&current, current_subject, &effective, &providers);
+        let assessment = assess_plan(&current, &s1, &effective, &providers);
         if assessment.status != AssessmentStatus::Complete || assessment != candidate.assessment {
             return Err(RepoError::InvalidUpdate);
         }
@@ -396,6 +492,12 @@ impl RepositoryStore {
         let final_path = dir.join("closure.json");
         if final_path.exists() || pending.exists() {
             return Err(RepoError::InvalidUpdate);
+        }
+        let s2 = capture
+            .capture()
+            .map_err(RepoError::ClosureSubjectCapture)?;
+        if s2 != s1 || s2 != candidate.subject {
+            return Err(RepoError::ClosureSubjectDrift);
         }
         atomic_write(&pending, &serde_json::to_vec(&record)?)?;
         atomic_write(&self.plan_path(&candidate.plan_id), &encode_plan(&closed)?)?;

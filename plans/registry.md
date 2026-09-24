@@ -55,7 +55,7 @@ Planning-system bootstrap:
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current + maintenance ready | M002 C002 remains qualified; non-blocking C003 reference/guard hygiene registered | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | ready | M001 closed; M002 loss-aware Markdown import/render registered for handoff | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | blocked | M001 closed; M002 blocked pending exact execution-subject capture in CodeGG | plans/subsystems/codegg-integration-roadmap.md |
+| CodeGG integration | blocked | M001 closed; M002 blocked on CodeGG Eggplan-integration M001 execution-subject provenance, now registered upstream | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | ready | M001 provider SPI closed; M002 Eggwork/Eggsearch adapters registered against fresh sibling baselines | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
@@ -75,7 +75,7 @@ Planning-system bootstrap:
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | ready | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | handoff authorized |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
-| CodeGG integration | M002 staged Eggplan assessment adoption | blocked | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | exact source SubjectRevision is not persisted with CodeGG execution evidence |
+| CodeGG integration | M002 staged Eggplan assessment adoption | blocked | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | upstream CodeGG M001 provenance plan registered at af0a3e0; resume after positive closure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | ready | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | handoff authorized; fresh sibling baselines recorded |
 
@@ -114,18 +114,22 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
 4. CodeGG Integration M001 — historically closed.
 5. Eggstack Provider SPI M001 — historically closed.
 6. Projection/CLI M001 — historically closed.
-7. Sequential implementation stopped at CodeGG M002 after the Eggplan bridge
-   exposed a missing authority input in current CodeGG execution evidence:
-   the exact source SubjectRevision is not persisted with completed jobs or
-   runs. CodeGG M002 is blocked pending a host-side subject-capture handoff.
-   Evidence M002 C003 remains non-blocking; Projection/CLI M002 and Eggstack
-   M002 remain independently ready and have not been started in this sequence.
-8. After positive M002 closures:
+7. CodeGG M002 is blocked on one explicit upstream CodeGG handoff:
+   `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`,
+   registered in dbowm91/codegg at `af0a3e0`. That plan captures/persists
+   attempt-scoped execution subjects and never backfills legacy evidence from
+   the current worktree.
+8. Parallel Eggplan work remains authorized now:
+   - Evidence M002 C003 — non-blocking closure-reference/static-guard hygiene;
+   - Projection/CLI M002 — loss-aware Markdown import/render;
+   - Eggstack M002 — real Eggwork/Eggsearch evidence adapters.
+   None depends on the CodeGG provenance handoff.
+9. After positive M002 closures:
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - CodeGG M003 repository Plan binding may be planned;
    - Eggstack M003 Eggbench/CI/forge adapters may be planned after a fresh
      Eggbench interface recheck.
-9. Interoperability/distribution remains deferred until the local capability
+10. Interoperability/distribution remains deferred until the local capability
    wave is qualified.
 
 ## External interface research baselines
@@ -134,7 +138,7 @@ Reviewed during planning; these are not dependency pins.
 
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
-| CodeGG | a3c87fc18ee55aaf630401a562c11bb83112fd82 | current WorkPlan model/store/evidence/assessment/projection; WorkOrder/Goal/Todo/checkpoints/runtime remain separate; M001 fixture baseline was 28b469... |
+| CodeGG | f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c (interfaces); af0a3e0fb9b6552f45e3ea5d698e7980582493fd (registered provenance handoff) | WorkPlan runtime ownership remains CodeGG; current blocker is attempt-scoped execution subject provenance; M001 Eggplan fixture baseline remains a3c87fc/28b469 historical |
 | Eggwork | 128f808c62f176d414dd18a705773e45f5e2891a | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
 | Eggsearch | 5db6e1984a1441787f6d6a54754eb4a685766ec2 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
 | Eggbench | d7d1fd9a9b67a5b2ca6a816c841d2588a368aae9 | .eggb manifest v2; execution status separated from comparison verdict |
@@ -197,6 +201,9 @@ integration milestone is actually handed off.
     enrollment; Eggwork execution verification binding is host-supplied.
 19. Sibling commit SHAs recorded by compatibility/adapters are fixture/review
     provenance, not runtime trust or branch dependencies.
+20. Historical CodeGG execution subjects must come from durable attempt-time
+    provenance. Eggplan integration must never reconstruct an older job/run
+    subject from CodeGG's current worktree.
 
 ## Planning hygiene
 

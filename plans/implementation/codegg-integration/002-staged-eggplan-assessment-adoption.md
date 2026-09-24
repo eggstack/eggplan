@@ -13,9 +13,11 @@ Predecessor closure:
 - plans/closure/codegg-integration/001-closed.md
 - plans/closure/evidence-closure/002-c002-closed.md
 
-Fresh CodeGG baseline reviewed:
+Fresh CodeGG baselines reviewed:
 
-- dbowm91/codegg @ a3c87fc18ee55aaf630401a562c11bb83112fd82
+- original M002 planning baseline: dbowm91/codegg @ a3c87fc18ee55aaf630401a562c11bb83112fd82
+- current blocker/interface recheck: dbowm91/codegg @ f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c
+- upstream provenance-plan registration: dbowm91/codegg @ af0a3e0fb9b6552f45e3ea5d698e7980582493fd
 
 Prior compatibility baseline:
 
@@ -461,24 +463,29 @@ The Eggplan closure record must cite:
 
 Eggplan-side bridge work is committed as `088968b` (pure live snapshot mapper,
 fixture-only source-SHA validation, detailed deterministic assessment result,
-and shared verification-digest helper). The CodeGG head was rechecked at
-`5f4532659dbf0df2cd9f2b3bdb024217d2ea7868`; the WorkPlan model, evidence,
-assessment, and store interfaces remain unchanged from reviewed baseline
-`a3c87fc18ee55aaf630401a562c11bb83112fd82`.
+and shared verification-digest helper). CodeGG was rechecked through
+`f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c`; the relevant WorkPlan evidence
+shape still lacks exact attempt-scoped source provenance.
 
-CodeGG currently stores only status in `WorkPlanEvidenceSnapshot`. Its durable
-`JobRecord` and `RunManifest` do not record the exact source `SubjectRevision`
-observed by the execution. A current worktree capture cannot establish the
-subject of an older completed job. Attaching that current subject to an
-observation would manufacture authority, and leaving the observation
-subjectless cannot satisfy Eggplan's exact-subject policy. The live bridge
-therefore fails closed for these refs.
+CodeGG currently stores only status in `WorkPlanEvidenceSnapshot`. A current
+worktree capture cannot establish the subject of an older completed job.
+Attaching that current subject to an observation would manufacture authority,
+and leaving the observation subjectless cannot satisfy Eggplan's exact-subject
+policy. The live bridge therefore correctly fails closed.
 
-This prevents the required CodeGG adoption and differential qualification:
-the existing passing-evidence cases cannot be represented as exact-subject
-observations without a source-subject capture recorded with execution. No
-CodeGG production changes or differential claims have been made. Keep M002
-blocked until a bounded host-side plan captures and persists the execution
-subject and resolves it alongside the authoritative verification
-specification. The three other registered M002 handoffs remain independently
-ready; this sequential execution stops here for reassessment.
+The required upstream handoff is now registered in CodeGG at
+`af0a3e0fb9b6552f45e3ea5d698e7980582493fd`:
+
+- `plans/subsystems/eggplan-assessment-integration-roadmap.md`
+- `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
+
+Its M001 captures and persists CodeGG-native attempt-scoped execution subjects,
+handles live-workspace drift and immutable/materialized seal points, keeps
+legacy records explicitly subject-unavailable, and exposes enriched host
+evidence without replacing CodeGG's current assessor.
+
+Resume this Eggplan M002 only after that CodeGG M001 closes positively. Then
+complete the remaining verification-digest derivation, CodeGG dependency pin,
+differential parity, and production assessor adoption. Evidence C003,
+Projection/CLI M002, and Eggstack M002 remain independent and may proceed in
+parallel.

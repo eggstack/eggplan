@@ -11,6 +11,10 @@ M001 execution-time baseline re-checked 2026-09-24:
 28b4695661d463dd1675d045ac6299c5fbc9ea31.
 M002 planning baseline re-checked 2026-09-24:
 a3c87fc18ee55aaf630401a562c11bb83112fd82.
+Current CodeGG interface/blocker baseline re-checked:
+f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c.
+Upstream provenance handoff registered in CodeGG at:
+af0a3e0fb9b6552f45e3ea5d698e7980582493fd.
 
 ## 1. Purpose
 
@@ -81,12 +85,25 @@ production bridge must not depend on eggplan-repo and must not invent
 verification identity from prose or native reference IDs.
 
 Implementation checkpoint: Eggplan's live bridge is committed as
-`088968b`. The current CodeGG WorkPlan evidence snapshot stores status but not
-the exact source SubjectRevision observed by a completed execution. The current
-worktree cannot authoritatively stand in for a historical execution subject.
-The bridge fails closed, so CodeGG adoption/differential qualification is
-blocked until execution-time subject capture is persisted and resolved by the
-host adapter.
+`088968b`. Current CodeGG `f4e6e69` still stores status without the exact
+attempt-scoped source SubjectRevision observed by completed execution. The
+current worktree cannot authoritatively stand in for a historical execution
+subject.
+
+The upstream corrective/unblock is now explicitly registered in CodeGG:
+
+- CodeGG planning commit:
+  `af0a3e0fb9b6552f45e3ea5d698e7980582493fd`
+- Roadmap:
+  `plans/subsystems/eggplan-assessment-integration-roadmap.md`
+- Ready plan:
+  `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
+
+That plan makes subject provenance attempt-scoped, preserves legacy rows as
+subject-unavailable, distinguishes live-workspace and materialized-input seal
+points, and exposes enriched host evidence without swapping CodeGG's assessor.
+M002 remains blocked only on positive closure of that upstream M001 plus its
+own verification-digest/differential-adoption work.
 
 ### M003 — Repository Plan binding
 

@@ -228,6 +228,12 @@ Execution-derived proof must carry a verification digest derived from the
 authoritative native execution specification; reference IDs and prose are not
 verification identity. No circular repository dependency is permitted.
 
+Current dependency note: M002 is blocked on CodeGG's registered
+`eggplan-assessment-integration` M001 durable execution-subject provenance
+handoff (CodeGG planning commit `af0a3e0`). That upstream primitive is
+attempt-scoped and CodeGG-owned. Projection/CLI M002, Eggstack M002, and
+Evidence C003 remain independent and may proceed in parallel.
+
 ## 7. Eggstack integrations
 
 ### M001 — Evidence provider SPI

@@ -56,7 +56,7 @@ Planning-system bootstrap:
 | Evidence/closure | closed/current | M001/C001 and M002 guarded closure/integrity closed | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | active | M001 ready against Evidence M002 closure d669b48 | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001 golden parity and adapter seam closed | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | active | M001 evidence provider SPI in progress against four sibling interfaces re-checked 2026-09-24 | plans/subsystems/eggstack-integration-roadmap.md |
+| Eggstack integrations | active | M001 evidence provider SPI closing against four sibling interfaces re-checked 2026-09-24 | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -71,7 +71,7 @@ Planning-system bootstrap:
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | closure plans/closure/evidence-closure/002-closed.md |
 | Projection/CLI | M001 CLI control surface + derived registry | ready | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | Evidence M002 closed at d669b48 |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
-| Eggstack integrations | M001 evidence provider SPI | active | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | current sibling SHAs re-checked; repo baseline 068b748c |
+| Eggstack integrations | M001 evidence provider SPI | closing | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | current sibling SHAs re-checked; repo baseline 9f07e152 |
 
 ## Registered next implementation wave
 

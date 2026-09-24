@@ -1,8 +1,10 @@
 # Eggstack Integrations M001 — Evidence Provider SPI
 
-Status: active
+Status: closing
 
-Eggplan repository baseline: 068b748c4bd5028a27319b9deb201bf2372b795e
+Eggplan repository baseline: 9f07e1528e44e8a1dd9a0df7aa03b61c2adc3e13
+
+Implementation commit: 24682f74040aa0fd8a6c2ff6311098c964cc6358
 
 Initial planning sibling baselines (historical):
 
@@ -307,6 +309,16 @@ Stop and report if:
 - the adapter must execute work to normalize evidence;
 - preserving provider semantics requires hiding native failure state;
 - trust can only be represented by auto-registering the adapter.
+
+## 14.1 Current implementation evidence
+
+The synchronous `eggplan-integrations` crate is implemented in
+`crates/eggplan-integrations/`. It provides strict descriptors, bounded
+observation contexts/results, host-controlled provider authority, normalized
+finalization, provider-namespaced verification digests, synthetic fixtures,
+and a static dependency/acquisition boundary. Local workspace, boundary, and
+Rust 1.89 gates pass on implementation commit
+`24682f74040aa0fd8a6c2ff6311098c964cc6358`; hosted CI is pending for closure.
 
 ## 15. Closure evidence required
 

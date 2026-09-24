@@ -521,7 +521,7 @@ fn synthetic_sibling_contract_corpus_has_reviewed_source_metadata() {
     assert!(corpus.fixture_only);
     assert_eq!(corpus.cases.len(), 11);
     let mut seen = BTreeSet::new();
-    for case in corpus.cases {
+    for (index, case) in corpus.cases.into_iter().enumerate() {
         assert!(!case.native_state.is_empty());
         seen.insert((case.provider.clone(), case.native_state.clone()));
         if case.source_trust == Some(SourceTrust::ExternalUntrusted) {
@@ -531,6 +531,45 @@ fn synthetic_sibling_contract_corpus_has_reviewed_source_metadata() {
         if case.provider == "eggbench" && case.comparison_verdict.as_deref() == Some("none") {
             assert_eq!(case.status, EvidenceStatus::Inconclusive);
         }
+        let (provider_id, class, kind) = match case.provider.as_str() {
+            "eggwork" => ("epp_eggwork", ProviderClass::Execution, EvidenceKind::Test),
+            "eggsearch" => (
+                "epp_eggsearch",
+                ProviderClass::Research,
+                EvidenceKind::Research,
+            ),
+            "eggbench" => (
+                "epp_eggbench",
+                ProviderClass::Benchmark,
+                EvidenceKind::Benchmark,
+            ),
+            _ => panic!("unknown synthetic fixture provider"),
+        };
+        let descriptor = descriptor(provider_id, class, &[kind]);
+        let mut observation_context = context(
+            kind,
+            matches!(kind, EvidenceKind::Test | EvidenceKind::Benchmark).then(binding),
+        );
+        observation_context.observation_id =
+            EvidenceObservationId::new(format!("epe_fixture_{index}")).unwrap();
+        let mut normalized = result(case.status);
+        normalized.source_trust = case.source_trust;
+        normalized
+            .result_metadata
+            .insert("native_state".into(), case.native_state);
+        if let Some(gap_count) = case.gap_count {
+            normalized
+                .result_metadata
+                .insert("gap_count".into(), gap_count.to_string());
+        }
+        if let Some(verdict) = case.comparison_verdict {
+            normalized
+                .result_metadata
+                .insert("comparison_verdict".into(), verdict);
+        }
+        let observation =
+            finalize_observation(&descriptor, &observation_context, &normalized).unwrap();
+        assert_eq!(observation.status(), case.status);
     }
     assert_eq!(seen.len(), 11);
 }

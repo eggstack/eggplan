@@ -1,6 +1,6 @@
 # Projection and CLI M002 — Loss-Aware Markdown Import and Deterministic Render
 
-Status: closing
+Status: closed
 
 Repository baseline: bfbec4a77d1e35e0a422af1edc9c3f358f7ad982
 
@@ -468,5 +468,6 @@ Record:
 - Local Linux verification passed: formatting, workspace check, clippy,
   118 workspace tests, 3 doc compile-fail tests, Rust 1.89 check/tests, core,
   projection/CLI and closure-authority boundary guards, and `git diff --check`.
-- Hosted native/MSRV qualification is pending the implementation push and
-  will be recorded in the closure record.
+- Hosted run `36036043263` passed: Linux `107756268846`, macOS `107756268791`,
+  Windows `107756268906`, Rust 1.89 `107756268481`. Closure record:
+  plans/closure/projection-cli/002-closed.md.

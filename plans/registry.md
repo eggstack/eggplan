@@ -54,7 +54,7 @@ Planning-system bootstrap:
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | active | M001 closed; M002 loss-aware Markdown import/render in implementation | plans/subsystems/projection-cli-roadmap.md |
+| Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 closed; M002 blocked on CodeGG Eggplan-integration M001 execution-subject provenance, now registered upstream | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | ready | M001 provider SPI closed; M002 Eggwork/Eggsearch adapters registered against fresh sibling baselines | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
@@ -73,7 +73,7 @@ Planning-system bootstrap:
 | Evidence | M002 C002 finalization test-seam containment + closure evidence reconciliation | closed | plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md | closure plans/closure/evidence-closure/002-c002-closed.md; preserves M002/C001 historical closures |
 | Evidence | M002 C003 closure reference + authority-guard hygiene | closed | plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md | closure plans/closure/evidence-closure/002-c003-closed.md; non-blocking maintenance |
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
-| Projection/CLI | M002 loss-aware Markdown import + deterministic render | closing | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | implementation/local checks passed; hosted native/MSRV qualification pending |
+| Projection/CLI | M002 loss-aware Markdown import + deterministic render | closed | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | closure plans/closure/projection-cli/002-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | blocked | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | upstream CodeGG M001 provenance plan registered at af0a3e0; resume after positive closure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
@@ -119,9 +119,10 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
    registered in dbowm91/codegg at `af0a3e0`. That plan captures/persists
    attempt-scoped execution subjects and never backfills legacy evidence from
    the current worktree.
-8. Projection/CLI M002 is active and Eggstack M002 remains ready; both are
-   independent of the CodeGG provenance handoff. Evidence M002 C003 closed as
-   non-blocking hygiene without gating either capability plan.
+8. Projection/CLI M002 is closed. Eggstack M002 remains ready and independent
+   of the CodeGG provenance handoff; its sibling interfaces must be rechecked
+   at handoff. Evidence M002 C003 closed as non-blocking hygiene without
+   gating either capability plan.
 9. After positive M002 closures:
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - CodeGG M003 repository Plan binding may be planned;

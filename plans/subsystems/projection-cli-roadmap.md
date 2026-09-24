@@ -40,16 +40,18 @@ plans/closure/projection-cli/001-closed.md.
 
 ### M002 — Markdown import/render
 
-Status: blocked on Evidence M002 C002 closure.
+Status: ready to plan (Evidence M002 C002 has closed).
 
-M001 remains historically closed. The C001 double-capture production path is
-implemented, but C002 must first contain the accidentally public subject-capture
-test seam and reconcile closure evidence. After C002 closes, create and
-register a bounded M002 implementation plan before extending the CLI /
-projection surface.
+M001 remains historically closed. Evidence M002 C002 has closed: the
+finalization subject capture seam is now crate-internal, no downstream crate
+can substitute closure subject authority, the C001 closure evidence is
+reconciled with the actual hosted workflow, and `RepositoryStore::finalize_closure`
+is the only supported external closure entry point.
 
-Support Eggplan-native implementation/closure projections and the documented
-subset of CodeGG's plans hierarchy. Report lossy or unmapped fields.
+After registering a bounded M002 implementation plan and re-checking current
+CodeGG sibling interfaces, add support for Eggplan-native implementation /
+closure projections and the documented subset of CodeGG's plans hierarchy.
+Report lossy or unmapped fields.
 
 ### M003 — Ergonomics and performance
 

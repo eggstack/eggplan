@@ -63,12 +63,16 @@ ownership change was required.
 
 ### M002 — Staged core adoption
 
-Status: blocked on Evidence M002 C002 closure. M001 remains historically
-closed. Production adoption must not bind to a repository API that still
-exposes a caller-injectable closure subject authority seam.
+Status: ready to plan (Evidence M002 C002 has closed).
 
-No M002 implementation plan is registered yet. After C002 closes, re-check
-current CodeGG interfaces before planning.
+M001 remains historically closed. Evidence M002 C002 has closed: production
+adoption may bind to the supported `RepositoryStore::finalize_closure`
+boundary without inheriting a caller-injectable closure subject authority
+seam. The historical C001 closure placeholders have been reconciled with
+the actual hosted workflow.
+
+No M002 implementation plan is registered yet. After re-checking current
+CodeGG interfaces, register and execute a bounded M002 plan.
 
 Make CodeGG consume Eggplan generic domain/assessment where it reduces
 duplication. Keep CodeGG storage and runtime policy adapters.

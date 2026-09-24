@@ -127,9 +127,11 @@ Historical M002 closure remains preserved.
 
 ### M002 C002 — Finalization test-seam containment and closure evidence reconciliation
 
-Status: ready.
+Status: closed.
 
 Plan: plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md
+
+Closure: plans/closure/evidence-closure/002-c002-closed.md
 
 Post-C001 review found that the deterministic SubjectCapture seam and alternate
 capture-injected finalizer were hidden from docs but remained public Rust API,
@@ -138,7 +140,10 @@ that seam truly internal/test-only, adds compile/public-API boundary
 regressions, preserves all C001 S1/S2 runtime semantics, and factually repairs
 the C001 hosted-CI placeholders using the completed workflow evidence.
 
-Historical M002 and C001 closures remain preserved.
+Historical M002 and C001 closures remain preserved. Projection/CLI M002,
+CodeGG M002, and Eggstack M002 are unblocked by this closure; each still
+needs its own bounded implementation plan and a fresh sibling-interface
+recheck before handoff.
 
 ### M003 — Policy extensions
 

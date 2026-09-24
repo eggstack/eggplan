@@ -85,19 +85,22 @@ plans/closure/eggstack-integration/001-closed.md.
 
 ### M002 — Eggwork and Eggsearch
 
-Status: blocked on Evidence M002 C002 closure. M001 remains historically
-closed. Live providers should not bind to the closure API until the accidental
-public capture-injection seam is contained and the closure evidence record is
-reconciled.
+Status: ready to plan (Evidence M002 C002 has closed).
 
-After C002 closes, recheck sibling interfaces and create the bounded M002
-handoff. Two contrasting providers qualify execution and research trust
-semantics.
+M001 remains historically closed. Evidence M002 C002 has closed: live
+provider adapters may bind to the supported `RepositoryStore::finalize_closure`
+boundary. The accidental public capture-injection seam is contained and
+the closure evidence record is reconciled.
+
+After rechecking current Eggwork and Eggsearch sibling interfaces, create
+the bounded M002 handoff. Two contrasting providers qualify execution and
+research trust semantics.
 
 ### M003 — Eggbench plus CI/forge
 
 Blocked on positive M002. Add bundle, CI, commit, and artifact evidence and
-forge adapters.
+forge adapters. After M002 lands, recheck the Eggbench sibling interface
+before planning.
 
 ## 5. Verification
 

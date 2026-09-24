@@ -1,6 +1,6 @@
 # Evidence and Closure M002 C002 — Finalization Test-Seam Containment and Closure Evidence Reconciliation
 
-Status: ready for handoff
+Status: closed
 
 Repository baseline: 5d2b6c8bac3fd056946e94aaa541a3c1e216abba
 
@@ -541,3 +541,33 @@ Do not start the next capability wave in the same implementation change. The
 point of C002 is to make the closure authority boundary mechanically true in
 the public API and to restore the repository's evidence discipline before new
 consumers bind to it.
+
+## 22. Closure record
+
+Status: closed.
+
+Implementation commit: `0c0484afe5be83ed92e6e4a4fdbcf6af6dbf6f3c`.
+
+Closure record: plans/closure/evidence-closure/002-c002-closed.md.
+
+Hosted C002 implementation run:
+
+- Run: https://github.com/eggstack/eggplan/actions/runs/36004813178
+- Linux 107650129619
+- macOS 107650129837
+- Windows 107650129154
+- Rust 1.89 107650129645
+
+C001 implementation run placeholders reconciled in
+plans/closure/evidence-closure/002-c001-closed.md:
+
+- Run: https://github.com/eggstack/eggplan/actions/runs/35998715018
+- Linux 107629794960
+- macOS 107629795068
+- Windows 107629794971
+- Rust 1.89 107629794849
+
+Projection/CLI M002, CodeGG M002, and Eggstack M002 are unblocked; each
+still requires a registered bounded implementation plan and a fresh
+sibling-interface recheck before handoff. Interop/distribution remains
+deferred.

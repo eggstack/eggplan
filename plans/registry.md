@@ -53,10 +53,10 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | corrective required | M001/C001 and M002/C001 closed historically; M002 C002 test-seam containment/evidence reconciliation ready | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | blocked | M001 closed historically; M002 waits on Evidence M002 C002 | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | blocked | M001 closed historically; M002 staged adoption waits on Evidence M002 C002 | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | blocked | M001 provider SPI closed historically; live-provider M002 waits on Evidence M002 C002 | plans/subsystems/eggstack-integration-roadmap.md |
+| Evidence/closure | closed/current | M001/C001 and M002/C001 closed historically; M002 C002 closed and cross-platform qualified | plans/subsystems/evidence-closure-roadmap.md |
+| Projection/CLI | ready to plan | M001 closed historically; M002 Markdown import/render unblocked and needs a fresh bounded implementation plan | plans/subsystems/projection-cli-roadmap.md |
+| CodeGG integration | ready to plan | M001 closed historically; M002 staged adoption unblocked and needs a fresh CodeGG interface recheck | plans/subsystems/codegg-integration-roadmap.md |
+| Eggstack integrations | ready to plan | M001 provider SPI closed historically; live-provider M002 unblocked and needs fresh Eggwork/Eggsearch interface rechecks | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -70,34 +70,38 @@ Planning-system bootstrap:
 | Evidence | M001 C001 verification binding + end-to-end evidence corrective | closed | plans/implementation/evidence-closure/001-c001-verification-binding-and-end-to-end-evidence-corrective.md | closure plans/closure/evidence-closure/001-c001-closed.md |
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | historical closure plans/closure/evidence-closure/002-closed.md |
 | Evidence | M002 C001 finalization subject revalidation | closed | plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md | historical closure plans/closure/evidence-closure/002-c001-closed.md |
-| Evidence | M002 C002 finalization test-seam containment + closure evidence reconciliation | ready | plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md | next corrective handoff; preserves M002/C001 historical closures |
+| Evidence | M002 C002 finalization test-seam containment + closure evidence reconciliation | closed | plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md | closure plans/closure/evidence-closure/002-c002-closed.md; preserves M002/C001 historical closures |
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 
 ## Registered corrective gate
 
-Evidence M002 C001 remains historically closed, but post-closure review found
-that its deterministic SubjectCapture test seam and alternate capture-injected
-finalizer are hidden from documentation rather than private Rust API. That
-leaves an externally callable path that can substitute closure subject
-authority.
+Evidence M002 C001 is historically closed. Evidence M002 C002 is now
+closed. The deterministic `SubjectCapture` seam and alternate
+capture-injected finalizer that C001 had marked `#[doc(hidden)] pub` are
+now crate-private / `#[cfg(test)]` only; no downstream crate can reach
+the closure subject authority. Crate-level `compile_fail` doctests in
+`eggplan-repo` and `scripts/check-closure-authority-boundary.sh` (wired
+into the hosted CI native shell guard step) prevent re-publication. The
+historical C001 closure placeholders were reconciled with the actual
+hosted workflow:
 
-1. Evidence M002 C002 is ready now.
-2. C002 makes the injected capture seam private/crate-private/test-only and
-   removes all crate-root public re-exports.
-3. C002 adds compile/public-API and static boundary regressions so caller-
-   controlled closure subject authority cannot be reintroduced unnoticed.
-4. C002 also reconciles the historical C001 closure placeholders with the
-   completed successful workflow evidence:
-   - run 35998715018;
-   - Linux 107629794960;
-   - macOS 107629795068;
-   - Windows 107629794971;
-   - Rust 1.89 107629794849.
-5. Projection/CLI M002, CodeGG M002, and Eggstack M002 are temporarily blocked
-   until C002 closes.
-6. No other corrective implementation plan is currently registered.
+- C001 implementation run: 35998715018
+  - Linux 107629794960
+  - macOS 107629795068
+  - Windows 107629794971
+  - Rust 1.89 107629794849
+- C002 implementation run: 36004813178
+  - Linux 107650129619
+  - macOS 107650129837
+  - Windows 107650129154
+  - Rust 1.89 107650129645
+
+Projection/CLI M002, CodeGG M002, and Eggstack M002 are unblocked; each
+still requires its own bounded implementation plan and a fresh
+sibling-interface recheck before handoff. No other corrective
+implementation plan is currently registered.
 
 ## Current execution order
 
@@ -106,19 +110,14 @@ authority.
 3. Evidence M002 — historically closed with guarded closure, supersession, and
    crash recovery.
 4. Evidence M002 C001 — historically closed; production S1/S2 recapture path
-   implemented, but later public test-seam bypass finding preserved.
-5. CodeGG Integration M001 — historically closed.
-6. Eggstack Provider SPI M001 — historically closed.
-7. Projection/CLI M001 — historically closed.
-8. Execute Evidence M002 C002:
-   - contain SubjectCapture/test-double visibility;
-   - make capture-injected alternate finalizer non-public;
-   - retain deterministic internal A/A, A/B, and capture-failure tests;
-   - add compile/public-API authority regression;
-   - add closure-authority boundary guard;
-   - factually reconcile C001 CI placeholders;
-   - close only after C002 hosted native/MSRV evidence exists.
-9. After C002 closes, independently plan the next capability wave:
+   implemented; C002 closed the public test-seam exposure.
+5. Evidence M002 C002 — closed; deterministic test seam is now
+   crate-private; compile-fail doctests and `check-closure-authority-boundary.sh`
+   enforce the boundary; C001 CI placeholders reconciled.
+6. CodeGG Integration M001 — historically closed.
+7. Eggstack Provider SPI M001 — historically closed.
+8. Projection/CLI M001 — historically closed.
+9. Independently plan the next capability wave:
    - Projection/CLI M002 — Markdown import/render;
    - CodeGG M002 — staged core adoption after a fresh CodeGG interface check;
    - Eggstack M002 — real Eggwork/Eggsearch adapters after sibling re-check.

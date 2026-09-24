@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: blocked
+Status: active planning baseline
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -85,13 +85,12 @@ plans/closure/eggstack-integration/001-closed.md.
 
 ### M002 — Eggwork and Eggsearch
 
-Status: blocked on Evidence M002 C001 closure. M001 remains historically
-closed. Live providers should not be introduced while guarded closure still
-accepts caller-owned current-subject authority.
+Status: ready for implementation planning. M001 remains historically
+closed. Live providers may be introduced now that guarded closure owns
+current-subject authority (Evidence M002 C001, closed).
 
-After C001 closes, recheck sibling interfaces and create the bounded M002
-handoff. Two contrasting providers qualify execution and research trust
-semantics.
+Recheck sibling interfaces and create the bounded M002 handoff. Two
+contrasting providers qualify execution and research trust semantics.
 
 ### M003 — Eggbench plus CI/forge
 

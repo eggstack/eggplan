@@ -1,6 +1,6 @@
 # Evidence and Closure Roadmap
 
-Status: corrective required
+Status: closed / current
 
 Long-term references: plans/000-long-term-specification.md sections 8-12 and 17-20.
 
@@ -68,13 +68,15 @@ subject identity and repository persistence.
 
 ### M001 — Evidence ledger and assessment
 
-Status: closed. Preserve the Windows/macOS qualification caveat from
-Foundation M002 in later work.
+Status: closed.
 
 Plan: plans/implementation/evidence-closure/001-evidence-ledger-and-assessment.md
 
 Deliver normalized statuses, provider identities, append-only observations,
 criterion matching, exact-subject policy, pure assessment, and explanations.
+The Windows/macOS qualification caveat inherited from Foundation M002 was
+resolved by Foundation M003's native supported-subset workflow; historical
+M001 closure remains preserved.
 
 ### M001 C001 — Verification binding and end-to-end evidence corrective
 
@@ -105,18 +107,24 @@ guarded closure record. See plans/closure/evidence-closure/002-closed.md.
 
 ### M002 C001 — Finalization subject revalidation
 
-Status: ready.
+Status: closed.
 
 Plan: plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md
 
-Post-closure review found that RepositoryStore finalization recomputes
-assessment under the Eggplan state lock but accepts the caller's previously
-captured SubjectRevision as "current" authority. C001 moves authoritative Git
-subject recapture into finalization, requires a second pre-write recapture,
-adds typed subject-drift failures, and preserves existing M002 crash recovery
-and closure-record compatibility.
+Closure: plans/closure/evidence-closure/002-c001-closed.md
 
-Historical M002 closure remains preserved.
+Post-closure review found that RepositoryStore finalization recomputed
+assessment under the Eggplan state lock but accepted the caller's previously
+captured SubjectRevision as "current" authority. C001 moved authoritative
+Git subject recapture into finalization, added a second pre-write recapture,
+introduced typed `ClosureSubjectStale`, `ClosureSubjectDrift`, and
+`ClosureSubjectCapture` errors, and preserved existing M002 crash recovery
+and closure-record compatibility. CLI `close` no longer passes its own
+captured subject to the repository and reports subject drift as a stable
+machine diagnostic.
+
+Historical M002 closure remains preserved. Projection/CLI M002, CodeGG M002,
+and Eggstack M002 are unblocked.
 
 ### M003 — Policy extensions
 

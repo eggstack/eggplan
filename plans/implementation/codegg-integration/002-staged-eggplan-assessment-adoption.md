@@ -1,6 +1,6 @@
 # CodeGG Integration M002 — Staged Eggplan Assessment Adoption
 
-Status: ready for handoff
+Status: blocked
 
 Repository baseline: 0904218554c425c30aa6501b58d7fb8bcb839414
 
@@ -456,3 +456,29 @@ The Eggplan closure record must cite:
 - focused/full test results from both repos;
 - hosted workflow IDs;
 - residual findings and M003 disposition.
+
+## 21. Implementation checkpoint — blocked on exact execution subject
+
+Eggplan-side bridge work is committed as `088968b` (pure live snapshot mapper,
+fixture-only source-SHA validation, detailed deterministic assessment result,
+and shared verification-digest helper). The CodeGG head was rechecked at
+`5f4532659dbf0df2cd9f2b3bdb024217d2ea7868`; the WorkPlan model, evidence,
+assessment, and store interfaces remain unchanged from reviewed baseline
+`a3c87fc18ee55aaf630401a562c11bb83112fd82`.
+
+CodeGG currently stores only status in `WorkPlanEvidenceSnapshot`. Its durable
+`JobRecord` and `RunManifest` do not record the exact source `SubjectRevision`
+observed by the execution. A current worktree capture cannot establish the
+subject of an older completed job. Attaching that current subject to an
+observation would manufacture authority, and leaving the observation
+subjectless cannot satisfy Eggplan's exact-subject policy. The live bridge
+therefore fails closed for these refs.
+
+This prevents the required CodeGG adoption and differential qualification:
+the existing passing-evidence cases cannot be represented as exact-subject
+observations without a source-subject capture recorded with execution. No
+CodeGG production changes or differential claims have been made. Keep M002
+blocked until a bounded host-side plan captures and persists the execution
+subject and resolves it alongside the authoritative verification
+specification. The three other registered M002 handoffs remain independently
+ready; this sequential execution stops here for reassessment.

@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: active / ready
+Status: active / blocked
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -65,7 +65,7 @@ ownership change was required.
 
 ### M002 — Staged core adoption
 
-Status: ready for handoff.
+Status: blocked on host-side exact execution-subject capture.
 
 Plan: plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md
 
@@ -79,6 +79,14 @@ existing assessment surface. CodeGG keeps SQLite WorkPlan storage, Goal/Todo,
 checkpoint/context-epoch, scheduler, worktree, and agent-loop ownership. The
 production bridge must not depend on eggplan-repo and must not invent
 verification identity from prose or native reference IDs.
+
+Implementation checkpoint: Eggplan's live bridge is committed as
+`088968b`. The current CodeGG WorkPlan evidence snapshot stores status but not
+the exact source SubjectRevision observed by a completed execution. The current
+worktree cannot authoritatively stand in for a historical execution subject.
+The bridge fails closed, so CodeGG adoption/differential qualification is
+blocked until execution-time subject capture is persisted and resolved by the
+host adapter.
 
 ### M003 — Repository Plan binding
 

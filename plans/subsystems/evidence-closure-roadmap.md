@@ -145,9 +145,11 @@ CodeGG M002, and Eggstack M002 are unblocked by this closure.
 
 ### M002 C003 — Closure reference and authority-guard hygiene
 
-Status: closing; non-blocking maintenance.
+Status: closed; non-blocking maintenance complete.
 
 Plan: plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md
+
+Closure: plans/closure/evidence-closure/002-c003-closed.md
 
 Post-C002 review found two maintenance defects that do not invalidate the
 qualified production authority boundary: active C002 planning/closure text

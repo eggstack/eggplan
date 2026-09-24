@@ -53,7 +53,7 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | closed/current + maintenance ready | M002 C002 remains qualified; non-blocking C003 reference/guard hygiene registered | plans/subsystems/evidence-closure-roadmap.md |
+| Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | ready | M001 closed; M002 loss-aware Markdown import/render registered for handoff | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | blocked | M001 closed; M002 blocked on CodeGG Eggplan-integration M001 execution-subject provenance, now registered upstream | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | ready | M001 provider SPI closed; M002 Eggwork/Eggsearch adapters registered against fresh sibling baselines | plans/subsystems/eggstack-integration-roadmap.md |
@@ -71,7 +71,7 @@ Planning-system bootstrap:
 | Evidence | M002 guarded closure records + supersession + recovery | closed | plans/implementation/evidence-closure/002-closure-records-integrity-and-recovery.md | historical closure plans/closure/evidence-closure/002-closed.md |
 | Evidence | M002 C001 finalization subject revalidation | closed | plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md | historical closure plans/closure/evidence-closure/002-c001-closed.md |
 | Evidence | M002 C002 finalization test-seam containment + closure evidence reconciliation | closed | plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md | closure plans/closure/evidence-closure/002-c002-closed.md; preserves M002/C001 historical closures |
-| Evidence | M002 C003 closure reference + authority-guard hygiene | closing | plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md | non-blocking maintenance; local verification passed; hosted workflow pending |
+| Evidence | M002 C003 closure reference + authority-guard hygiene | closed | plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md | closure plans/closure/evidence-closure/002-c003-closed.md; non-blocking maintenance |
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | ready | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | handoff authorized |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
@@ -98,7 +98,7 @@ Recorded hosted evidence remains:
   - Windows 107650129154
   - Rust 1.89 107650129645
 
-One non-blocking maintenance correction is closing:
+The non-blocking maintenance correction is closed:
 
 - Evidence M002 C003 — correct the C002 implementation-SHA citation and
   strengthen the static closure-authority guard/negative proof.
@@ -119,11 +119,9 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
    registered in dbowm91/codegg at `af0a3e0`. That plan captures/persists
    attempt-scoped execution subjects and never backfills legacy evidence from
    the current worktree.
-8. Parallel Eggplan work remains authorized now:
-   - Evidence M002 C003 — non-blocking closure-reference/static-guard hygiene;
-   - Projection/CLI M002 — loss-aware Markdown import/render;
-   - Eggstack M002 — real Eggwork/Eggsearch evidence adapters.
-   None depends on the CodeGG provenance handoff.
+8. Projection/CLI M002 and Eggstack M002 are ready and independent of the
+   CodeGG provenance handoff. Evidence M002 C003 closed as non-blocking hygiene
+   without gating either capability plan.
 9. After positive M002 closures:
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - CodeGG M003 repository Plan binding may be planned;

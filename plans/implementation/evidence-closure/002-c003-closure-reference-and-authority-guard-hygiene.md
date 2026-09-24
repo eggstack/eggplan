@@ -1,6 +1,6 @@
 # Evidence and Closure M002 C003 — Closure Reference and Authority-Guard Hygiene
 
-Status: closing
+Status: closed
 
 Repository baseline: 0904218554c425c30aa6501b58d7fb8bcb839414
 
@@ -213,5 +213,6 @@ This is maintenance only.
 - Local Linux verification passed: formatting, workspace check, clippy,
   workspace tests (100 tests), doc tests (3 compile-fail doctests), Rust 1.89
   check/tests, guard self-proofs, and `git diff --check`.
-- Hosted native/MSRV workflow is triggered by the implementation push and will
-  be recorded in the closure record when available.
+- Hosted native/MSRV run `36030390582` passed: Linux `107737361529`, macOS
+  `107737361185`, Windows `107737361346`, Rust 1.89 `107737361192`. See
+  plans/closure/evidence-closure/002-c003-closed.md.

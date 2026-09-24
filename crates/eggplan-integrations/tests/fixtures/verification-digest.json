@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "provider_namespace": "eggwork",
+  "payload": {"b": 2, "a": {"z": 1, "y": 0}},
+  "digest": "sha256:867a18c5d2019e7031be5389e4002244c0ad8efd45b04e4f51553ed8226b6bf0"
+}

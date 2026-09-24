@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "fixture_only": true,
+  "cases": [
+    {"provider":"eggwork","native_state":"running","status":"in_progress"},
+    {"provider":"eggwork","native_state":"succeeded","status":"passed"},
+    {"provider":"eggwork","native_state":"failed","status":"failed"},
+    {"provider":"eggwork","native_state":"timed_out","status":"unavailable"},
+    {"provider":"eggwork","native_state":"cancelled","status":"skipped"},
+    {"provider":"eggsearch","native_state":"local_bundle","status":"passed","source_trust":"provider_trusted"},
+    {"provider":"eggsearch","native_state":"external_bundle_with_gap","status":"inconclusive","source_trust":"external_untrusted","gap_count":1},
+    {"provider":"eggbench","native_state":"completed_without_comparison","status":"inconclusive","comparison_verdict":"none"},
+    {"provider":"eggbench","native_state":"comparison_pass","status":"passed","comparison_verdict":"pass"},
+    {"provider":"eggbench","native_state":"comparison_fail","status":"failed","comparison_verdict":"fail"},
+    {"provider":"eggbench","native_state":"comparison_inconclusive","status":"inconclusive","comparison_verdict":"inconclusive"}
+  ]
+}

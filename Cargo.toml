@@ -4,6 +4,7 @@ members = [
     "crates/eggplan-core",
     "crates/eggplan-repo",
     "crates/eggplan-codegg-compat",
+    "crates/eggplan-integrations",
 ]
 
 [workspace.package]

@@ -25,6 +25,8 @@ jobs:
         if: runner.os != 'Windows'
       - run: bash scripts/check-codegg-compat-boundary.sh
         if: runner.os != 'Windows'
+      - run: bash scripts/check-integrations-boundary.sh
+        if: runner.os != 'Windows'
 
   msrv:
     runs-on: ubuntu-latest

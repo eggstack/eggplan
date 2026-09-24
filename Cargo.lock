@@ -104,6 +104,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "eggplan-integrations"
+version = "0.1.0"
+dependencies = [
+ "eggplan-core",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
 name = "eggplan-repo"
 version = "0.1.0"
 dependencies = [

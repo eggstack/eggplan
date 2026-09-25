@@ -283,7 +283,8 @@ impl MappingManifest {
 
 #[derive(Debug, Clone)]
 pub struct MappedPlan {
-    /// Snapshot intent at revision zero. Persist with `create_snapshot` so the
+    /// Snapshot intent at revision zero. Persist with the test-only
+    /// `create_snapshot` helper (`tests/parity.rs`) so the
     /// source lifecycle is reached through legal Eggplan CAS transitions.
     pub plan: Plan,
     pub observations: Vec<EvidenceObservation>,

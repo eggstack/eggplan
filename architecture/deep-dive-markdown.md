@@ -1,6 +1,6 @@
 # Deep dive: `eggplan-markdown` interchange
 
-Index: [overview](overview.md) (forward reference) · Normative companion: [markdown-interchange](markdown-interchange.md).
+Index: [overview](overview.md) · Normative companion: [markdown-interchange](markdown-interchange.md).
 Status context: projection/CLI M002 (loss-aware Markdown import + deterministic render) is closed
 (`plans/subsystems/projection-cli-roadmap.md:41-56`); fixtures re-pinned to CodeGG head
 `5f4532659dbf0df2cd9f2b3bdb024217d2ea7868` (`crates/eggplan-markdown/tests/fixtures.rs:10-17`).

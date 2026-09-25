@@ -24,7 +24,11 @@ execute work, acquire evidence, or edit the development planning registry.
 - `check` validates repository, Plans, evidence, supersessions, closure
   records, pending transactions, and staging state. It opens the repository in
   read-only mode and never recovers a pending transaction unless
-  `--recover-pending` is explicit.
+  `--recover-pending` is explicit. `check` also emits a check-time
+  `closure_subject_stale` code (state `stale`) when a stored closure record's
+  subject no longer matches the current subject; this is distinct from the
+  finalization-time `closure_subject_changed` / `closure_subject_drifted` /
+  `closure_subject_unavailable` diagnostics above.
 - `registry render` derives a compact view from canonical `.eggplan` Plans. It
   never edits this repository's `plans/registry.md`.
 - `markdown render` emits deterministic Eggplan Markdown v1; `markdown inspect`
@@ -65,7 +69,7 @@ invocation and contains no credentials. There is no default trusted provider.
 Structural failures are returned as typed `invalid_plan`, `corrupt_state`, or
 `recovery_required` diagnostics. Valid stored state is reported per Plan as
 `complete`, `incomplete`, `unavailable`, `stale`, `invalid_or_stale`,
-`in_flight`, `blocked`, `failed`, or `awaiting_human_judgment`. If no provider
+`in_flight`, `blocked`, `failed`, `inconclusive`, or `awaiting_human_judgment`. If no provider
 policy is supplied to `check`, its empty host registry cannot promote passing
 observations to trusted proof. Current Git subject unavailability is explicit.
 

@@ -11,7 +11,9 @@ local Plan store, append-only evidence ledger, and Git subject adapter;
 `eggplan-integrations`, a provider-neutral evidence normalization SPI;
 `eggplan-projection`, bounded derived summaries; and `eggplan-cli`, the
 `eggplan` command-line control surface. `eggplan-markdown` provides bounded,
-loss-aware Markdown intent import and deterministic rendering. See
+loss-aware Markdown intent import and deterministic rendering.
+`eggplan-codegg-compat` is a pure one-way CodeGG WorkPlan assessment bridge
+with no repository or scheduler ownership. See
 [core architecture](architecture/core.md),
 [repository architecture](architecture/repository.md), the
 [evidence architecture](architecture/evidence.md), the
@@ -47,5 +49,8 @@ cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 bash scripts/check-core-boundary.sh
+bash scripts/check-codegg-compat-boundary.sh
+bash scripts/check-integrations-boundary.sh
 bash scripts/check-projection-cli-boundary.sh
+bash scripts/check-closure-authority-boundary.sh
 ```

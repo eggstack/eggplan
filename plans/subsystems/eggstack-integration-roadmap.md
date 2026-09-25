@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: active / M002 closed; M003 ready for planning
+Status: closed / current; M003 ready for planning
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -94,9 +94,11 @@ plans/closure/eggstack-integration/001-closed.md.
 
 ### M002 — Eggwork and Eggsearch
 
-Status: ready for handoff.
+Status: closed.
 
 Plan: plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md
+
+Closure: plans/closure/eggstack-integration/002-closed.md
 
 M001 remains historically closed. M002's current sibling interfaces and
 fixture baselines are recorded in section 3.1 and its closure evidence.

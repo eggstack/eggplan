@@ -1,7 +1,6 @@
 # Deep dive: `eggplan-repo`
 
-Part of the [forward-reference index](overview.md) (note: `architecture/overview.md`
-does not exist yet in this tree; the link is a forward reference).
+Part of the [overview index](overview.md).
 Normative companions: [repository storage](repository.md),
 [evidence and assessment](evidence.md), [core](core.md).
 

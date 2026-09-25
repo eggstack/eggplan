@@ -41,7 +41,7 @@ timestamps, random values, terminal escapes, or locale-dependent sorting.
 | `Status:` / `Repository baseline:` | Import report and provenance only |
 | `## N. Objective` | Objective text |
 | `## N. Ordered work packages` (or `Work packages`) with `### Work package A — Title` | One deterministically identified Plan item per work package, preserving source order |
-| `Dependencies: A, B` inside a work package | Exact references to labeled work packages; unknown, self, duplicate, or cyclic references fail validation |
+| `Dependencies: A, B` (or the `Depends on:` alias) inside a work package | Exact references to labeled work packages; unknown, self, duplicate, or cyclic references fail validation |
 | `## N. Acceptance criteria` (including names such as `Binary acceptance criteria`) | Plan-level criteria become a final intent item depending on work packages; `Work package A: ...` criteria attach to that named item |
 | Other sections, including Scope, Findings, Verification, Stop conditions, and Handoff notes | Dropped from canonical Plan intent and named in the loss report |
 | Fenced code blocks | Ignored as semantics and reported as unmapped input |

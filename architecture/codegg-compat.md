@@ -20,8 +20,10 @@ AgentRun/Job, and arbiter control flow remain CodeGG-owned.
 fixture provenance and then calls the same mapper. `assess_codegg_snapshot`
 is pure over the snapshot, exact host-supplied SubjectRevision, resolved
 observations, and explicit ProviderRegistry. It writes no Eggplan repository
-state. CodeGG derives verification digests from canonical native execution
-specifications through Eggplan's shared `verification_digest` helper. If a
+state. Host obligation (not implemented behavior in this crate, which only
+compares host-supplied bindings): CodeGG must derive verification digests
+from canonical native execution specifications through Eggplan's shared
+`verification_digest` helper. If a
 native execution specification or exact evidence subject cannot be
 reconstructed, the host must mark that evidence unavailable and retain its
 compatibility fallback; reference IDs, prose, and serialized `Satisfied`

@@ -3,7 +3,7 @@
 This note reviews the repository's mechanical tooling (CI, static boundary
 guards, verify order) and its planning/closure governance as an operational
 control system. For the crate map and product boundary, see
-[architecture overview](overview.md) (forward reference; companion to the
+[architecture overview](overview.md) (companion to the
 per-subsystem architecture notes).
 
 ## 1. Boundary scripts: what each enforces and how
@@ -102,7 +102,7 @@ Authoritative order per `AGENTS.md`:
 5. The five boundary scripts in `core → codegg-compat → integrations →
    projection-cli → closure-authority` order.
 
-Focused variants: `cargo test -p <crate>` and `cargo test -p <crate> <filter>`. Note: root `README.md` lists only two of the five guards — an abbreviated quick-start, not the full gate.
+Focused variants: `cargo test -p <crate>` and `cargo test -p <crate> <filter>`. The root `README.md` dev-checks block now lists the full gate (all five guards).
 
 ## 4. Planning/closure governance as an operational tool
 

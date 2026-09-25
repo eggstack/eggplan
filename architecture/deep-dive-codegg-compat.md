@@ -1,6 +1,6 @@
 # Deep dive: `eggplan-codegg-compat`
 
-See also [overview.md](overview.md) (forward reference) and [codegg-compat.md](codegg-compat.md)
+See also [overview.md](overview.md) and [codegg-compat.md](codegg-compat.md)
 (this file is the review; that file is the contract).
 
 ## 1. Crate role: pure one-way bridge
@@ -144,14 +144,13 @@ the mapping auditable.
    uniqueness at `lib.rs:560-565`, binding equality at `lib.rs:566-575`) fail
    closed on a faulty resolver, but resolver and `ProviderRegistry` correctness
    are assumed, not verified, by this crate.
-3. `architecture/codegg-compat.md:23-28` says "CodeGG derives verification
-   digests … through Eggplan's shared `verification_digest` helper." Verified:
-   this crate never calls that helper — the sentence is a requirement on the
-   CodeGG host, not implemented behavior here. It should be worded as a host
-   obligation to avoid misreading.
-4. `MappedPlan` docs (`lib.rs:285-287`) reference `create_snapshot` as though
-   it were adjacent API; it now exists only in `tests/parity.rs:22-44`. Minor
-   stale pointer; consider naming the test-only location.
+3. `architecture/codegg-compat.md:23-28` previously read as though the
+   bridge called the shared `verification_digest` helper. Resolved
+   2026-09-25: reworded as an explicit host obligation (the crate only
+   compares host-supplied bindings at `lib.rs:566-575`).
+4. `MappedPlan` docs (`lib.rs:285-287`) referenced `create_snapshot` as though
+   it were adjacent API. Resolved 2026-09-25: the doc comment now names the
+   test-only location (`tests/parity.rs`).
 5. `hash_id` truncates SHA-256 hex to 32 chars (`lib.rs:341`); collisions are
    rejected per-run and duplicates per-manifest, but `MappingManifest::validate`
    does not re-derive IDs from sources — determinism rests on the parity test

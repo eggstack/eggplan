@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: active / M002 closed
+Status: closed / current; M003 deferred until real repository use
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 

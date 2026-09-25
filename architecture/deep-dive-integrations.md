@@ -1,8 +1,8 @@
 # Deep dive: `eggplan-integrations` (provider SPI + Eggwork/Eggsearch adapters)
 
 Role within the workspace: pure, synchronous normalization of host-acquired
-facts into Eggplan observations. See [overview](overview.md) (forward
-reference), [provider SPI](provider-spi.md), [Eggwork adapter](eggwork-adapter.md),
+facts into Eggplan observations. See [overview](overview.md),
+[provider SPI](provider-spi.md), [Eggwork adapter](eggwork-adapter.md),
 and [Eggsearch adapter](eggsearch-adapter.md).
 
 ## 1. Crate role: what it is and must never do
@@ -167,15 +167,18 @@ Gaps and risks:
 
 - `synthetic-results.json:8` maps Eggwork `timed_out` to `unavailable`, but the
   implementation maps `TimedOut` to `Failed` (`src/eggwork.rs:244`) and
-  [Eggwork adapter](eggwork-adapter.md) lines 16-18 agrees with the code. The
-  fixture row is stale relative to both; confirm whether the conformance test
-  actually asserts that row or skips Eggwork-detail cases.
+  [Eggwork adapter](eggwork-adapter.md) lines 16-18 agrees with the code.
+  Resolved 2026-09-25: `tests/conformance.rs:511-584` feeds each fixture row
+  through `finalize_observation` and asserts round-trip only; it never runs
+  the Eggwork `normalize` mapping, so the row is an inert hypothetical input,
+  not an asserted mapping. Fixture left unchanged (`fixture_only: true`).
 - `synthetic-results.json:10` models an Eggsearch local bundle with
   `source_trust: provider_trusted`, but `normalize` always emits
   `external_untrusted` (`src/eggsearch.rs:398-407`) and [Eggsearch
-  adapter](eggsearch-adapter.md) lines 12-15 mandates that. Either the fixture
-  models a hypothetical the adapter intentionally refuses, or the row predates
-  the trust-marker decision — worth a fixture comment or correction.
+  adapter](eggsearch-adapter.md) lines 12-15 mandates that. Resolved
+  2026-09-25: same conformance test only branches on `ExternalUntrusted`
+  rows, so this row exercises the non-untrusted input path without asserting
+  the adapter can emit it. Fixture left unchanged (`fixture_only: true`).
 - `manifest.json:7` pins Eggbench `d7d1fd9…`, while the subsystem roadmap M003
   section cites a recheck at `d870512a…` with manifest v2 separating execution
   status from comparison verdict. The manifest is therefore stale for the

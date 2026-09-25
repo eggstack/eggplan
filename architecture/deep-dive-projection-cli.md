@@ -1,6 +1,6 @@
 # Deep dive: projection + CLI
 
-See also [overview](overview.md) (forward reference) and [CLI control surface](cli-control-surface.md).
+See also [overview](overview.md) and [CLI control surface](cli-control-surface.md).
 Roadmap: `plans/subsystems/projection-cli-roadmap.md` — M001/M002 closed, M003 deferred.
 
 ## 1. Roles

@@ -1,6 +1,6 @@
 # Foundation Core and Repository Roadmap
 
-Status: active
+Status: closed / current
 
 Long-term references:
 
@@ -105,8 +105,9 @@ tests pass, and canonical digest fixtures are frozen.
 
 Class: capability / invariant
 
-Status: conditionally closed after M001 closure. Linux behavior is qualified;
-Windows/macOS runtime and cross-target evidence remain outstanding.
+Status: conditionally closed. Historical closure:
+plans/closure/foundation-core/002-conditionally-closed.md. The Windows/macOS
+qualification caveat is resolved by M003, which is closed.
 
 Plan: plans/implementation/foundation-core/002-repository-store-cas-and-subject.md
 

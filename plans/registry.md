@@ -55,7 +55,7 @@ Planning-system bootstrap:
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | blocked | M001 closed; M002 blocked on CodeGG Eggplan-integration M001 execution-subject provenance, now registered upstream | plans/subsystems/codegg-integration-roadmap.md |
+| CodeGG integration | active | M001 closed; M002 ready after upstream CodeGG provenance closure | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 provider SPI and M002 Eggwork/Eggsearch adapters closed; M003 ready for planning against rechecked Eggbench contract | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
@@ -75,7 +75,7 @@ Planning-system bootstrap:
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | closed | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | closure plans/closure/projection-cli/002-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
-| CodeGG integration | M002 staged Eggplan assessment adoption | blocked | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | upstream CodeGG M001 provenance plan registered at af0a3e0; resume after positive closure |
+| CodeGG integration | M002 staged Eggplan assessment adoption | ready | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | upstream CodeGG M001 closed at 418fdc85; hosted CI run 36106606574 passed; current pure bridge rechecked at Eggplan 85c4c7e |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -114,11 +114,13 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
 4. CodeGG Integration M001 — historically closed.
 5. Eggstack Provider SPI M001 — historically closed.
 6. Projection/CLI M001 — historically closed.
-7. CodeGG M002 is blocked on one explicit upstream CodeGG handoff:
+7. CodeGG M002 is ready after its explicit upstream CodeGG handoff closed:
    `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`,
-   registered in dbowm91/codegg at `af0a3e0`. That plan captures/persists
-   attempt-scoped execution subjects and never backfills legacy evidence from
-   the current worktree.
+   implemented/closed in dbowm91/codegg at `418fdc85656e7e1faa57f71e5e7f10f7f4859c60`
+   with hosted CI run `36106606574` green. It captures/persists attempt-scoped
+   execution subjects and never backfills legacy evidence from the current
+   worktree. M002's own differential adoption and verification-digest work
+   remains to be completed before any M003 repository Plan binding.
 8. Projection/CLI M002 and Eggstack M002 are closed, independent of the CodeGG
    provenance handoff. Eggstack M003 is ready for planning after rechecking
    Eggbench at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`. Evidence M002 C003

@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: active / blocked
+Status: active / M002 ready
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -69,7 +69,7 @@ ownership change was required.
 
 ### M002 — Staged core adoption
 
-Status: blocked on host-side exact execution-subject capture.
+Status: ready; host-side exact execution-subject capture is closed.
 
 Plan: plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md
 
@@ -90,7 +90,14 @@ attempt-scoped source SubjectRevision observed by completed execution. The
 current worktree cannot authoritatively stand in for a historical execution
 subject.
 
-The upstream corrective/unblock is now explicitly registered in CodeGG:
+The upstream provenance handoff is now implemented and closed in CodeGG at
+`418fdc85656e7e1faa57f71e5e7f10f7f4859c60`. Closure evidence is
+`plans/closure/eggplan-assessment-integration/001-status.md`, with hosted CI run
+`36106606574` passed on the exact implementation commit. The pure bridge was
+rechecked at the current Eggplan head `85c4c7ef5dc826dd0be7cf65d71843c3264d842b`
+and remains `088968bd58680ae2b3741e2f1feb0614e0ff81a0`.
+
+The upstream corrective/unblock was registered in CodeGG:
 
 - CodeGG planning commit:
   `af0a3e0fb9b6552f45e3ea5d698e7980582493fd`
@@ -102,8 +109,8 @@ The upstream corrective/unblock is now explicitly registered in CodeGG:
 That plan makes subject provenance attempt-scoped, preserves legacy rows as
 subject-unavailable, distinguishes live-workspace and materialized-input seal
 points, and exposes enriched host evidence without swapping CodeGG's assessor.
-M002 remains blocked only on positive closure of that upstream M001 plus its
-own verification-digest/differential-adoption work.
+The M001 blocker is removed. M002 is ready; its verification-digest and
+differential-adoption work remains open and owned by this plan.
 
 ### M003 — Repository Plan binding
 

@@ -1,6 +1,6 @@
 # CodeGG Integration M002 — Staged Eggplan Assessment Adoption
 
-Status: blocked
+Status: ready
 
 Repository baseline: 0904218554c425c30aa6501b58d7fb8bcb839414
 
@@ -18,6 +18,13 @@ Fresh CodeGG baselines reviewed:
 - original M002 planning baseline: dbowm91/codegg @ a3c87fc18ee55aaf630401a562c11bb83112fd82
 - current blocker/interface recheck: dbowm91/codegg @ f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c
 - upstream provenance-plan registration: dbowm91/codegg @ af0a3e0fb9b6552f45e3ea5d698e7980582493fd
+- upstream provenance implementation and closure: dbowm91/codegg @ 418fdc85656e7e1faa57f71e5e7f10f7f4859c60; closure `plans/closure/eggplan-assessment-integration/001-status.md`
+- hosted CodeGG CI: run `36106606574` passed on the exact implementation commit
+- current Eggplan bridge/head recheck: `eggstack/eggplan` @ 85c4c7ef5dc826dd0be7cf65d71843c3264d842b; pure bridge `088968bd58680ae2b3741e2f1feb0614e0ff81a0`
+
+M001's only hard dependency is satisfied. M002 is ready to resume from this
+plan's staged-adoption checkpoint; verification-digest derivation, bridge
+qualification, and differential adoption remain required within M002.
 
 Prior compatibility baseline:
 

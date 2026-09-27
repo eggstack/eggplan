@@ -2,7 +2,11 @@
 
 Status: ready
 
-Repository baseline: 0904218554c425c30aa6501b58d7fb8bcb839414
+Repository baselines:
+
+- original Eggplan planning baseline: `0904218554c425c30aa6501b58d7fb8bcb839414`
+- current Eggplan handoff head: `0d4a6af7adc6f80f975aca1bfe9bae04e2eb27d8`
+- current CodeGG planning head: `ce088e9153b821d8473372c7c04786a4d90ab6ae`
 
 Source roadmap:
 
@@ -20,11 +24,16 @@ Fresh CodeGG baselines reviewed:
 - upstream provenance-plan registration: dbowm91/codegg @ af0a3e0fb9b6552f45e3ea5d698e7980582493fd
 - upstream provenance implementation and closure: dbowm91/codegg @ 418fdc85656e7e1faa57f71e5e7f10f7f4859c60; closure `plans/closure/eggplan-assessment-integration/001-status.md`
 - hosted CodeGG CI: run `36106606574` passed on the exact implementation commit
-- current Eggplan bridge/head recheck: `eggstack/eggplan` @ 85c4c7ef5dc826dd0be7cf65d71843c3264d842b; pure bridge `088968bd58680ae2b3741e2f1feb0614e0ff81a0`
+- current Eggplan bridge/head recheck: `eggstack/eggplan` @ 0d4a6af7adc6f80f975aca1bfe9bae04e2eb27d8; pure bridge `088968bd58680ae2b3741e2f1feb0614e0ff81a0`
+- current CodeGG production/planning baseline: `dbowm91/codegg` @ 6ad127c9913ee6999f44295db2fc03f8b3e5063b
+- CodeGG-local M002 handoff registered at `ce088e9153b821d8473372c7c04786a4d90ab6ae`:
+  `plans/implementation/eggplan-assessment-integration/003-staged-production-assessment-adoption.md`
+- CodeGG provenance corrective C002 closed at `88d6831a2d4d1fa7d6d88393f8b81fef00bc96f6` after implementation `91b2bc7b`
 
-M001's only hard dependency is satisfied. M002 is ready to resume from this
-plan's staged-adoption checkpoint; verification-digest derivation, bridge
-qualification, and differential adoption remain required within M002.
+M001's only hard dependency is satisfied. M002 is ready for coordinated
+handoff. Verification-digest derivation, application-layer assessment
+adoption, current-subject completion revalidation, and differential
+qualification remain required within M002.
 
 Prior compatibility baseline:
 
@@ -245,21 +254,36 @@ that convention.
 
 ## 8. CodeGG assessment migration
 
-Replace or delegate the duplicative pure evidence-satisfaction portion of
-`codegg-core::work_plan::assessment` only after golden parity is demonstrated.
+Current CodeGG layering makes the correct M002 boundary explicit:
 
-Keep CodeGG's public types/functions stable during M002 where practical:
+- `codegg_core::work_plan::assess_work_plan` is pure/store-independent;
+- exact current subject capture and `assemble_resolved` live in the
+  application layer.
 
-- `assess_work_plan` may become a facade around the Eggplan bridge;
-- `WorkPlanCompletionAssessment` remains the CodeGG-facing DTO;
+Do not force SQLite/Git authority into `codegg-core`.
+
+The CodeGG-local M002 plan therefore owns an application-layer Eggplan
+assessment facade that:
+
+- captures the current exact subject;
+- consumes `assemble_resolved`;
+- derives verification digests from durable native execution specs;
+- invokes this crate's pure `assess_codegg_snapshot`;
+- projects the result back into `WorkPlanCompletionAssessment`.
+
+Keep CodeGG's public DTOs stable:
+
+- `WorkPlanCompletionAssessment` remains the CodeGG-facing result;
 - Todo/arbiter callers need not know Eggplan types;
 - WorkPlanStore remains unchanged.
 
-Do not delete the old assessor until differential tests prove parity for the
-supported semantic subset.
+The legacy pure assessor remains a compatibility/differential oracle and an
+explicit whole-assessment fallback only for positively identified non-Git
+workspaces or currently unsupported Artifact/Commit evidence. Missing/stale
+Git subject or verification binding must NOT fall back to legacy satisfaction.
 
-A temporary test-only legacy assessor is acceptable for differential
-qualification; it must not become a second production authority after closure.
+Production Git-backed supported-evidence call sites must use the new facade
+after differential qualification.
 
 ## 9. Semantics that remain CodeGG-specific
 
@@ -466,33 +490,37 @@ The Eggplan closure record must cite:
 - hosted workflow IDs;
 - residual findings and M003 disposition.
 
-## 21. Implementation checkpoint — blocked on exact execution subject
+## 21. Coordinated implementation checkpoint — ready
 
-Eggplan-side bridge work is committed as `088968b` (pure live snapshot mapper,
-fixture-only source-SHA validation, detailed deterministic assessment result,
-and shared verification-digest helper). CodeGG was rechecked through
-`f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c`; the relevant WorkPlan evidence
-shape still lacks exact attempt-scoped source provenance.
+The historical execution-subject blocker is closed.
 
-CodeGG currently stores only status in `WorkPlanEvidenceSnapshot`. A current
-worktree capture cannot establish the subject of an older completed job.
-Attaching that current subject to an observation would manufacture authority,
-and leaving the observation subjectless cannot satisfy Eggplan's exact-subject
-policy. The live bridge therefore correctly fails closed.
+CodeGG M001 durable execution-subject provenance closed at
+`418fdc85656e7e1faa57f71e5e7f10f7f4859c60` with hosted CI run
+`36106606574` green. The later C002 corrective fixed AgentRun link resolution,
+pinned the five-field Eggplan subject projection, and added an ownership guard;
+closure is `plans/closure/eggplan-assessment-integration/002-status.md` in
+CodeGG.
 
-The required upstream handoff is now registered in CodeGG at
-`af0a3e0fb9b6552f45e3ea5d698e7980582493fd`:
+The CodeGG-local M002 handoff is now registered at:
 
-- `plans/subsystems/eggplan-assessment-integration-roadmap.md`
-- `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
+- CodeGG planning commit:
+  `ce088e9153b821d8473372c7c04786a4d90ab6ae`
+- plan:
+  `plans/implementation/eggplan-assessment-integration/003-staged-production-assessment-adoption.md`
 
-Its M001 captures and persists CodeGG-native attempt-scoped execution subjects,
-handles live-workspace drift and immutable/materialized seal points, keeps
-legacy records explicitly subject-unavailable, and exposes enriched host
-evidence without replacing CodeGG's current assessor.
+That plan makes the application-layer facade authoritative for Git-backed
+supported evidence, adds canonical verification-spec derivation, explicitly
+selects legacy compatibility only for non-Git/unsupported evidence, and
+requires S2 current-subject revalidation immediately before a completion
+transition.
 
-Resume this Eggplan M002 only after that CodeGG M001 closes positively. Then
-complete the remaining verification-digest derivation, CodeGG dependency pin,
-differential parity, and production assessor adoption. Evidence C003,
-Projection/CLI M002, and Eggstack M002 remain independent and may proceed in
-parallel.
+The current CodeGG repository has a separate CI timing-flake corrective. It is
+an operational closure dependency, not a hard implementation dependency:
+M002 coding/local qualification may proceed in parallel, but hosted M002
+closure evidence must wait for a trustworthy green baseline and exact-head
+canonical qualification.
+
+No new Eggplan persisted schema or repository-state behavior is required by
+this checkpoint. The bridge remains pure and `eggplan-repo` remains
+dev/test-only for compatibility fixtures.
+

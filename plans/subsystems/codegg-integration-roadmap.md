@@ -11,10 +11,12 @@ M001 execution-time baseline re-checked 2026-09-24:
 28b4695661d463dd1675d045ac6299c5fbc9ea31.
 M002 planning baseline re-checked 2026-09-24:
 a3c87fc18ee55aaf630401a562c11bb83112fd82.
-Current CodeGG interface/blocker baseline re-checked:
-f4e6e69d9e968e2adbb4228b3a7d45f55bd1294c.
-Upstream provenance handoff registered in CodeGG at:
-af0a3e0fb9b6552f45e3ea5d698e7980582493fd.
+Current CodeGG production/planning baseline re-checked:
+6ad127c9913ee6999f44295db2fc03f8b3e5063b.
+Upstream provenance implementation/closure:
+418fdc85656e7e1faa57f71e5e7f10f7f4859c60.
+Current CodeGG-local M002 handoff registration:
+ce088e9153b821d8473372c7c04786a4d90ab6ae.
 
 ## 1. Purpose
 
@@ -109,8 +111,14 @@ The upstream corrective/unblock was registered in CodeGG:
 That plan makes subject provenance attempt-scoped, preserves legacy rows as
 subject-unavailable, distinguishes live-workspace and materialized-input seal
 points, and exposes enriched host evidence without swapping CodeGG's assessor.
-The M001 blocker is removed. M002 is ready; its verification-digest and
-differential-adoption work remains open and owned by this plan.
+The M001 blocker is removed. M002 is ready for coordinated handoff. CodeGG's
+local plan is
+`plans/implementation/eggplan-assessment-integration/003-staged-production-assessment-adoption.md`.
+It owns the application-layer adoption facade, verification-spec derivation,
+current-subject S1/S2 completion revalidation, production call-site migration,
+and differential qualification. The unrelated CodeGG CI timing-flake
+corrective may run in parallel, but trustworthy hosted qualification remains a
+closure requirement.
 
 ### M003 — Repository Plan binding
 

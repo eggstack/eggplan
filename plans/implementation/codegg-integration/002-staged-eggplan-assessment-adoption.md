@@ -35,6 +35,29 @@ handoff. Verification-digest derivation, application-layer assessment
 adoption, current-subject completion revalidation, and differential
 qualification remain required within M002.
 
+## CodeGG-side M002 closure (recorded 2026-09-27)
+
+CodeGG implemented and closed its M002 staged adoption independently
+against the pinned Eggplan head above:
+
+- implementation `dbowm91/codegg @ 85058541` (+ test-only follow-ups
+  `81a914df`, `79bae034`): application-layer facade
+  (`src/work_plan_eggplan.rs`), canonical verification digests,
+  resolved-evidence adapter, explicit engine selection, 36-case
+  differential matrix (universal rule: Eggplan allows completion only
+  where legacy allows), production call-site migration, S1/S2
+  completion revalidation;
+- closure `plans/closure/eggplan-assessment-integration/003-m002-status.md`;
+- hosted CodeGG `CI / verify` run `36336450431` success on exact head
+  `79bae034` (PR dbowm91/codegg#80);
+- consumed Eggplan packages: `eggplan-core` + `eggplan-codegg-compat`
+  at `0d4a6af7` (pure bridge `088968bd`); no `eggplan-repo` production
+  dependency; no Eggplan repository state created.
+
+This Eggplan-side M002 plan stays `ready` until Eggplan's own closure
+pass consumes these SHAs. CodeGG M003 repository Plan binding is
+dependency-ready on the CodeGG side (handoff unregistered).
+
 Prior compatibility baseline:
 
 - 28b4695661d463dd1675d045ac6299c5fbc9ea31

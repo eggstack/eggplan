@@ -75,7 +75,7 @@ Planning-system bootstrap:
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | closed | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | closure plans/closure/projection-cli/002-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
-| CodeGG integration | M002 staged Eggplan assessment adoption | ready | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | CodeGG-local handoff registered at ce088e9; upstream M001/C002 closed; app-layer facade + verification binding + differential adoption ready. CodeGG CI-stability corrective is closure-operational only, not an implementation blocker. |
+| CodeGG integration | M002 staged Eggplan assessment adoption | ready | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | CodeGG side implemented and closed (dbowm91/codegg @ 85058541 + follow-ups through 79bae034; closure plans/closure/eggplan-assessment-integration/003-m002-status.md; hosted CI 36336450431 green on exact head). Upstream M001/C002 closed. This Eggplan-side M002 stays ready until Eggplan's own closure pass. |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -139,7 +139,7 @@ Reviewed during planning; these are not dependency pins.
 
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
-| CodeGG | 6ad127c9913ee6999f44295db2fc03f8b3e5063b (current reviewed head); ce088e9153b821d8473372c7c04786a4d90ab6ae (registered M002 handoff) | M001 durable provenance + corrective are closed; M002 uses application-layer Eggplan facade while WorkPlan/Goal/Todo/checkpoint/scheduler ownership stays CodeGG |
+| CodeGG | 79bae03425470a0ec898003b5b39bd75b5b21d8c (M002 implementation head, hosted-green); e4528ab9 (M002 closure, plans/closure/eggplan-assessment-integration/003-m002-status.md) | M001 durable provenance + corrective are closed; M002 staged adoption is closed CodeGG-side with the app-layer facade, verification binding, differential parity, and S2 revalidation; ownership stays CodeGG; M003 handoff unregistered |
 | Eggwork | faaa0b905fa6bc43e46825fdd98530b5533a970f | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
 | Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
 | Eggbench | d870512a5a1af16276ff05286ff0b6e2366b7f8f | current .eggb manifest v2; execution status remains separate from comparison verdict |

@@ -11,6 +11,7 @@ use eggplan_core::{
     SubjectState, VerificationDigest, assess_plan,
 };
 use eggplan_repo::{PlanStore, RepoError, RepositoryStore};
+use std::collections::BTreeSet;
 use std::sync::{Arc, Barrier};
 use tempfile::tempdir;
 
@@ -226,6 +227,38 @@ fn live_snapshot_mapping_does_not_require_fixture_provenance_and_assesses_purely
     );
 }
 
+/// M001 fixture provenance is rejected by the qualification wrapper and is
+/// never silently relabelled as the current baseline. The identical snapshot
+/// body still maps through the live path, which never reads a source SHA.
+#[test]
+fn old_m001_fixture_provenance_is_rejected_not_relabelled() {
+    const M001_SOURCE_CODEGG_SHA: &str = "28b4695661d463dd1675d045ac6299c5fbc9ea31";
+    let current = load(FOUNDATION);
+    let mut legacy = current.clone();
+    legacy.source_sha = M001_SOURCE_CODEGG_SHA.into();
+    assert_eq!(legacy.snapshot, current.snapshot);
+    assert!(
+        normalize_fixture(
+            &legacy,
+            subject(),
+            &mut Resolver {
+                status: EvidenceStatus::Passed
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        normalize_snapshot(
+            &legacy.snapshot,
+            subject(),
+            &mut Resolver {
+                status: EvidenceStatus::Passed
+            }
+        )
+        .is_ok()
+    );
+}
+
 #[test]
 fn strict_versioned_fixture_corpus_and_stable_identity_mapping() {
     let foundation = load(FOUNDATION);
@@ -395,6 +428,181 @@ fn stale_and_unbound_or_mismatched_execution_evidence_fail_closed() {
     ] {
         assert!(normalize_fixture(&fixture, subject(), &mut FaultyResolver(fault)).is_err());
     }
+}
+
+fn snapshot_with_evidence_kinds(
+    kinds: &[CodeggEvidenceKind],
+) -> eggplan_codegg_compat::CodeggPlanSnapshot {
+    let mut fixture = load(FOUNDATION);
+    fixture.snapshot.status = CodeggPlanStatus::Active;
+    fixture.snapshot.items[0].evidence = kinds
+        .iter()
+        .enumerate()
+        .map(|(index, kind)| CodeggEvidenceRef {
+            kind: *kind,
+            ref_id: format!("ref-{index}"),
+            detail: None,
+        })
+        .collect();
+    fixture.snapshot
+}
+
+#[test]
+fn execution_kinds_satisfy_only_with_the_authoritative_matching_binding() {
+    let execution_kinds = [
+        CodeggEvidenceKind::TestJob,
+        CodeggEvidenceKind::SchedulerJob,
+        CodeggEvidenceKind::DelegatedRun,
+        CodeggEvidenceKind::AgentRun,
+    ];
+    let snapshot = snapshot_with_evidence_kinds(&execution_kinds);
+    let result = assess_codegg_snapshot(
+        &snapshot,
+        subject(),
+        &mut Resolver {
+            status: EvidenceStatus::Passed,
+        },
+        &providers(),
+    )
+    .unwrap();
+    assert_eq!(
+        result.completion_family,
+        completion_family(AssessmentStatus::Complete)
+    );
+    assert_eq!(result.assessment.status, AssessmentStatus::Complete);
+    let requirement_kinds: BTreeSet<_> = result
+        .plan
+        .items
+        .iter()
+        .flat_map(|item| item.criteria.iter())
+        .flat_map(|criterion| criterion.requirements.iter())
+        .map(|requirement| requirement.kind)
+        .collect();
+    assert_eq!(
+        requirement_kinds,
+        BTreeSet::from([
+            EvidenceKind::Test,
+            EvidenceKind::Command,
+            EvidenceKind::DelegatedRun
+        ])
+    );
+    for requirement in result
+        .plan
+        .items
+        .iter()
+        .flat_map(|item| item.criteria.iter())
+        .flat_map(|criterion| criterion.requirements.iter())
+    {
+        assert!(requirement.expected_verification_digest.is_some());
+        assert_eq!(
+            requirement.subject_policy,
+            eggplan_core::SubjectPolicy::Exact
+        );
+    }
+
+    for kind in execution_kinds {
+        let snapshot = snapshot_with_evidence_kinds(&[kind]);
+        for fault in [
+            ResolverFault::MissingBinding,
+            ResolverFault::MismatchedBinding,
+            ResolverFault::StaleSubject,
+        ] {
+            assert!(
+                assess_codegg_snapshot(
+                    &snapshot,
+                    subject(),
+                    &mut FaultyResolver(fault),
+                    &providers()
+                )
+                .is_err(),
+                "{kind:?} accepted an unbound execution observation"
+            );
+        }
+    }
+}
+
+#[test]
+fn artifact_and_commit_evidence_needs_no_execution_binding() {
+    let snapshot =
+        snapshot_with_evidence_kinds(&[CodeggEvidenceKind::Artifact, CodeggEvidenceKind::Commit]);
+    let mapped = normalize_snapshot(
+        &snapshot,
+        subject(),
+        &mut FaultyResolver(ResolverFault::MissingBinding),
+    )
+    .unwrap();
+    assert!(mapped.observations.iter().all(|observation| {
+        observation.verification_digest().is_none()
+            && matches!(
+                observation.kind(),
+                EvidenceKind::Artifact | EvidenceKind::Revision
+            )
+    }));
+    assert!(
+        mapped
+            .plan
+            .items
+            .iter()
+            .flat_map(|item| item.criteria.iter())
+            .flat_map(|criterion| criterion.requirements.iter())
+            .all(|requirement| requirement.expected_verification_digest.is_none())
+    );
+    let result = assess_codegg_snapshot(
+        &snapshot,
+        subject(),
+        &mut Resolver {
+            status: EvidenceStatus::Passed,
+        },
+        &providers(),
+    )
+    .unwrap();
+    assert_eq!(result.assessment.status, AssessmentStatus::Complete);
+}
+
+#[test]
+fn completion_family_folds_but_detailed_eggplan_reason_codes_survive() {
+    let snapshot = snapshot_with_evidence_kinds(&[CodeggEvidenceKind::TestJob]);
+    let result = assess_codegg_snapshot(
+        &snapshot,
+        subject(),
+        &mut Resolver {
+            status: EvidenceStatus::Unavailable,
+        },
+        &providers(),
+    )
+    .unwrap();
+    assert_ne!(result.assessment.status, AssessmentStatus::Complete);
+    assert_eq!(
+        result.completion_family,
+        eggplan_codegg_compat::CodeggCompletionFamily::ActionableWorkRemaining
+    );
+    assert!(
+        result.reason_codes.contains(&"evidence_status".to_owned()),
+        "{:?}",
+        result.reason_codes
+    );
+    let untrusted = ProviderRegistry::default();
+    let result = assess_codegg_snapshot(
+        &snapshot,
+        subject(),
+        &mut Resolver {
+            status: EvidenceStatus::Passed,
+        },
+        &untrusted,
+    )
+    .unwrap();
+    assert_eq!(
+        result.completion_family,
+        eggplan_codegg_compat::CodeggCompletionFamily::ActionableWorkRemaining
+    );
+    assert!(
+        result
+            .reason_codes
+            .iter()
+            .any(|code| code.starts_with("untrusted_provider")),
+        "{:?}",
+        result.reason_codes
+    );
 }
 
 #[test]

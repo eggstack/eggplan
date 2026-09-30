@@ -9,11 +9,16 @@ runtime authority. The production crate depends on `eggplan-core`, serde, and
 serde_json only. Repository persistence remains outside this bridge.
 
 The reviewed fixture baseline is CodeGG
-`a3c87fc18ee55aaf630401a562c11bb83112fd82`; current `origin/main`
-`5f4532659dbf0df2cd9f2b3bdb024217d2ea7868` was rechecked and the WorkPlan
-model/assessment/storage interfaces are unchanged in that range. WorkPlan
-model/statuses, bounded projections, CAS storage, and runtime ownership remain
-CodeGG-owned. Later checkpoint, context-epoch, Todo, Goal, WorkOrder,
+`a3c87fc18ee55aaf630401a562c11bb83112fd82`. Rechecked at the CodeGG
+M002-adopted head `ffa1c15e654776c3ebe1022f4ce7de2582bc5d98`:
+`crates/codegg-core/src/work_plan/` (model, assessment, evidence, projection,
+store, Todo projection, checkpoint, epoch policy) is byte-identical across that
+whole range, so the fixture contract still describes the current WorkPlan
+model. The M002 adoption is entirely application-layer (`src/work_plan_eggplan.rs`,
+`src/work_plan_arbiter.rs`, `src/work_plan_evidence.rs`, `src/tool/work_plan.rs`)
+plus the root `Cargo.toml` pin; `codegg-core` carries no Eggplan dependency.
+WorkPlan model/statuses, bounded projections, CAS storage, and runtime ownership
+remain CodeGG-owned. Later checkpoint, context-epoch, Todo, Goal, WorkOrder,
 AgentRun/Job, and arbiter control flow remain CodeGG-owned.
 
 `normalize_snapshot` is the live mapper; `normalize_fixture` first validates
@@ -23,11 +28,32 @@ observations, and explicit ProviderRegistry. It writes no Eggplan repository
 state. Host obligation (not implemented behavior in this crate, which only
 compares host-supplied bindings): CodeGG must derive verification digests
 from canonical native execution specifications through Eggplan's shared
-`verification_digest` helper. If a
-native execution specification or exact evidence subject cannot be
-reconstructed, the host must mark that evidence unavailable and retain its
-compatibility fallback; reference IDs, prose, and serialized `Satisfied`
-dispositions never supply a digest.
+digest helper. CodeGG implemented that obligation in its M002 application
+facade: `CodeggVerificationSpecV1` is digested with `eggplan_core::digest_json`
+and formatted by `VerificationDigest`, so the host digest is Eggplan-canonical
+by construction rather than by convention. If a native execution
+specification or exact evidence subject cannot be reconstructed, the host
+must mark that evidence unavailable and retain its compatibility fallback;
+reference IDs, prose, and serialized `Satisfied` dispositions never supply a
+digest.
+
+## Verification-binding ownership
+
+Ownership of the verification identity is deliberately split, and the split is
+enforced rather than documented:
+
+| Concern | Owner | Enforced by |
+|---|---|---|
+| Which native object a ref names (`TestJob`, `SchedulerJob`, `DelegatedRun`/`AgentRun`) | CodeGG | `CodeggEvidenceRef` kind in the snapshot DTO |
+| Deriving the verification digest from the authoritative execution specification | CodeGG host adapter | `VerificationDigest` equality check in `normalize_snapshot`; Eggplan only compares, never mints |
+| Requiring a binding for execution-derived kinds | Eggplan | `requires_verification_binding` gate; missing or mismatched binding fails the whole mapping closed |
+| Provider identity and class/trust policy | Eggplan `ProviderRegistry`, supplied by the host | `assess_plan`; `register_trusted` never appears in this crate's `src/` |
+| Artifact/Commit refs needing no execution binding | Eggplan | non-execution kinds bypass the binding gate and keep `expected_verification: None` |
+
+`Artifact` and `Commit` map to `Artifact`/`Revision` and are deliberately exempt:
+they are content/revision references, not executions, so a digest would be
+invented identity. The exemption is a kind allowlist, not a host assertion.
+
 
 ## Mapping contract
 
@@ -57,7 +83,25 @@ failed authority, stale subject and verification binding, judgment, blocked
 dependencies, current/actionable projection bounds, stale CAS, restart, and
 cancel-versus-guarded-close contention.
 
+Provenance is gated, not relabelled. `normalize_fixture` accepts only
+`schema_version == 1`, `source_repository == "codegg"`, and
+`source_sha == SOURCE_CODEGG_SHA`, so a fixture stamped with the superseded M001
+baseline `28b4695661d463dd1675d045ac6299c5fbc9ea31` is rejected outright while
+the identical snapshot body still maps through `normalize_snapshot`. The M001
+corpus was not kept as a second accepted baseline: it described a different
+CodeGG contract, and dual acceptance would let stale bytes masquerade as
+current provenance.
+
+The live assessment surface is qualified independently of the corpus. The
+bridge tests drive `assess_codegg_snapshot` over synthesized snapshots covering
+every evidence kind (Test/Command/DelegatedRun/Artifact/Revision), proving that
+execution kinds complete only with a matching authoritative binding, that
+Artifact/Commit complete without one, that missing or mismatched bindings fail
+the whole assessment closed rather than degrading, and that the five-family fold
+never discards Eggplan's detailed reason codes.
+
 Run `scripts/check-codegg-compat-boundary.sh` to verify the crate has no
 CodeGG dependency or declarations for CodeGG-only runtime ownership. Existing
 Eggplan core/repository libraries remain the only persistence and assessment
 authority.
+

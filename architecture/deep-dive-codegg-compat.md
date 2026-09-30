@@ -102,25 +102,45 @@ no WorkOrder/scheduler state, no storage, and no evidence acquisition:
   `long_horizon_trajectory_qualification.json` (dependency gating, no hidden
   reasoning). Each fixture records its own `source_case` naming the upstream
   CodeGG test.
-- `tests/parity.rs` (~740 lines) covers: live mapping without fixture
-  provenance plus pure assessment (`parity.rs:202-227`); strict corpus/SHA/
-  unknown-field rejection and deterministic identity mapping (`parity.rs:229-296`);
+- `tests/parity.rs` (948 lines, 19 tests) covers: live mapping without fixture
+  provenance plus pure assessment (`parity.rs:204`); rejection of the superseded
+  M001 fixture SHA without relabelling, with the same snapshot body still
+  mapping live (`parity.rs:234`); strict corpus/SHA/unknown-field rejection and
+  deterministic identity mapping (`parity.rs:263`);
   `Satisfied`/owner/completed-label non-authority and provider-trust gating
-  (`parity.rs:298-360`); completed-without-proof stays incomplete
-  (`parity.rs:362-386`); stale/unbound/mismatched bindings fail closed
-  (`parity.rs:388-398`); judgment stays pending and family folding is edge-only
-  (`parity.rs:400-438`); bounded projection stability (`parity.rs:440-467`);
-  CAS creation, stale-writer conflict, restart (`parity.rs:469-499`);
-  cancel-vs-guarded-close single CAS winner (`parity.rs:501-565`); dependency
-  mapping and input bounds (`parity.rs:567-604`); artifact/empty-acceptance
-  non-completeness (`parity.rs:606-648`); explicit plan/item status tables
-  (`parity.rs:650-740`).
+  (`parity.rs:332`); completed-without-proof stays incomplete
+  (`parity.rs:396`); stale/unbound/mismatched bindings fail closed
+  (`parity.rs:422`); every execution kind (TestJob/SchedulerJob/DelegatedRun/
+  AgentRun) completing only on a matching authoritative binding, and failing
+  closed per kind under missing/mismatched/stale faults (`parity.rs:451`);
+  Artifact/Commit completing with no execution binding at all
+  (`parity.rs:525`); the five-family fold retaining Eggplan's detailed
+  `evidence_status` / `untrusted_provider*` reason codes (`parity.rs:563`);
+  judgment staying pending and family folding being edge-only (`parity.rs:609`);
+  bounded projection stability; CAS creation, stale-writer conflict, restart;
+  cancel-vs-guarded-close single CAS winner; dependency mapping and input
+  bounds; artifact/empty-acceptance non-completeness; explicit plan/item status
+  tables.
 - Recorded baselines: M002 planning baseline `a3c87fc…` (fixture SHA),
   blocker/interface recheck `f4e6e69…`, upstream provenance registration
   `af0a3e0…`, provenance implementation/closure `418fdc8…` with CodeGG CI run
-  `36106606574`, Eggplan bridge `088968b` — per the subsystem roadmap §M002
-  and the M002 plan header. The `architecture/codegg-compat.md:11-14` recheck
-  notes `origin/main 5f45326…` left model/assessment/storage interfaces unchanged.
+  `36106606574`, Eggplan bridge `088968b`, pinned-by-CodeGG Eggplan head
+  `0d4a6af…`, CodeGG M002 implementation `3e992291` + hermeticity follow-up
+  `3c7438c7`, CodeGG M002 closure `ffa1c15e` with hosted canonical run
+  `36760308368` — per the subsystem roadmap §M002, the M002 plan header, and
+  `plans/closure/codegg-integration/002-closed.md`.
+
+The earlier `architecture/codegg-compat.md` recheck note that cited
+`origin/main 5f45326…` as leaving "model/assessment/storage interfaces
+unchanged" was accurate for `crates/codegg-core/src/work_plan/` but was read as
+a claim that no WorkPlan path had moved. It is now stated precisely against the
+M002-adopted head `ffa1c15e…`: the `codegg-core` WorkPlan module is
+byte-identical from `a3c87fc…` to `ffa1c15e…`, and everything M002 touched is
+application-layer. `tests/long_horizon_trajectory_qualification.rs` did change
+in that range, but only by an upstream import reformat plus an added
+`ExecutionTarget::default()` field from the M001 provenance work — the
+dependency-gating and no-hidden-reasoning behavior the fixture records is
+unchanged, so the fixture remains valid provenance.
 
 ## 5. Review findings
 
@@ -134,11 +154,14 @@ the mapping auditable.
 
 **Gaps / risks (what M002 still leaves open).**
 
-1. Differential adoption is still ahead: `assess_codegg_snapshot` is a pure
-   view; CodeGG has not yet swapped its assessor behind the existing surface
-   (M002 plan §§7–8, acceptance criteria 4–5). The upstream subject-provenance
-   handoff closed the M001 blocker, but verification-digest derivation and the
-   parity matrix remain M002 work (roadmap §M002, plan §21).
+1. ~~Differential adoption is still ahead.~~ Resolved 2026-09-30: CodeGG
+   landed M002 in `3e992291` (facade, canonical verification-spec derivation,
+   resolved-evidence adapter, explicit engine selection, 28-case differential
+   matrix, production call-site migration, S1/S2 completion revalidation) and
+   closed it in `ffa1c15e` with hosted canonical run `36760308368` green on the
+   exact head. `assess_codegg_snapshot` is now consumed in production behind
+   CodeGG's unchanged `WorkPlanCompletionAssessment` surface. What remains on
+   the Eggplan side is M003 (CodeGG Plan binding), not M002.
 2. Trust boundary is caller-side: the `EvidenceResolver` trait
    (`lib.rs:147-153`) is arbitrary host code. In-crate guards (subject/kind/ID
    uniqueness at `lib.rs:560-565`, binding equality at `lib.rs:566-575`) fail
@@ -154,12 +177,27 @@ the mapping auditable.
 5. `hash_id` truncates SHA-256 hex to 32 chars (`lib.rs:341`); collisions are
    rejected per-run and duplicates per-manifest, but `MappingManifest::validate`
    does not re-derive IDs from sources — determinism rests on the parity test
-   (`parity.rs:272-282`), not on the validator. Acceptable but worth stating.
+   (`parity.rs:308-313`), not on the validator. Acceptable but worth stating.
 6. `project_bounded` clamps and history-exclusion (`lib.rs:773-774,827-834`)
    are CodeGG-view choices, not core projection authority; the folded
    `assessment_reason_code` string (`lib.rs:899`) is lossy by design with detail
    retained only in `CodeggAssessmentBridgeResult::reason_codes`. No issue found,
    but callers must not treat the projection label as the assessment.
+7. Fail-closed is whole-assessment, not per-item. One unbound execution ref
+   makes `normalize_snapshot` return `Err` and discards every other resolved
+   observation for that snapshot (`lib.rs:560-587`). That is the intended
+   stricter-than-legacy behavior, but it means a single bad ref suppresses
+   otherwise-valid evidence, so callers must surface the error rather than
+   retry with a filtered snapshot. CodeGG's engine selection honors this by
+   treating a resolver error as a hard failure and never degrading to legacy
+   satisfaction.
+8. Resolver-supplied provider identity is accepted verbatim. The bridge checks
+   that the observation's subject/kind match and that the verification binding
+   is equal, but it does not check *which* provider the host used — that is
+   `ProviderRegistry`'s job, and an untrusted or class-mismatched provider
+   degrades assessment to non-completion rather than an error
+   (`parity.rs:563` asserts the fold). Residual risk is bounded: misconfigured
+   trust can only ever withhold completion, never manufacture it.
 
 ## Verification pointers
 

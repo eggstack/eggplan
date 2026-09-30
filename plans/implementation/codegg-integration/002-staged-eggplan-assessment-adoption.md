@@ -1,6 +1,8 @@
 # CodeGG Integration M002 — Staged Eggplan Assessment Adoption
 
-Status: ready
+Status: closed
+
+Closure: plans/closure/codegg-integration/002-closed.md
 
 Repository baselines:
 
@@ -57,6 +59,21 @@ against the pinned Eggplan head above:
 This Eggplan-side M002 plan stays `ready` until Eggplan's own closure
 pass consumes these SHAs. CodeGG M003 repository Plan binding is
 dependency-ready on the CodeGG side (handoff unregistered).
+
+### Errata — landed revisions (2026-09-30)
+
+The branch-local revisions recorded above were superseded when the work
+landed on `dbowm91/codegg` `main`. The landed revisions are
+implementation `3e992291b6024fae29f2512ad2fa42a209fe7ca9`, qualification
+follow-up `3c7438c738a142fdd0c4e79684d7d1154fe52a99`, and closure
+`ffa1c15e654776c3ebe1022f4ce7de2582bc5d98`, with hosted canonical run
+`36760308368` green on the exact implementation tree. The differential
+matrix in the landed tree is 28 cases, not 36. The CodeGG closure also
+states that the M002 gate is lifted and M003 may be planned.
+
+This is a factual correction of revision identifiers and one case count.
+No criterion, finding, or conclusion below changes. Full evidence is in
+plans/closure/codegg-integration/002-closed.md.
 
 Prior compatibility baseline:
 
@@ -546,4 +563,27 @@ canonical qualification.
 No new Eggplan persisted schema or repository-state behavior is required by
 this checkpoint. The bridge remains pure and `eggplan-repo` remains
 dev/test-only for compatibility fixtures.
+
+## Resolution (2026-09-30)
+
+Both sides of the coordinated handoff are closed.
+
+Eggplan: the pure bridge landed in `088968b` and the §13 test matrix was
+completed in `1291799`. All §18 acceptance criteria are met; see
+plans/closure/codegg-integration/002-closed.md.
+
+CodeGG: the application-layer facade, canonical verification-spec
+derivation, resolved-evidence adapter, explicit engine selection, 28-case
+differential matrix, production call-site migration, and S1/S2 completion
+revalidation landed in `3e992291` and closed in `ffa1c15e`, with hosted
+canonical run `36760308368` green on the exact implementation tree.
+
+No stop condition fired. Ownership is unchanged: `crates/codegg-core/src/work_plan/`
+is byte-identical from the fixture baseline through the adopted head,
+`codegg-core` gained no Eggplan dependency, and the CodeGG production graph
+contains only `eggplan-core` and `eggplan-codegg-compat`.
+
+M003 (CodeGG repository Plan binding) is dependency-ready and may be
+planned from CodeGG `ffa1c15e654776c3ebe1022f4ce7de2582bc5d98`. It must
+not make Eggplan the CodeGG WorkOrder scheduler.
 

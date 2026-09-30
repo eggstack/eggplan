@@ -14,7 +14,7 @@ no WorkOrder/scheduler state, no storage, and no evidence acquisition:
   `tempfile` appear only under `[dev-dependencies]`
   (`Cargo.toml:13-15`) for test-only snapshot persistence.
 - The `create_snapshot` helper the `MappedPlan` doc comment mentions
-  (`src/lib.rs:285-287`) lives in `tests/parity.rs:22-44`, not in `src` —
+  (`src/lib.rs:285-288`) lives in `tests/parity.rs:22-44`, not in `src` —
   matching M002 §3 (repository coupling moved to test-only).
 - Source grep confirms `src/` contains no `register_trusted`,
   `SubjectCapture`, `finalize_closure`, `PlanStore`, `eggplan-repo`,
@@ -30,65 +30,68 @@ no WorkOrder/scheduler state, no storage, and no evidence acquisition:
 
 ## 2. Entry-point walkthrough
 
-- `normalize_snapshot` (`src/lib.rs:429-692`) is the live mapper. It takes a
+- `normalize_snapshot` (`src/lib.rs:430-693`) is the live mapper. It takes a
   parsed `CodeggPlanSnapshot` (`lib.rs:42-54`), an exact host-supplied
   `SubjectRevision`, and a host `EvidenceResolver` (`lib.rs:147-153`). It
-  validates bounds (revision/item count at `lib.rs:434`, per-item limits at
-  `lib.rs:465-472`, text/ID/detail sizes via `lib.rs:344-375`), maps IDs,
+  validates bounds (revision/item count at `lib.rs:435`, per-item limits at
+  `lib.rs:466-473`, text/ID/detail sizes via `lib.rs:345-375`), maps IDs,
   resolves each evidence ref through the host, builds `EvidenceRequirement`s
   plus host observations, then emits a revision-zero `Plan` with provenance
-  (`lib.rs:644-660`) and a digest-pinned `MappingManifest` (`lib.rs:662-683`).
-- `normalize_fixture` (`lib.rs:411-425`) is the qualification wrapper: it
+  (`lib.rs:645-661`) and a digest-pinned `MappingManifest` (`lib.rs:663-684`).
+- `normalize_fixture` (`lib.rs:412-426`) is the qualification wrapper: it
   rejects anything that is not `schema_version == 1`, `source_repository ==
-  "codegg"`, `source_sha == SOURCE_CODEGG_SHA` (`lib.rs:14,416-421`), then
-  calls `normalize_snapshot` (`lib.rs:424`). Fixture SHA is provenance
+  "codegg"`, `source_sha == SOURCE_CODEGG_SHA` (`lib.rs:14,417-422`), then
+  calls `normalize_snapshot` (`lib.rs:425`). Fixture SHA is provenance
   gating, never runtime authority — as specified in M002 §3 and
   `architecture/codegg-compat.md:19-28`.
-- `assess_codegg_snapshot` (`lib.rs:696-734`) is the pure live assessment
+- `assess_codegg_snapshot` (`lib.rs:697-735`) is the pure live assessment
   bridge. It normalizes, then applies the source lifecycle
   (`Active`/`Completed` → `PlanStatus::Active`, `Blocked` → `Blocked`,
-  `Cancelled` → `Cancelled` at `lib.rs:703-707`), calls core `assess_plan`
-  (`lib.rs:708`), folds the status via `completion_family` (`lib.rs:709`),
+  `Cancelled` → `Cancelled` at `lib.rs:704-708`), calls core `assess_plan`
+  (`lib.rs:709`), folds the status via `completion_family` (`lib.rs:710`),
   and collects sorted/deduped stable reason-code strings from plan, item,
-  and criterion reasons (`lib.rs:710-726`). It writes no repository state.
+  and criterion reasons (`lib.rs:711-727`). It writes no repository state.
 - Verification-digest handling: the bridge never mints a digest. Execution
   kinds must arrive with `expected_verification` equal to the observation's
-  own binding, else mapping fails closed (`lib.rs:566-575`). `src/` contains
-  no call to core's `verification_digest` helper (core defines it in
-  `crates/eggplan-core/src/schema.rs:22`); derivation is a CodeGG-host duty.
-- `project_bounded` (`lib.rs:767-909`) is a CodeGG-facing display projection:
-  clamp `max_items` to 1..=8 and `max_text_chars` to 1..=200 (`lib.rs:773-774`),
-  rank current item first then by status/position/id (`lib.rs:777-796`),
-  exclude completed/cancelled history (`lib.rs:827-834`), truncate
-  (`lib.rs:861`), and label with the folded family string (`lib.rs:899`).
+  own binding, else mapping fails closed (`lib.rs:567-576`). `src/` contains
+  no call to core's `digest_json`/`VerificationDigest` for *derivation* (both
+  live in `eggplan-core`); the bridge only compares a host-supplied pair. CodeGG
+  discharges the derivation duty in `src/work_plan_eggplan.rs` by calling
+  `eggplan_core::digest_json` over its own `CodeggVerificationSpecV1` and
+  formatting the result with `VerificationDigest::new`.
+- `project_bounded` (`lib.rs:768-910`) is a CodeGG-facing display projection:
+  clamp `max_items` to 1..=8 and `max_text_chars` to 1..=200 (`lib.rs:774-775`),
+  rank current item first then by status/position/id (`lib.rs:778-797`),
+  exclude completed/cancelled history (`lib.rs:828-835`), truncate
+  (`lib.rs:862`), and label with the folded family string (`lib.rs:900`).
 
 ## 3. Mapping contract as implemented
 
-- **ID derivation** (`lib.rs:335-342,445-450,488-502`): `ep_<32 hex>` plan IDs
+- **ID derivation** (`lib.rs:336-343,446-451,489-503`): `ep_<32 hex>` plan IDs
   and `epi_<32 hex>` item IDs from `digest_json(("eggplan-codegg-compat",
   namespace, source))`, truncated to 32 hex chars. Duplicate source IDs
-  rejected (`lib.rs:493-498`), derived collisions rejected (`lib.rs:490-492`),
+  rejected (`lib.rs:494-499`), derived collisions rejected (`lib.rs:491-493`),
   manifest re-checks duplicate identities plus a content digest
   (`lib.rs:252-282`).
 - **Lifecycle**: item statuses map 1:1 with no transition replay
-  (`lib.rs:400-409`); plan `Completed` maps to `Active` and always records
-  `CompletedPlanNeedsGuardedClose` (`lib.rs:458-460,703-704`) — only Evidence
+  (`lib.rs:401-410`); plan `Completed` maps to `Active` and always records
+  `CompletedPlanNeedsGuardedClose` (`lib.rs:459-461,704-705`) — only Evidence
   M002 may close it. `Cancelled` maps to cancelled intent (`lib.rs:706`).
-- **Ref-to-requirement mapping** (`lib.rs:377-387,552-587`): `TestJob`→`Test`,
+- **Ref-to-requirement mapping** (`lib.rs:378-388,558-587`): `TestJob`→`Test`,
   `DelegatedRun`/`AgentRun`→`DelegatedRun`, `SchedulerJob`→`Command`,
   `Artifact`→`Artifact`, `Commit`→`Revision`. Each ref becomes one
   `EvidenceRequirement` with `SubjectPolicy::Exact`, provider `None`,
-  `allow_human_judgment: false` (`lib.rs:576-585`). Resolver output is
+  `allow_human_judgment: false` (`lib.rs:577-586`). Resolver output is
   guarded: subject/kind must match and observation IDs must be unique
-  (`lib.rs:560-565`).
-- **`RequiresUserJudgment`** (`lib.rs:596-608`): human criteria get empty
+  (`lib.rs:561-566`).
+- **`RequiresUserJudgment`** (`lib.rs:597-609`): human criteria get empty
   requirements, so ordinary refs cannot satisfy them; non-human criteria
   share the item's full requirement set (item-scoped assignment).
-- **Lossy diagnostics** (`Loss`, `lib.rs:155-165`): `SourceRevisionIsProvenanceOnly`
-  always recorded (`lib.rs:457`); owner IDs → provenance only (`lib.rs:503-512`);
-  serialized `Satisfied` → claim, never evidence (`lib.rs:513-516`); notes/details
-  omitted (`lib.rs:522-542`); multi-acceptance sharing item refs flagged
-  (`lib.rs:588-590`). The five-family fold (`lib.rs:192-205`) keeps the full
+- **Lossy diagnostics** (`Loss`, `lib.rs:157-166`): `SourceRevisionIsProvenanceOnly`
+  always recorded (`lib.rs:458`); owner IDs → provenance only (`lib.rs:504-513`);
+  serialized `Satisfied` → claim, never evidence (`lib.rs:514-517`); notes/details
+  omitted (`lib.rs:523-543`); multi-acceptance sharing item refs flagged
+  (`lib.rs:589-591`). The five-family fold (`lib.rs:192-205`) keeps the full
   Eggplan assessment intact and folds failed/missing/stale/inconclusive into
   `ActionableWorkRemaining` for the compat display only.
 
@@ -171,16 +174,16 @@ the mapping auditable.
    bridge called the shared `verification_digest` helper. Resolved
    2026-09-25: reworded as an explicit host obligation (the crate only
    compares host-supplied bindings at `lib.rs:566-575`).
-4. `MappedPlan` docs (`lib.rs:285-287`) referenced `create_snapshot` as though
+4. `MappedPlan` docs (`lib.rs:285-288`) referenced `create_snapshot` as though
    it were adjacent API. Resolved 2026-09-25: the doc comment now names the
    test-only location (`tests/parity.rs`).
-5. `hash_id` truncates SHA-256 hex to 32 chars (`lib.rs:341`); collisions are
+5. `hash_id` truncates SHA-256 hex to 32 chars (`lib.rs:342`); collisions are
    rejected per-run and duplicates per-manifest, but `MappingManifest::validate`
    does not re-derive IDs from sources — determinism rests on the parity test
    (`parity.rs:308-313`), not on the validator. Acceptable but worth stating.
-6. `project_bounded` clamps and history-exclusion (`lib.rs:773-774,827-834`)
+6. `project_bounded` clamps and history-exclusion (`lib.rs:774-775,828-835`)
    are CodeGG-view choices, not core projection authority; the folded
-   `assessment_reason_code` string (`lib.rs:899`) is lossy by design with detail
+   `assessment_reason_code` string (`lib.rs:900`) is lossy by design with detail
    retained only in `CodeggAssessmentBridgeResult::reason_codes`. No issue found,
    but callers must not treat the projection label as the assessment.
 7. Fail-closed is whole-assessment, not per-item. One unbound execution ref

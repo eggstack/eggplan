@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: active / M002 ready
+Status: closed/current; M003 dependency-ready
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -11,12 +11,17 @@ M001 execution-time baseline re-checked 2026-09-24:
 28b4695661d463dd1675d045ac6299c5fbc9ea31.
 M002 planning baseline re-checked 2026-09-24:
 a3c87fc18ee55aaf630401a562c11bb83112fd82.
-Current CodeGG production/planning baseline re-checked:
+CodeGG production/planning baseline:
 6ad127c9913ee6999f44295db2fc03f8b3e5063b.
 Upstream provenance implementation/closure:
 418fdc85656e7e1faa57f71e5e7f10f7f4859c60.
-Current CodeGG-local M002 handoff registration:
+CodeGG-local M002 handoff registration:
 ce088e9153b821d8473372c7c04786a4d90ab6ae.
+CodeGG M002 implementation: 3e992291b6024fae29f2512ad2fa42a209fe7ca9
+plus qualification follow-up 3c7438c738a142fdd0c4e79684d7d1154fe52a99.
+CodeGG M002 closure: ffa1c15e654776c3ebe1022f4ce7de2582bc5d98.
+Current reviewed CodeGG baseline: ffa1c15e654776c3ebe1022f4ce7de2582bc5d98.
+Eggplan head pinned by CodeGG: 0d4a6af7adc6f80f975aca1bfe9bae04e2eb27d8.
 
 ## 1. Purpose
 
@@ -71,61 +76,62 @@ ownership change was required.
 
 ### M002 — Staged core adoption
 
-Status: ready; host-side exact execution-subject capture is closed.
+Status: closed.
 
 Plan: plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md
+
+Closure: plans/closure/codegg-integration/002-closed.md
 
 M001 remains historically closed. Current CodeGG was re-checked at
 `a3c87fc18ee55aaf630401a562c11bb83112fd82`; relative to the M001 fixture
 baseline, the WorkPlan implementation contract remains stable and only a
 WorkPlan foundation test changed in the reviewed compare range.
 
-M002 stages Eggplan's pure plan/evidence assessment semantics behind CodeGG's
-existing assessment surface. CodeGG keeps SQLite WorkPlan storage, Goal/Todo,
+M002 staged Eggplan's pure plan/evidence assessment semantics behind CodeGG's
+existing assessment surface. CodeGG kept SQLite WorkPlan storage, Goal/Todo,
 checkpoint/context-epoch, scheduler, worktree, and agent-loop ownership. The
-production bridge must not depend on eggplan-repo and must not invent
-verification identity from prose or native reference IDs.
+production bridge did not depend on eggplan-repo and did not invent verification
+identity from prose or native reference IDs.
 
-Implementation checkpoint: Eggplan's live bridge is committed as
-`088968b`. Current CodeGG `f4e6e69` still stores status without the exact
-attempt-scoped source SubjectRevision observed by completed execution. The
-current worktree cannot authoritatively stand in for a historical execution
-subject.
+The staged plan closed on both sides:
 
-The upstream provenance handoff is now implemented and closed in CodeGG at
-`418fdc85656e7e1faa57f71e5e7f10f7f4859c60`. Closure evidence is
-`plans/closure/eggplan-assessment-integration/001-status.md`, with hosted CI run
-`36106606574` passed on the exact implementation commit. The pure bridge was
-rechecked at the current Eggplan head `85c4c7ef5dc826dd0be7cf65d71843c3264d842b`
-and remains `088968bd58680ae2b3741e2f1feb0614e0ff81a0`.
+- Eggplan shipped the pure bridge in `088968b` — live mapper split from the
+  fixture wrapper, source SHA demoted to qualification provenance,
+  `eggplan-repo` moved to dev-dependencies, and `assess_codegg_snapshot`
+  providing a persistence-free deterministic assessment view. The §13 test
+  matrix was completed in `1291799`.
+- CodeGG shipped the consuming facade in `3e992291` — application-layer
+  Eggplan assessment, canonical verification-spec derivation through
+  `eggplan_core::digest_json`, resolved-evidence adapter, explicit engine
+  selection, a 28-case differential matrix, production call-site migration, and
+  S1/S2 completion revalidation. Closed in `ffa1c15e` with hosted canonical run
+  `36760308368` green on the exact implementation tree.
 
-The upstream corrective/unblock was registered in CodeGG:
+Ownership invariance is mechanically true, not asserted:
+`crates/codegg-core/src/work_plan/` is byte-identical from the fixture baseline
+through the adopted head, `codegg-core` has no Eggplan dependency, and CodeGG's
+production graph contains only `eggplan-core` and `eggplan-codegg-compat`. No
+Eggplan repository state is created by CodeGG.
 
-- CodeGG planning commit:
-  `af0a3e0fb9b6552f45e3ea5d698e7980582493fd`
-- Roadmap:
-  `plans/subsystems/eggplan-assessment-integration-roadmap.md`
-- Ready plan:
-  `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
-
-That plan makes subject provenance attempt-scoped, preserves legacy rows as
-subject-unavailable, distinguishes live-workspace and materialized-input seal
-points, and exposes enriched host evidence without swapping CodeGG's assessor.
-The M001 blocker is removed. M002 is ready for coordinated handoff. CodeGG's
-local plan is
-`plans/implementation/eggplan-assessment-integration/003-staged-production-assessment-adoption.md`.
-It owns the application-layer adoption facade, verification-spec derivation,
-current-subject S1/S2 completion revalidation, production call-site migration,
-and differential qualification. The unrelated CodeGG CI timing-flake
-corrective may run in parallel, but trustworthy hosted qualification remains a
-closure requirement.
+The upstream subject-provenance handoff that unblocked M002 is
+`plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`,
+implemented and closed in CodeGG at
+`418fdc85656e7e1faa57f71e5e7f10f7f4859c60` with hosted CI run `36106606574`
+green. The CodeGG corrective C002 that made attempt-scoped subject provenance
+authoritative closed at `88d6831a`.
 
 ### M003 — Repository Plan binding
+
+Status: dependency-ready; not yet planned.
 
 Later capability: allow a CodeGG WorkOrder or session to reference an Eggplan
 Plan and feed CodeGG job/run/test/artifact observations back into Eggplan.
 
-This must not make Eggplan the CodeGG scheduler.
+This must not make Eggplan the CodeGG scheduler. M003 inherits two hard
+constraints proven by M002: Eggplan is assessment substrate only, and
+verification identity is derived from authoritative native execution
+specifications rather than prose or reference IDs. M003 may be planned from
+CodeGG `ffa1c15e654776c3ebe1022f4ce7de2582bc5d98`.
 
 ## 5. Verification
 

@@ -228,6 +228,12 @@ commit. Conclusion: success.
 | native (windows-latest) | 110051873961 | success — check, clippy, tests, boundary scripts (format is platform-skipped by workflow) |
 | msrv (Rust 1.89.0) | 110051873538 | success — check and tests only |
 
+The closure/roadmap/registry commit `0985aee` is itself green on all four
+jobs: [CI run 36764064936](https://github.com/eggstack/eggplan/actions/runs/36764064936).
+Per the M001 convention, the authoritative run cited above is the
+implementation commit's run; later documentation-only commits are recorded but
+not treated as the qualification subject.
+
 CodeGG verification is recorded in CodeGG's own closure and was not re-executed
 from this repository; the commands and results above are quoted from
 `plans/closure/eggplan-assessment-integration/003-m002-status.md`, with the

@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: active; M003 implementation and coordinated qualification in progress
+Status: closed; M001-M003 closed, coordinated CodeGG consumer landed
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -122,7 +122,10 @@ authoritative closed at `88d6831a`.
 
 ### M003 — Repository Plan binding
 
-Status: conditionally closed in Eggplan; coordinated CodeGG consumer is ready.
+Status: closed. The CodeGG consumer is implemented at CodeGG `53dea47f`
+against this exact revision, with hosted canonical CodeGG run
+`36938461935` (success); CodeGG closure
+`dbowm91/codegg:plans/closure/eggplan-assessment-integration/004-m003-status.md`.
 
 Plan:
 `plans/implementation/codegg-integration/003-repository-plan-binding-contract.md`
@@ -147,10 +150,10 @@ CodeGG-local plan registered at
 
 The Eggplan-owned contract is implemented at `3f7c603315131bb169bfdd2bb575531d228532b1`
 and qualified by hosted CI run `36868055136` across Ubuntu, macOS, Windows,
-and Rust 1.89. Its closure is conditional on CodeGG's registered consumer
-plan completing the durable binding, identity proof, evidence writeback,
-reconciliation, guarded-closure, and cross-repository qualification work.
-CodeGG M003 is now ready for implementation against that exact revision.
+and Rust 1.89. The CodeGG consumer completed the durable binding, identity
+proof, evidence writeback, reconciliation, guarded-closure, and
+cross-repository qualification work, so the condition that made the Eggplan
+closure conditional is satisfied and both sides are closed.
 
 ## 5. Verification
 

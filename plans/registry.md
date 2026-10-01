@@ -76,7 +76,7 @@ Planning-system bootstrap:
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | closed | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | closure plans/closure/projection-cli/002-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | closed | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | closure plans/closure/codegg-integration/002-closed.md; Eggplan bridge 088968b + 1291799, CodeGG adoption 3e992291/3c7438c7, CodeGG closure ffa1c15e |
-| CodeGG integration | M003 repository Plan binding contract | active | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Pure reverse projection and digest contract implemented locally; coordinated CodeGG binding/writeback consumer, cross-repository tests, and hosted qualification remain outstanding. |
+| CodeGG integration | M003 repository Plan binding contract | conditionally closed | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Eggplan contract implementation `3f7c603` qualified by hosted run `36868055136`; CodeGG consumer and cross-repository binding/writeback/closure tests remain outstanding under the ready CodeGG M003 plan. Closure: plans/closure/codegg-integration/003-conditionally-closed.md |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -128,10 +128,10 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
    Eggbench at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`. Evidence M002 C003
    closed as non-blocking hygiene without gating either capability plan.
 9. After positive M002 closures:
-   - CodeGG M003 repository Plan binding is active in Eggplan. The coordinated
-     CodeGG consumer handoff can be planned against the implemented projection
-     schema; it must remain blocked from implementation until that exact
-     immutable Eggplan revision is pushed and pinned;
+   - Eggplan's M003 pure contract is conditionally closed with hosted
+     qualification at `3f7c603`; the CodeGG consuming implementation remains
+     outstanding. CodeGG M003 is registered and ready at
+     `dbowm91/codegg:plans/implementation/eggplan-assessment-integration/004-repository-plan-binding-and-writeback.md`.
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - Eggstack M003 Eggbench/CI/forge adapters are ready for planning after the
      recheck above.

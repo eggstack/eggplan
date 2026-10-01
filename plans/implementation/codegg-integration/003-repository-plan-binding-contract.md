@@ -1,6 +1,6 @@
 # CodeGG Integration M003 — Repository Plan Binding Contract
 
-Status: active — Eggplan projection implemented; coordinated CodeGG consumption and qualification remain
+Status: conditionally closed — Eggplan contract qualified; CodeGG consumer remains outstanding
 
 Repository baseline:
 

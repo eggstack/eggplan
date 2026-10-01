@@ -122,7 +122,7 @@ authoritative closed at `88d6831a`.
 
 ### M003 — Repository Plan binding
 
-Status: active — Eggplan projection implemented; CodeGG consumption remains.
+Status: conditionally closed in Eggplan; coordinated CodeGG consumer is ready.
 
 Plan:
 `plans/implementation/codegg-integration/003-repository-plan-binding-contract.md`
@@ -144,6 +144,13 @@ verification-binding and ownership invariants and coordinates with the
 CodeGG-local plan registered at
 `440403e82304537f6ed9de22103987b16df6f642`:
 `plans/implementation/eggplan-assessment-integration/004-repository-plan-binding-and-writeback.md`.
+
+The Eggplan-owned contract is implemented at `3f7c603315131bb169bfdd2bb575531d228532b1`
+and qualified by hosted CI run `36868055136` across Ubuntu, macOS, Windows,
+and Rust 1.89. Its closure is conditional on CodeGG's registered consumer
+plan completing the durable binding, identity proof, evidence writeback,
+reconciliation, guarded-closure, and cross-repository qualification work.
+CodeGG M003 is now ready for implementation against that exact revision.
 
 ## 5. Verification
 

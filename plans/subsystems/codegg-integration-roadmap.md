@@ -141,7 +141,9 @@ before persisting an identity association.
 
 This must not make Eggplan the CodeGG scheduler. M003 inherits the M002
 verification-binding and ownership invariants and coordinates with the
-CodeGG-local repository-binding implementation plan.
+CodeGG-local plan registered at
+`440403e82304537f6ed9de22103987b16df6f642`:
+`plans/implementation/eggplan-assessment-integration/004-repository-plan-binding-and-writeback.md`.
 
 ## 5. Verification
 

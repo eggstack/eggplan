@@ -76,7 +76,7 @@ Planning-system bootstrap:
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | closed | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | closure plans/closure/projection-cli/002-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | closed | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | closure plans/closure/codegg-integration/002-closed.md; Eggplan bridge 088968b + 1291799, CodeGG adoption 3e992291/3c7438c7, CodeGG closure ffa1c15e |
-| CodeGG integration | M003 repository Plan binding contract | ready | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | coordinated handoff: pure reverse projection/digests in Eggplan; CodeGG owns repository I/O, durable binding, evidence writeback, mirror reconciliation, and guarded closure consumption |
+| CodeGG integration | M003 repository Plan binding contract | ready | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | coordinated CodeGG plan registered at `440403e8`; pure reverse projection/digests in Eggplan; CodeGG owns repository I/O, v68 durable binding, evidence writeback, mirror reconciliation, WorkOrder inheritance, and guarded closure consumption |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -143,7 +143,7 @@ Reviewed during planning; these are not dependency pins.
 
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
-| CodeGG | 9e93e949e1a4abcc91fd7755d929a54fd6531160 (M003 status-reconciled planning head); M002 closure ffa1c15e654776c3ebe1022f4ce7de2582bc5d98 | M001/M002 closed; M003 coordinated repository Plan binding is registered. CodeGG remains runtime owner; repository Plan becomes canonical only for explicitly bound plan intent/lifecycle/evidence/closure. |
+| CodeGG | 440403e82304537f6ed9de22103987b16df6f642 (M003 plan registration); M002 closure ffa1c15e654776c3ebe1022f4ce7de2582bc5d98 | M001/M002 closed; M003 coordinated repository Plan binding/writeback is registered in both repos. CodeGG remains runtime owner; repository Plan becomes canonical only for explicitly bound plan intent/lifecycle/evidence/closure. |
 | Eggwork | faaa0b905fa6bc43e46825fdd98530b5533a970f | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
 | Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
 | Eggbench | d870512a5a1af16276ff05286ff0b6e2366b7f8f | current .eggb manifest v2; execution status remains separate from comparison verdict |

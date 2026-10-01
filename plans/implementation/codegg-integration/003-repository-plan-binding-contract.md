@@ -6,8 +6,12 @@ Repository baseline:
 
 - Eggplan: `178f72dfc46367944ec059d6b88310f14af8f8a8`
 - CodeGG M002 closure consumed: `ffa1c15e654776c3ebe1022f4ce7de2582bc5d98`
-- CodeGG current planning baseline after M003 status reconciliation:
+- CodeGG M003 status-reconciled baseline:
   `9e93e949e1a4abcc91fd7755d929a54fd6531160`
+- CodeGG coordinated M003 plan registration:
+  `440403e82304537f6ed9de22103987b16df6f642`
+- CodeGG M003 plan:
+  `plans/implementation/eggplan-assessment-integration/004-repository-plan-binding-and-writeback.md`
 
 Source roadmap:
 

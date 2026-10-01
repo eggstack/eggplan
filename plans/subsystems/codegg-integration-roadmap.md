@@ -122,16 +122,26 @@ authoritative closed at `88d6831a`.
 
 ### M003 — Repository Plan binding
 
-Status: dependency-ready; not yet planned.
+Status: ready for coordinated handoff.
 
-Later capability: allow a CodeGG WorkOrder or session to reference an Eggplan
-Plan and feed CodeGG job/run/test/artifact observations back into Eggplan.
+Plan:
+`plans/implementation/codegg-integration/003-repository-plan-binding-contract.md`
 
-This must not make Eggplan the CodeGG scheduler. M003 inherits two hard
-constraints proven by M002: Eggplan is assessment substrate only, and
-verification identity is derived from authoritative native execution
-specifications rather than prose or reference IDs. M003 may be planned from
-CodeGG `ffa1c15e654776c3ebe1022f4ce7de2582bc5d98`.
+M003 adds the pure reverse compatibility contract needed for CodeGG to mirror
+an existing repository Plan without making the compatibility crate a
+repository client. Repository Plan structure/lifecycle/evidence/closure remain
+Eggplan authority; CodeGG owns execution/session state and persists the runtime
+binding/mapping.
+
+The Eggplan side provides a bounded repository-Plan projection with exact
+lifecycle mapping plus deterministic structural intent/projection digests. It
+does not rewrite SubjectRevision repository identity: CodeGG must prove its
+workspace subject and Eggplan repository subject describe the same Git state
+before persisting an identity association.
+
+This must not make Eggplan the CodeGG scheduler. M003 inherits the M002
+verification-binding and ownership invariants and coordinates with the
+CodeGG-local repository-binding implementation plan.
 
 ## 5. Verification
 

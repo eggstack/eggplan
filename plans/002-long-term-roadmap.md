@@ -228,11 +228,31 @@ Execution-derived proof must carry a verification digest derived from the
 authoritative native execution specification; reference IDs and prose are not
 verification identity. No circular repository dependency is permitted.
 
-Current dependency note: M002 is blocked on CodeGG's registered
-`eggplan-assessment-integration` M001 durable execution-subject provenance
-handoff (CodeGG planning commit `af0a3e0`). That upstream primitive is
-attempt-scoped and CodeGG-owned. Projection/CLI M002, Eggstack M002, and
-Evidence C003 remain independent and may proceed in parallel.
+M002 is closed on both sides. CodeGG now consumes the pure assessment bridge
+with exact execution-subject provenance, verification binding, differential
+parity, and completion-time S1/S2 revalidation while retaining runtime/storage
+ownership.
+
+### M003 — Repository Plan binding
+
+Class: integration / authority binding
+
+Allow an explicitly bound CodeGG session or WorkOrder occurrence to execute
+against an existing Active/Blocked repository-local Eggplan Plan. Eggplan Plan
+intent, item lifecycle, evidence ledger, assessment, and guarded closure become
+canonical for that bound plan; CodeGG retains session/WorkOrder/scheduler/job/
+worktree/Todo/checkpoint ownership and keeps a reconciled runtime mirror.
+
+Add a pure repository-Plan -> CodeGG projection contract with deterministic
+structural intent/projection digests. CodeGG must independently verify that its
+workspace Git subject and the Eggplan repository store subject match before
+associating `codegg-workspace:*` provenance with an `epr_*` repository
+identity. Persist terminal execution/artifact observations idempotently and
+close only through `RepositoryStore::finalize_closure`.
+
+Cross-store updates are not atomic: repository state is written first and the
+CodeGG mirror must detect/reconcile interrupted mirror updates. Structural
+repository edits while bound fail closed rather than being silently flattened.
 
 ## 7. Eggstack integrations
 

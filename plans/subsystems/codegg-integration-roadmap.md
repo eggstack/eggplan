@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: closed/current; M003 dependency-ready
+Status: active; M003 implementation and coordinated qualification in progress
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -122,7 +122,7 @@ authoritative closed at `88d6831a`.
 
 ### M003 — Repository Plan binding
 
-Status: ready for coordinated handoff.
+Status: active — Eggplan projection implemented; CodeGG consumption remains.
 
 Plan:
 `plans/implementation/codegg-integration/003-repository-plan-binding-contract.md`

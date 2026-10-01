@@ -55,7 +55,7 @@ Planning-system bootstrap:
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | active / ready | M001 and M002 closed; M003 repository Plan binding contract registered | plans/subsystems/codegg-integration-roadmap.md |
+| CodeGG integration | active | M001 and M002 closed; M003 pure projection implemented, CodeGG consumer qualification remains | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 provider SPI and M002 Eggwork/Eggsearch adapters closed; M003 ready for planning against rechecked Eggbench contract | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
@@ -76,7 +76,7 @@ Planning-system bootstrap:
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | closed | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | closure plans/closure/projection-cli/002-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | closed | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | closure plans/closure/codegg-integration/002-closed.md; Eggplan bridge 088968b + 1291799, CodeGG adoption 3e992291/3c7438c7, CodeGG closure ffa1c15e |
-| CodeGG integration | M003 repository Plan binding contract | ready | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | coordinated CodeGG plan registered at `440403e8`; pure reverse projection/digests in Eggplan; CodeGG owns repository I/O, v68 durable binding, evidence writeback, mirror reconciliation, WorkOrder inheritance, and guarded closure consumption |
+| CodeGG integration | M003 repository Plan binding contract | active | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Pure reverse projection and digest contract implemented locally; coordinated CodeGG binding/writeback consumer, cross-repository tests, and hosted qualification remain outstanding. |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -128,9 +128,10 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
    Eggbench at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`. Evidence M002 C003
    closed as non-blocking hygiene without gating either capability plan.
 9. After positive M002 closures:
-   - CodeGG M003 repository Plan binding is registered for coordinated
-     handoff at
-     `plans/implementation/codegg-integration/003-repository-plan-binding-contract.md`;
+   - CodeGG M003 repository Plan binding is active in Eggplan. The coordinated
+     CodeGG consumer handoff can be planned against the implemented projection
+     schema; it must remain blocked from implementation until that exact
+     immutable Eggplan revision is pushed and pinned;
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - Eggstack M003 Eggbench/CI/forge adapters are ready for planning after the
      recheck above.

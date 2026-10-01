@@ -3,7 +3,7 @@
 See also [overview.md](overview.md) and [codegg-compat.md](codegg-compat.md)
 (this file is the review; that file is the contract).
 
-## 1. Crate role: pure one-way bridge
+## 1. Crate role: pure two-direction bridge
 
 `eggplan-codegg-compat` is a single-file pure mapping/assessment view
 (`crates/eggplan-codegg-compat/src/lib.rs`, ~909 lines). It owns no runtime,
@@ -209,3 +209,22 @@ cargo test -p eggplan-codegg-compat --locked
 cargo test -p eggplan-codegg-compat --locked --test parity
 bash scripts/check-codegg-compat-boundary.sh
 ```
+
+## 6. M003 repository Plan projection
+
+`project_repository_plan` is the reverse direction from M002: it accepts a
+validated repository `Plan` and returns `RepositoryPlanProjectionV1` only for
+Active or Blocked lifecycle. Projection DTOs are strict serde structures and
+include source Eggplan identities, exact lifecycle, complete criteria and
+requirements, and no observations or closure/trust state. The `intent_digest`
+is computed from objective and ordered structural content; the
+`projection_digest` changes with any emitted lifecycle/progress change. The
+binding manifest pins both digests and the plan revision for CodeGG restart and
+drift reconciliation.
+
+The compatibility crate has no repository client and does not translate
+repository identity. CodeGG must independently capture both subjects and
+verify Git subject equality before persisting its explicit workspace/repository
+to Eggplan repository association. Bound completion remains an application
+workflow through repository CAS, evidence append, assessment, and guarded
+closure finalization. No ordinary CAS may close the canonical Plan.

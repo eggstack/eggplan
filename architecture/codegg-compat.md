@@ -1,12 +1,41 @@
 # CodeGG WorkPlan compatibility
 
-`eggplan-codegg-compat` is a pure one-way compatibility and assessment bridge.
-It accepts a strict bounded live snapshot DTO and emits an Eggplan Plan, a
-mapping manifest, host-resolved observations, and deterministic assessment.
+`eggplan-codegg-compat` is a pure two-direction compatibility bridge. Its M002
+direction accepts a strict bounded CodeGG snapshot and emits a transient
+Eggplan assessment view. Its M003 direction projects a bindable repository
+Plan into a bounded CodeGG mirror contract. Neither direction performs
+repository I/O or evidence acquisition.
 Fixture parsing is a separate qualification wrapper; fixtures validate their
 recorded repository/SHA, while live snapshots do not use fixture provenance as
 runtime authority. The production crate depends on `eggplan-core`, serde, and
 serde_json only. Repository persistence remains outside this bridge.
+
+## Repository Plan binding projection (M003)
+
+`project_repository_plan` converts only an Active or Blocked, validated Plan
+into schema version 1 of `RepositoryPlanProjectionV1`. The projection keeps
+Eggplan Plan/item/criterion IDs as source identities and preserves item order,
+parent/dependency edges, exact item status, descriptions, blockers/next action,
+criterion judgment policy, and each complete evidence requirement (kind,
+provider constraint, subject policy, cardinality, minimum count, human policy,
+and verification digest). Draft and terminal plans fail closed.
+
+`intent_digest` covers objective and ordered structural intent, including all
+criteria and requirement semantics. It excludes revision, lifecycle, blocker,
+next action, subject, evidence observations, and closure. `projection_digest`
+covers the complete emitted projection contract, so lifecycle/progress changes
+are visible while the intent digest stays stable. `content_digest` is the
+Eggplan canonical digest of the validated Plan. The projection exposes no
+observations, trust enrollment, closure data, caller-selected repository
+identity, or CodeGG runtime IDs. In particular, this crate has no helper that
+relabels a `SubjectRevision.repository_id`; the CodeGG application must prove
+workspace and Eggplan subjects match before recording an identity association.
+
+The host persists the runtime-ID mapping and mirror, synchronizes item
+lifecycle/evidence through Eggplan repository APIs, and consumes closure only
+after `RepositoryStore::finalize_closure` succeeds. Criteria may be displayed
+as CodeGG acceptance rows, but those display rows cannot become satisfied from
+projection; structured requirement data stays in the binding manifest.
 
 The reviewed fixture baseline is CodeGG
 `a3c87fc18ee55aaf630401a562c11bb83112fd82`. Rechecked at the CodeGG
@@ -104,4 +133,3 @@ Run `scripts/check-codegg-compat-boundary.sh` to verify the crate has no
 CodeGG dependency or declarations for CodeGG-only runtime ownership. Existing
 Eggplan core/repository libraries remain the only persistence and assessment
 authority.
-

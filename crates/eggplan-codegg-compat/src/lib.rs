@@ -19,6 +19,214 @@ pub const MAX_TEXT_CHARS: usize = 4_000;
 pub const MAX_SOURCE_ID_CHARS: usize = 128;
 pub const MAX_DETAIL_CHARS: usize = 2_000;
 pub const MAX_FIXTURE_BYTES: usize = 4 * 1024 * 1024;
+pub const REPOSITORY_PROJECTION_SCHEMA_VERSION: u32 = 1;
+
+/// A bounded, pure projection of an active repository-owned Eggplan Plan.
+/// It carries source Eggplan identities and never includes evidence rows or
+/// trust/closure authority.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepositoryPlanProjectionV1 {
+    pub schema_version: u32,
+    pub plan_id: PlanId,
+    pub revision: u64,
+    pub objective: String,
+    pub status: PlanStatus,
+    pub content_digest: String,
+    pub intent_digest: String,
+    pub projection_digest: String,
+    pub items: Vec<RepositoryItemProjectionV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepositoryItemProjectionV1 {
+    pub item_id: PlanItemId,
+    pub position: u32,
+    pub parent_item_id: Option<PlanItemId>,
+    pub dependencies: Vec<PlanItemId>,
+    pub status: PlanItemStatus,
+    pub description: String,
+    pub blocker: Option<String>,
+    pub next_action: Option<String>,
+    pub criteria: Vec<RepositoryCriterionProjectionV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepositoryCriterionProjectionV1 {
+    pub criterion_id: eggplan_core::CriterionId,
+    pub statement: String,
+    pub human_judgment_allowed: bool,
+    pub requirements: Vec<RepositoryRequirementProjectionV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepositoryRequirementProjectionV1 {
+    pub description: String,
+    pub kind: EvidenceKind,
+    pub provider: Option<eggplan_core::EvidenceProviderId>,
+    pub subject_policy: SubjectPolicy,
+    pub cardinality: EvidenceCardinality,
+    pub min_count: u16,
+    pub allow_human_judgment: bool,
+    pub expected_verification_digest: Option<VerificationDigest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepositoryPlanBindingManifestV1 {
+    pub schema_version: u32,
+    pub plan_id: PlanId,
+    pub revision: u64,
+    pub intent_digest: String,
+    pub projection_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepositoryProjectionError {
+    NonBindableLifecycle,
+    InvalidPlan(String),
+    Digest(String),
+}
+
+#[derive(Serialize)]
+struct RepositoryIntent<'a> {
+    objective: &'a str,
+    items: Vec<RepositoryIntentItem<'a>>,
+}
+
+#[derive(Serialize)]
+struct RepositoryIntentItem<'a> {
+    item_id: &'a PlanItemId,
+    position: u32,
+    parent_item_id: &'a Option<PlanItemId>,
+    dependencies: &'a [PlanItemId],
+    description: &'a str,
+    criteria: Vec<RepositoryIntentCriterion<'a>>,
+}
+
+#[derive(Serialize)]
+struct RepositoryIntentCriterion<'a> {
+    criterion_id: &'a eggplan_core::CriterionId,
+    statement: &'a str,
+    human_judgment_allowed: bool,
+    requirements: &'a [EvidenceRequirement],
+}
+
+/// Projects a bindable repository Plan without translating identities or
+/// exposing observations, trust enrollment, or closure records.
+pub fn project_repository_plan(
+    plan: &Plan,
+) -> Result<RepositoryPlanProjectionV1, RepositoryProjectionError> {
+    plan.validate()
+        .map_err(|error| RepositoryProjectionError::InvalidPlan(error.to_string()))?;
+    if !matches!(plan.status, PlanStatus::Active | PlanStatus::Blocked) {
+        return Err(RepositoryProjectionError::NonBindableLifecycle);
+    }
+    let items: Vec<_> = plan
+        .items
+        .iter()
+        .map(|item| RepositoryItemProjectionV1 {
+            item_id: item.id.clone(),
+            position: item.position,
+            parent_item_id: item.parent.clone(),
+            dependencies: item.dependencies.clone(),
+            status: item.status,
+            description: item.description.clone(),
+            blocker: item.blocker.clone(),
+            next_action: item.next_action.clone(),
+            criteria: item
+                .criteria
+                .iter()
+                .map(|criterion| RepositoryCriterionProjectionV1 {
+                    criterion_id: criterion.id.clone(),
+                    statement: criterion.statement.clone(),
+                    human_judgment_allowed: criterion.human_judgment_allowed,
+                    requirements: criterion
+                        .requirements
+                        .iter()
+                        .map(|requirement| RepositoryRequirementProjectionV1 {
+                            description: requirement.description.clone(),
+                            kind: requirement.kind,
+                            provider: requirement.provider.clone(),
+                            subject_policy: requirement.subject_policy.clone(),
+                            cardinality: requirement.cardinality.clone(),
+                            min_count: requirement.min_count,
+                            allow_human_judgment: requirement.allow_human_judgment,
+                            expected_verification_digest: requirement
+                                .expected_verification_digest
+                                .clone(),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        })
+        .collect();
+    let intent = RepositoryIntent {
+        objective: &plan.objective,
+        items: plan
+            .items
+            .iter()
+            .map(|item| RepositoryIntentItem {
+                item_id: &item.id,
+                position: item.position,
+                parent_item_id: &item.parent,
+                dependencies: &item.dependencies,
+                description: &item.description,
+                criteria: item
+                    .criteria
+                    .iter()
+                    .map(|criterion| RepositoryIntentCriterion {
+                        criterion_id: &criterion.id,
+                        statement: &criterion.statement,
+                        human_judgment_allowed: criterion.human_judgment_allowed,
+                        requirements: &criterion.requirements,
+                    })
+                    .collect(),
+            })
+            .collect(),
+    };
+    let intent_digest = digest_json(&intent)
+        .map_err(|error| RepositoryProjectionError::Digest(error.to_string()))?;
+    let content_digest =
+        digest_json(plan).map_err(|error| RepositoryProjectionError::Digest(error.to_string()))?;
+    let projection_digest = digest_json(&(
+        REPOSITORY_PROJECTION_SCHEMA_VERSION,
+        &plan.id,
+        plan.revision,
+        &plan.objective,
+        &plan.status,
+        &content_digest,
+        &intent_digest,
+        &items,
+    ))
+    .map_err(|error| RepositoryProjectionError::Digest(error.to_string()))?;
+    Ok(RepositoryPlanProjectionV1 {
+        schema_version: REPOSITORY_PROJECTION_SCHEMA_VERSION,
+        plan_id: plan.id.clone(),
+        revision: plan.revision,
+        objective: plan.objective.clone(),
+        status: plan.status.clone(),
+        content_digest,
+        intent_digest,
+        projection_digest,
+        items,
+    })
+}
+
+pub fn repository_plan_binding_manifest(
+    projection: &RepositoryPlanProjectionV1,
+) -> RepositoryPlanBindingManifestV1 {
+    RepositoryPlanBindingManifestV1 {
+        schema_version: REPOSITORY_PROJECTION_SCHEMA_VERSION,
+        plan_id: projection.plan_id.clone(),
+        revision: projection.revision,
+        intent_digest: projection.intent_digest.clone(),
+        projection_digest: projection.projection_digest.clone(),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

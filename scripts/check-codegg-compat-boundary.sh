@@ -21,8 +21,18 @@ if rg -n '^[[:space:]]*(codegg|codegg-core)[[:space:]]*=' "$manifest"; then
     exit 1
 fi
 
+if rg -n '^[[:space:]]*(tokio|sqlx|reqwest|hyper|ureq|surf|isahc)[[:space:]]*=' "$manifest"; then
+    echo "compatibility production dependencies must not include async, database, or network clients" >&2
+    exit 1
+fi
+
 if rg -n '^[[:space:]]*pub[[:space:]]+(struct|enum|trait|type)[[:space:]]+(WorkOrder|Goal|GoalVerification|TodoState|WorkPlanCheckpoint|ContextEpoch|AgentRunExecutor|JobExecutor|WorktreePolicy|SandboxPolicy)\b' "$source_dir"; then
     echo "compatibility crate declares ownership outside the WorkPlan seam" >&2
+    exit 1
+fi
+
+if rg -n 'std::process|Command::new|tokio::|reqwest::|hyper::|sqlx::|std::net|TcpStream|UdpSocket' "$source_dir"; then
+    echo "compatibility production source must remain free of process, network, and database access" >&2
     exit 1
 fi
 

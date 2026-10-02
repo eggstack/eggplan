@@ -9,6 +9,9 @@ Repository baseline:
 - Eggplan M003 closure reconciliation: `6644725ae540b19873d7c769e3afeab7bce53d09`
 - CodeGG M003 implementation: `53dea47f414641c3f9756c3f8f181f6208be8115`
 - CodeGG M003 closure: `aa21cfe1763d7ea00d11e582ed4108233e4088a9`
+- CodeGG C001 corrective registration: `dc9ae6ccf1cfa8dea51522ddc6bf33976562edb9`
+- CodeGG C001 plan:
+  `plans/implementation/eggplan-assessment-integration/005-m003-c001-dirty-subject-provenance-and-bound-evidence.md`
 
 Source roadmap:
 

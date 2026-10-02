@@ -162,6 +162,10 @@ Status: ready for coordinated handoff.
 Plan:
 `plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md`
 
+Coordinated CodeGG plan:
+`dbowm91/codegg:plans/implementation/eggplan-assessment-integration/005-m003-c001-dirty-subject-provenance-and-bound-evidence.md`
+registered at `dc9ae6ccf1cfa8dea51522ddc6bf33976562edb9`.
+
 Post-closure review found that the CodeGG consumer's native dirty digest and
 Eggplan's repository dirty digest are deliberately different canonical
 encodings. Binding-time HEAD + clean/dirty equality is therefore insufficient

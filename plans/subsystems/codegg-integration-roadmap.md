@@ -1,6 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: closed; M001-M003 closed, coordinated CodeGG consumer landed
+Status: M001-M003 closed; post-closure C001 dirty-subject corrective ready
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -154,6 +154,29 @@ and Rust 1.89. The CodeGG consumer completed the durable binding, identity
 proof, evidence writeback, reconciliation, guarded-closure, and
 cross-repository qualification work, so the condition that made the Eggplan
 closure conditional is satisfied and both sides are closed.
+
+### C001 — Dirty-subject fingerprint contract and bound-evidence requalification
+
+Status: ready for coordinated handoff.
+
+Plan:
+`plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md`
+
+Post-closure review found that the CodeGG consumer's native dirty digest and
+Eggplan's repository dirty digest are deliberately different canonical
+encodings. Binding-time HEAD + clean/dirty equality is therefore insufficient
+to prove stable dirty contents, and historical CodeGG dirty provenance cannot
+be copied into an Eggplan SubjectRevision for exact-subject assessment.
+
+C001 preserves M003 history and the existing Eggplan subject digest algorithm.
+Eggplan exposes a bounded repository-ID-free fingerprint using the exact
+existing digest bytes; CodeGG persists that fingerprint alongside its native
+attempt provenance and uses it only for bound repository subject translation.
+Legacy dirty provenance fails closed rather than being backfilled.
+
+The corrective also requires dirty execution -> observation -> item completion
+-> guarded closure qualification and reconciles stale M003 status/baseline
+documentation. Clean M003 behavior remains closed/current.
 
 ## 5. Verification
 

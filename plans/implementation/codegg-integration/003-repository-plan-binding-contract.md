@@ -1,6 +1,6 @@
 # CodeGG Integration M003 — Repository Plan Binding Contract
 
-Status: conditionally closed — Eggplan contract qualified; CodeGG consumer remains outstanding
+Status: closed — CodeGG consumer landed; post-closure dirty-subject C001 registered separately
 
 Repository baseline:
 

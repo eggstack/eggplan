@@ -55,7 +55,7 @@ Planning-system bootstrap:
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | closed | M001-M003 closed; coordinated CodeGG consumer landed | plans/subsystems/codegg-integration-roadmap.md |
+| CodeGG integration | active corrective | M001-M003 closed; C001 dirty-subject corrective ready | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 provider SPI and M002 Eggwork/Eggsearch adapters closed; M003 ready for planning against rechecked Eggbench contract | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
@@ -77,6 +77,7 @@ Planning-system bootstrap:
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | closed | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | closure plans/closure/codegg-integration/002-closed.md; Eggplan bridge 088968b + 1291799, CodeGG adoption 3e992291/3c7438c7, CodeGG closure ffa1c15e |
 | CodeGG integration | M003 repository Plan binding contract | closed | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Eggplan contract implementation `3f7c603` qualified by hosted run `36868055136`; the CodeGG consumer is implemented at CodeGG `53dea47f` and hosted-qualified there by run `36938461935` (success), satisfying the former condition. Closure: plans/closure/codegg-integration/003-conditionally-closed.md |
+| CodeGG integration | M003 C001 dirty-subject fingerprint + bound-evidence requalification | ready | plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md | Post-closure correctness corrective: preserve Eggplan digest bytes, expose bounded repository-ID-free fingerprint, require CodeGG to persist/use Eggplan-compatible dirty digest and qualify dirty bound evidence/closure. Historical M003 remains closed. |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -133,6 +134,7 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
      `53dea47f`, hosted-qualified there by run `36938461935` (success). Both
      sides of the cross-repository contract are closed; the CodeGG
      integration roadmap is terminal.
+   - CodeGG M003 C001 dirty-subject fingerprint/evidence requalification is ready and may proceed independently of unrelated capability work;
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - Eggstack M003 Eggbench/CI/forge adapters are ready for planning after the
      recheck above.
@@ -145,7 +147,7 @@ Reviewed during planning; these are not dependency pins.
 
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
-| CodeGG | 440403e82304537f6ed9de22103987b16df6f642 (M003 plan registration); M002 closure ffa1c15e654776c3ebe1022f4ce7de2582bc5d98 | M001/M002 closed; M003 coordinated repository Plan binding/writeback is registered in both repos. CodeGG remains runtime owner; repository Plan becomes canonical only for explicitly bound plan intent/lifecycle/evidence/closure. |
+| CodeGG | 53dea47f414641c3f9756c3f8f181f6208be8115 (M003 implementation); aa21cfe1763d7ea00d11e582ed4108233e4088a9 (M003 closure) | M001-M003 closed. Post-closure review found dirty-digest representation mismatch for bound exact-subject evidence; C001 is registered to add an Eggplan-native fingerprint handoff without changing CodeGG execution ownership. |
 | Eggwork | faaa0b905fa6bc43e46825fdd98530b5533a970f | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
 | Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
 | Eggbench | d870512a5a1af16276ff05286ff0b6e2366b7f8f | current .eggb manifest v2; execution status remains separate from comparison verdict |
@@ -218,6 +220,10 @@ integration milestone is actually handed off.
     lifecycle, evidence, and closure. CodeGG may keep a durable runtime mirror
     only with explicit reconciliation semantics; cross-store atomicity must
     never be claimed.
+23. Bound dirty CodeGG evidence must carry the exact Eggplan-compatible dirty
+    digest captured at execution time. CodeGG-native dirty digest bytes are
+    not interchangeable with Eggplan SubjectRevision dirty digests, and
+    current-worktree backfill for historical attempts is forbidden.
 
 ## Planning hygiene
 

@@ -235,10 +235,22 @@ fn frozen() -> GoldenMatrix {
     serde_json::from_str(FIXTURE.trim()).unwrap()
 }
 
+/// The frozen fixture bytes, with line endings normalized to LF.
+///
+/// Hosted Windows runners check text files out with CRLF, so the sidecar is
+/// asserted over the LF form this repository stores. Content changes are still
+/// detected: any byte difference in the LF form changes the digest.
+fn normalized_fixture() -> String {
+    FIXTURE.replace("\r\n", "\n")
+}
+
 #[test]
 fn golden_dirty_manifest_digests_are_frozen() {
     assert_eq!(
-        format!("sha256:{:x}", Sha256::digest(FIXTURE.trim().as_bytes())),
+        format!(
+            "sha256:{:x}",
+            Sha256::digest(normalized_fixture().trim().as_bytes())
+        ),
         FIXTURE_SHA256.trim(),
         "fixture bytes changed; the digest freeze must be restated deliberately"
     );

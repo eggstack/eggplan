@@ -3,15 +3,16 @@
 Status: implemented — conditionally closed pending CodeGG requalification on the
 pinned revision
 
-Eggplan implementation revision:
-`352a0f782b0166aad8e850185019d78ec162d487`
+Eggplan implementation revisions: `352a0f7` (contract),
+`faa6c87` (hosted Windows portability repair), `0dd33b7` (golden sidecar
+line-ending repair; hosted-qualified head).
 
 Closure record: `plans/closure/codegg-integration/003-c001-closed.md`
 
 This is a post-closure correctness corrective against the closed M003 contract.
 It does not rewrite the M003 closure, its conditional-closure narrative, or any
 historical observation. Remaining cross-repository conditions (CodeGG pin bump
-to `352a0f7` plus CodeGG hosted requalification) are named in the closure
+to `0dd33b7` plus CodeGG hosted requalification) are named in the closure
 record.
 
 Repository baseline:

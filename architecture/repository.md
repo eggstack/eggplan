@@ -104,3 +104,29 @@ whose name merely shares a string prefix remains in scope. Submodule manifests
 are evaluated independently. If the configured state path is outside the
 discovered worktree, no exclusion is applied. The HEAD OID remains part of the
 schema-v1 subject, so committing administrative state still changes identity.
+
+## Git subject fingerprint
+
+`capture_git_subject_fingerprint` returns the exact revision, clean/dirty
+state, and Eggplan-native dirty digest Eggplan requires for exact-subject
+assessment, without any repository identity. It exists so an external host can
+capture and durably persist those three values at its own execution boundary
+instead of reconstructing a historical subject later. It reads the same capture
+implementation as `GitSubjectSource`, so the two agree by construction, and the
+digest bytes are the frozen values asserted by the golden digest matrix.
+
+The returned `GitSubjectFingerprintV1` carries only schema version, HEAD
+revision, clean/dirty state, and the optional dirty digest. It exposes no path
+list, file content, index entry, symlink target, manifest byte, repository ID,
+or provider/evidence/closure state, and it is not a universal Git digest
+standard: CodeGG keeps its own native digest for its own execution provenance
+and may use only the Eggplan-compatible value for a bound repository subject.
+A host that binds plans must still prove identity itself; Eggplan offers no
+repository-ID relabeling helper for a fingerprint.
+
+The fingerprint supports the same single administrative-root exclusion,
+fails closed with a typed error when that exclusion does not resolve inside the
+discovered worktree, and returns the same typed `GitSubjectError` classes as
+normal subject capture for bound overflow, unsafe or symlinked paths,
+non-Unicode paths, Git errors, unborn HEAD, and filesystem read failures. No
+partial digest is ever returned.

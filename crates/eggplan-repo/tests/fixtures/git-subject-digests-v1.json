@@ -1,0 +1,42 @@
+{
+  "algorithm": "eggplan-repo dirty_manifest v1, frozen; capture refactor must be byte-identical",
+  "frozen_from_revision": "52a4be76b631822799e7f1e76fe5b439c94fd058",
+  "cases": {
+    "clean": {
+      "state": "clean",
+      "dirty_digest": null
+    },
+    "deleted_tracked_file": {
+      "state": "dirty",
+      "dirty_digest": "sha256:5a8498102a06ae2172241780cb7e7f01f861dea98ea3f6e5d0fadc43e7b30300"
+    },
+    "nested_dirty_submodule": {
+      "state": "dirty",
+      "dirty_digest": "sha256:dc3078228eb110bd4c309c83c33ec6019774026fd3c3bb035e3b5b0489f06568"
+    },
+    "staged_and_unstaged_same_path": {
+      "state": "dirty",
+      "dirty_digest": "sha256:06f87a2312fd63a0a46c1ffd30855308c3efc26c9fb6a6269dcdc9f55f3bdad4"
+    },
+    "staged_rename": {
+      "state": "dirty",
+      "dirty_digest": "sha256:e2e06fb08fd6512e6840834c047a914d717f4d076105d1235a7d10039508100c"
+    },
+    "staged_tracked_edit": {
+      "state": "dirty",
+      "dirty_digest": "sha256:f810470f083d27e4df127667ad166384075e1040bb4a859e00e591ea2260831b"
+    },
+    "symlink_typechange": {
+      "state": "dirty",
+      "dirty_digest": "sha256:ede7c75daa2c0a8e5fc08b7571b6f6613322c2dc03ef87798aa3f731ac424945"
+    },
+    "unstaged_tracked_edit": {
+      "state": "dirty",
+      "dirty_digest": "sha256:75ceabb95bc153177c3d553d70ec45e510e0f8565678cee8178f3f118669fe91"
+    },
+    "untracked_file": {
+      "state": "dirty",
+      "dirty_digest": "sha256:073df2ab0ef7799b5ac7f1de0d211791bb16b2e7974f7efc757a43955526163b"
+    }
+  }
+}

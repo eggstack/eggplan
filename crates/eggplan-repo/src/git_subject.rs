@@ -1,5 +1,6 @@
 use eggplan_core::{SubjectRevision, SubjectState};
 use git2::{Repository, Status, StatusOptions};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -41,6 +42,98 @@ pub enum GitSubjectError {
     UnsafePath(PathBuf),
     #[error("invalid SubjectRevision: {0}")]
     InvalidSubject(String),
+    #[error("excluded path does not resolve inside the discovered worktree: {0}")]
+    InvalidExclusion(PathBuf),
+    #[error("invalid GitSubjectFingerprintV1: {0}")]
+    InvalidFingerprint(String),
+}
+
+/// Bounded, versioned, repository-ID-free capture of the exact HEAD revision,
+/// clean/dirty state, and Eggplan-native dirty digest that
+/// [`GitSubjectSource`] would produce for the same root, options, and
+/// exclusion.
+///
+/// This is a compatibility fingerprint, not a universal Git digest standard:
+/// the `dirty_digest` is Eggplan's own canonical dirty-manifest digest. An
+/// external host may persist it so Eggplan exact-subject assessment can
+/// later compare a historical capture against the repository's own capture.
+///
+/// The value deliberately carries no repository identity, path list, file
+/// contents, index entries, symlink targets, or manifest bytes, and it grants
+/// no evidence, provider, or closure authority.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GitSubjectFingerprintV1 {
+    pub schema_version: u16,
+    pub revision: String,
+    pub state: SubjectState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dirty_digest: Option<String>,
+}
+
+impl GitSubjectFingerprintV1 {
+    /// Version of the fingerprint contract itself.
+    pub const SCHEMA_VERSION: u16 = 1;
+
+    /// Reject a decoded or captured fingerprint that is not internally
+    /// consistent: wrong schema version, blank revision, clean state with a
+    /// dirty digest, or dirty state without a `sha256:<64 lowercase hex>`
+    /// digest.
+    pub fn validate(&self) -> Result<(), GitSubjectError> {
+        if self.schema_version != Self::SCHEMA_VERSION {
+            return Err(GitSubjectError::InvalidFingerprint(format!(
+                "unsupported schema version: {}",
+                self.schema_version
+            )));
+        }
+        if self.revision.is_empty() {
+            return Err(GitSubjectError::InvalidFingerprint(
+                "revision must not be empty".into(),
+            ));
+        }
+        match (self.state, self.dirty_digest.as_ref()) {
+            (SubjectState::Clean, None) => Ok(()),
+            (SubjectState::Dirty, Some(digest)) if valid_digest(digest) => Ok(()),
+            _ => Err(GitSubjectError::InvalidFingerprint(
+                "clean fingerprints omit the dirty digest; dirty fingerprints require sha256:<64 lowercase hex>"
+                    .into(),
+            )),
+        }
+    }
+}
+
+/// Capture the exact [`GitSubjectFingerprintV1`] Eggplan requires for
+/// exact-subject dirty evidence, using the same discovery, manifest, ordering,
+/// and bounds as [`GitSubjectSource::capture`].
+///
+/// `excluded_path` is the single administrative root (for example
+/// `.eggplan`) excluded from the dirty identity and is resolved exactly as
+/// `GitSubjectSource::excluding_path` resolves it. Unlike that historical
+/// entry point, which silently applies no exclusion when the requested path
+/// does not resolve inside the discovered worktree (or when it names the
+/// worktree root itself), this function fails closed with
+/// [`GitSubjectError::InvalidExclusion`]. For any exclusion that does resolve
+/// inside the worktree, both entry points return byte-identical revision,
+/// state, and dirty digest.
+pub fn capture_git_subject_fingerprint(
+    root: impl AsRef<Path>,
+    options: GitSubjectOptions,
+    excluded_path: Option<&Path>,
+) -> Result<GitSubjectFingerprintV1, GitSubjectError> {
+    let captured = capture_subject(
+        root.as_ref(),
+        &options,
+        excluded_path,
+        ExclusionMode::Strict,
+    )?;
+    let fingerprint = GitSubjectFingerprintV1 {
+        schema_version: GitSubjectFingerprintV1::SCHEMA_VERSION,
+        revision: captured.revision,
+        state: captured.state,
+        dirty_digest: captured.dirty_digest,
+    };
+    fingerprint.validate()?;
+    Ok(fingerprint)
 }
 
 #[derive(Debug, Clone)]
@@ -73,49 +166,115 @@ impl GitSubjectSource {
     }
 
     pub fn capture(&self) -> Result<SubjectRevision, GitSubjectError> {
-        let repo = Repository::discover(&self.root)
-            .map_err(|_| GitSubjectError::NotGit(self.root.clone()))?;
-        let head = repo.head()?.target().ok_or(GitSubjectError::Unborn)?;
-        let mut budget = Budget {
-            paths: 0,
-            bytes: 0,
-            options: &self.options,
-        };
-        let exclusion = match (&self.excluded_root, repo.workdir()) {
-            (Some(path), Some(workdir)) => {
-                let absolute = if path.is_absolute() {
-                    path.clone()
-                } else {
-                    std::env::current_dir()?.join(path)
-                };
-                // macOS commonly exposes /var as /private/var and Windows
-                // canonicalizes path casing. Compare resolved existing roots
-                // so an administrative exclusion cannot disappear due to an
-                // alias spelling.
-                let absolute = fs::canonicalize(absolute)?;
-                let workdir = fs::canonicalize(workdir)?;
-                absolute.strip_prefix(workdir).ok().map(Path::to_path_buf)
-            }
-            _ => None,
-        };
-        let manifest = dirty_manifest(&repo, &mut budget, 0, exclusion.as_deref())?;
-        let dirty = !manifest.is_empty();
-        let digest = dirty.then(|| format!("sha256:{:x}", Sha256::digest(&manifest)));
+        let captured = capture_subject(
+            &self.root,
+            &self.options,
+            self.excluded_root.as_deref(),
+            ExclusionMode::Lenient,
+        )?;
         let subject = SubjectRevision {
             subject_kind: "git".into(),
             repository_id: self.repository_id.clone(),
-            revision: head.to_string(),
-            state: if dirty {
-                SubjectState::Dirty
-            } else {
-                SubjectState::Clean
-            },
-            dirty_digest: digest,
+            revision: captured.revision,
+            state: captured.state,
+            dirty_digest: captured.dirty_digest,
         };
         subject
             .validate()
             .map_err(|e| GitSubjectError::InvalidSubject(e.to_string()))?;
         Ok(subject)
+    }
+}
+
+/// Repository-ID-free result of one worktree capture. Both the public
+/// [`GitSubjectSource`] subject and [`capture_git_subject_fingerprint`] are
+/// derived from this single value, so they cannot disagree for one capture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CapturedSubject {
+    revision: String,
+    state: SubjectState,
+    dirty_digest: Option<String>,
+}
+
+/// How an administrative exclusion that does not resolve inside the
+/// discovered worktree is treated. The mode never changes the dirty manifest
+/// algorithm, row ordering, status bits, index-entry treatment, or bounds; it
+/// only decides whether an unusable exclusion is ignored or rejected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExclusionMode {
+    /// Historical `GitSubjectSource::capture` behavior: apply no exclusion.
+    Lenient,
+    /// Fingerprint contract behavior: fail closed.
+    Strict,
+}
+
+fn capture_subject(
+    root: &Path,
+    options: &GitSubjectOptions,
+    excluded_root: Option<&Path>,
+    exclusion_mode: ExclusionMode,
+) -> Result<CapturedSubject, GitSubjectError> {
+    let repo =
+        Repository::discover(root).map_err(|_| GitSubjectError::NotGit(root.to_path_buf()))?;
+    let head = repo.head()?.target().ok_or(GitSubjectError::Unborn)?;
+    let mut budget = Budget {
+        paths: 0,
+        bytes: 0,
+        options,
+    };
+    let exclusion = resolve_exclusion(excluded_root, repo.workdir(), exclusion_mode)?;
+    let manifest = dirty_manifest(&repo, &mut budget, 0, exclusion.as_deref())?;
+    let dirty = !manifest.is_empty();
+    Ok(CapturedSubject {
+        revision: head.to_string(),
+        state: if dirty {
+            SubjectState::Dirty
+        } else {
+            SubjectState::Clean
+        },
+        dirty_digest: dirty.then(|| format!("sha256:{:x}", Sha256::digest(&manifest))),
+    })
+}
+
+fn resolve_exclusion(
+    excluded_root: Option<&Path>,
+    workdir: Option<&Path>,
+    mode: ExclusionMode,
+) -> Result<Option<PathBuf>, GitSubjectError> {
+    let Some(excluded_root) = excluded_root else {
+        return Ok(None);
+    };
+    let Some(workdir) = workdir else {
+        return match mode {
+            ExclusionMode::Lenient => Ok(None),
+            ExclusionMode::Strict => Err(GitSubjectError::InvalidExclusion(
+                excluded_root.to_path_buf(),
+            )),
+        };
+    };
+    let absolute = if excluded_root.is_absolute() {
+        excluded_root.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(excluded_root)
+    };
+    // macOS commonly exposes /var as /private/var and Windows canonicalizes
+    // path casing. Compare resolved existing roots so an administrative
+    // exclusion cannot disappear due to an alias spelling.
+    let absolute = fs::canonicalize(absolute)?;
+    let workdir = fs::canonicalize(workdir)?;
+    match absolute.strip_prefix(&workdir).ok().map(Path::to_path_buf) {
+        // An exclusion that resolves to the worktree root itself would silently
+        // swallow the entire dirty manifest. The fingerprint contract fails
+        // closed instead of reporting a falsely clean subject.
+        Some(relative) if relative.as_os_str().is_empty() => match mode {
+            ExclusionMode::Lenient => Ok(None),
+            ExclusionMode::Strict => Err(GitSubjectError::InvalidExclusion(absolute)),
+        },
+        Some(relative) => Ok(Some(relative)),
+        None => match mode {
+            ExclusionMode::Lenient => Ok(None),
+            ExclusionMode::Strict => Err(GitSubjectError::InvalidExclusion(absolute)),
+        },
     }
 }
 
@@ -264,10 +423,103 @@ fn field(output: &mut Vec<u8>, bytes: &[u8]) {
     output.extend_from_slice(bytes);
 }
 
+fn valid_digest(value: &str) -> bool {
+    value.strip_prefix("sha256:").is_some_and(|hex| {
+        hex.len() == 64
+            && hex
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn strict_exclusion_fails_closed_and_lenient_exclusion_is_unchanged() {
+        let worktree = tempdir().unwrap();
+        fs::create_dir(worktree.path().join(".eggplan")).unwrap();
+        let administrative = worktree.path().join(".eggplan");
+        let outside = tempdir().unwrap();
+        let workdir = Some(worktree.path());
+
+        for mode in [ExclusionMode::Strict, ExclusionMode::Lenient] {
+            assert_eq!(
+                resolve_exclusion(Some(administrative.as_path()), workdir, mode).unwrap(),
+                Some(PathBuf::from(".eggplan")),
+                "a resolvable administrative root is excluded identically"
+            );
+        }
+        assert_eq!(
+            resolve_exclusion(None, workdir, ExclusionMode::Strict).unwrap(),
+            None
+        );
+        assert!(matches!(
+            resolve_exclusion(Some(worktree.path()), workdir, ExclusionMode::Strict),
+            Err(GitSubjectError::InvalidExclusion(_))
+        ));
+        assert!(matches!(
+            resolve_exclusion(Some(outside.path()), workdir, ExclusionMode::Strict),
+            Err(GitSubjectError::InvalidExclusion(_))
+        ));
+        assert_eq!(
+            resolve_exclusion(Some(outside.path()), workdir, ExclusionMode::Lenient).unwrap(),
+            None
+        );
+        assert!(matches!(
+            resolve_exclusion(Some(administrative.as_path()), None, ExclusionMode::Strict),
+            Err(GitSubjectError::InvalidExclusion(_))
+        ));
+        assert_eq!(
+            resolve_exclusion(Some(administrative.as_path()), None, ExclusionMode::Lenient)
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn fingerprint_validation_rejects_inconsistent_values() {
+        let dirty = GitSubjectFingerprintV1 {
+            schema_version: GitSubjectFingerprintV1::SCHEMA_VERSION,
+            revision: "a".repeat(40),
+            state: SubjectState::Dirty,
+            dirty_digest: Some(format!("sha256:{}", "0".repeat(64))),
+        };
+        dirty.validate().unwrap();
+        for invalid in [
+            GitSubjectFingerprintV1 {
+                schema_version: 0,
+                ..dirty.clone()
+            },
+            GitSubjectFingerprintV1 {
+                revision: String::new(),
+                ..dirty.clone()
+            },
+            GitSubjectFingerprintV1 {
+                state: SubjectState::Clean,
+                ..dirty.clone()
+            },
+            GitSubjectFingerprintV1 {
+                dirty_digest: None,
+                ..dirty.clone()
+            },
+            GitSubjectFingerprintV1 {
+                dirty_digest: Some(format!("sha256:{}", "0".repeat(63))),
+                ..dirty.clone()
+            },
+            GitSubjectFingerprintV1 {
+                dirty_digest: Some(format!("sha256:{}", "A".repeat(64))),
+                ..dirty.clone()
+            },
+        ] {
+            assert!(matches!(
+                invalid.validate(),
+                Err(GitSubjectError::InvalidFingerprint(_))
+            ));
+        }
+    }
 
     #[test]
     fn git_status_paths_must_be_relative_and_normalized() {

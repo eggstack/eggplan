@@ -49,10 +49,11 @@ acquisition, matching the [repository](repository.md) and
 
 ## 2. Module / function walkthrough
 
-`lib.rs` (`crates/eggplan-repo/src/lib.rs:1-48`) forbids `unsafe_code`,
+`lib.rs` (`crates/eggplan-repo/src/lib.rs:1-84`) forbids `unsafe_code`,
 declares `git_subject` + `store`, and re-exports exactly
-`GitSubjectError`, `GitSubjectOptions`, `GitSubjectSource`, `PlanStore`,
-`RepoError`, `RepositoryStore`, `StoreOptions`.
+`capture_git_subject_fingerprint`, `GitSubjectError`,
+`GitSubjectFingerprintV1`, `GitSubjectOptions`, `GitSubjectSource`,
+`PlanStore`, `RepoError`, `RepositoryStore`, `StoreOptions`.
 
 - **Open paths.** `open_read_only` (`store.rs:172-197`) reads `config.toml`
   without creating files or recovering pending closures — the inspection
@@ -109,33 +110,80 @@ declares `git_subject` + `store`, and re-exports exactly
 
 ## 3. Git `SubjectRevision` capture as implemented
 
-`GitSubjectSource` (`crates/eggplan-repo/src/git_subject.rs:46-120`):
+`GitSubjectSource` (`crates/eggplan-repo/src/git_subject.rs:140-209`):
 `new` + `with_options` + `excluding_path`
-(`git_subject.rs:55-73`), then `capture` (`git_subject.rs:75-119`).
-`Repository::discover` from the configured root (libgit2 only — no spawned
-Git, hooks, or repo-defined commands); HEAD OID required (`Unborn` if none);
-`NotGit` outside a worktree. Clean subjects carry repository ID + HEAD OID;
-dirty trees get a bounded sorted manifest (`dirty_manifest`,
-`git_subject.rs:146-233`): status bits, index blob IDs, regular file bytes,
-symlink targets, nested submodule HEAD/dirty manifests; untracked files and
-submodules participate, ignored files do not. Default bounds are 10,000
-paths, 64 MiB worktree bytes, 8 submodule levels (`git_subject.rs:16-24`);
-exceeding a bound fails (`BoundExceeded`) rather than returning a partial
-fingerprint. Non-Unicode paths fail (`NonUnicodePath`). Status paths are
-confined by `safe_worktree_path` (`git_subject.rs:235-260`), which also
-rejects descent through symlinked intermediate directories.
+(`git_subject.rs:148-166`), then `capture` (`git_subject.rs:168-209`),
+which is a thin wrapper over the shared `capture_subject`
+(`git_subject.rs:211-237`). `Repository::discover` from the configured root
+(libgit2 only — no spawned Git, hooks, or repo-defined commands); HEAD OID
+required (`Unborn` if none); `NotGit` outside a worktree. Clean subjects carry
+repository ID + HEAD OID; dirty trees get a bounded sorted manifest
+(`dirty_manifest`, `git_subject.rs:305-392`): status bits, index blob IDs,
+regular file bytes, symlink targets, nested submodule HEAD/dirty manifests;
+untracked files and submodules participate, ignored files do not. Default
+bounds are 10,000 paths, 64 MiB worktree bytes, 8 submodule levels
+(`git_subject.rs:17-25`); exceeding a bound fails (`BoundExceeded`) rather
+than returning a partial fingerprint. Non-Unicode paths fail
+(`NonUnicodePath`). Status paths are confined by `safe_worktree_path`
+(`git_subject.rs:394-418`), which also rejects descent through symlinked
+intermediate directories.
+
+`capture_subject` is the single capture implementation: it discovers the
+repository, resolves the HEAD, resolves the exclusion, and returns the
+repository-ID-free `CapturedSubject` (revision, state, dirty digest). Both
+public entry points derive their public value from that one result, so
+`SubjectRevision` and `GitSubjectFingerprintV1` cannot disagree for one
+capture. `ExclusionMode` (`git_subject.rs:203-209`) only decides how an
+unusable exclusion is treated; it never changes manifest bytes, row ordering,
+status bits, index-entry treatment, or bounds.
 
 Managed-root exclusion: `RepositoryStore::subject_source`
-(`store.rs:624-626`) wires `.excluding_path(&self.root)`; `capture`
-canonicalizes both roots (handling macOS `/var` → `/private/var` aliasing)
-and drops normalized status paths equal to or under the exclusion
-(`git_subject.rs:84-100,170-174`), independent of `.gitignore` and
+(`store.rs:624-626`) wires `.excluding_path(&self.root)`; `resolve_exclusion`
+(`git_subject.rs:239-279`) canonicalizes both roots (handling macOS `/var` →
+`/private/var` aliasing) and `dirty_manifest` drops normalized status paths
+equal to or under the exclusion
+(`git_subject.rs:329-334`), independent of `.gitignore` and
 tracked/staged/ignored/untracked state. A sibling sharing only a string
 prefix stays in scope (comparison is component-based). Submodule manifests
 are evaluated independently (exclusion is not propagated at
-`git_subject.rs:215`). Outside-worktree state paths apply no exclusion.
-The HEAD OID remains in the subject, so committing administrative state
-still changes identity — all per [repository](repository.md).
+`git_subject.rs:374`). Outside-worktree state paths apply no exclusion under
+`ExclusionMode::Lenient`. The HEAD OID remains in the subject, so committing
+administrative state still changes identity — all per
+[repository](repository.md).
+
+## 3a. Git subject fingerprint as implemented
+
+`GitSubjectFingerprintV1` (`git_subject.rs:66-103`) and
+`capture_git_subject_fingerprint` (`git_subject.rs:118-137`) expose the exact
+revision, clean/dirty state, and Eggplan-native dirty digest an external host
+must persist for later exact-subject assessment. Added by CodeGG integration
+C001.
+
+- **Versioned and strict.** `SCHEMA_VERSION == 1`; `deny_unknown_fields`;
+  `validate` rejects a wrong schema version, blank revision, clean-with-digest,
+  dirty-without-digest, and any digest that is not `sha256:<64 lowercase
+  hex>`.
+- **Repository-ID-free by construction.** No repository identity, path list,
+  index entry, symlink target, content, or manifest byte is present. Crate-level
+  `compile_fail` doctests in `git_subject.rs`'s crate root (`lib.rs`) fail if
+  such a field is ever added.
+- **Same algorithm, one implementation.** Fingerprint and subject read the
+  same `capture_subject`; the digest bytes are frozen by
+  `crates/eggplan-repo/tests/git_subject_digest_golden.rs` (fixture
+  `tests/fixtures/git-subject-digests-v1.json` + `.sha256` sidecar) captured
+  from the pre-C001 implementation at revision `52a4be76`.
+- **Fail-closed exclusion.** `ExclusionMode::Strict` rejects an exclusion that
+  does not resolve inside the discovered worktree, names the worktree root
+  itself, or is requested against a repository with no worktree
+  (`InvalidExclusion`). `GitSubjectSource` keeps its historical lenient
+  resolution (`ExclusionMode::Lenient`).
+- **Same typed failures and bounds.** Bound overflow, unsafe/symlinked paths,
+  non-Unicode paths, Git errors, unborn HEAD, and filesystem read failures
+  return the same `GitSubjectError` classes as normal subject capture and never
+  return a partial digest.
+- **Not an authority.** A fingerprint grants no evidence, provider, or closure
+  authority, and Eggplan provides no repository-ID relabeling constructor for
+  it: identity proof stays the host's responsibility.
 
 ## 4. Closure-authority boundary as implemented
 
@@ -149,7 +197,9 @@ Three layers, matching [repository](repository.md) and
    and cannot be named from another crate.
 2. **Compile-fail doctests.** `lib.rs:15-42` assert that naming
    `SubjectCapture` / `ScriptedSubjectCapture` or calling
-   `finalize_closure_with_capture` from outside fails to compile.
+   `finalize_closure_with_capture` from outside fails to compile;
+   `lib.rs:44-83` assert that a fingerprint exposes no `repository_id`,
+   `paths`, or `dirty_manifest` field.
 3. **Static guard.** `scripts/check-closure-authority-boundary.sh` strips
    comments and rejects `pub use` re-exports (direct and grouped,
    multiline-aware) of the three hidden types in `lib.rs`/`store.rs`, plus
@@ -168,7 +218,18 @@ Three layers, matching [repository](repository.md) and
   managed-state exclusion, bound-evidence end-to-end, guarded closure
   persistence + reopen, non-Git error, submodule manifests, stale-subject
   abort with no partial state.
-- **Unit-in-crate (`store.rs:1228-1478`, `git_subject.rs:267-297`):**
+- **Fingerprint (`crates/eggplan-repo/tests/git_subject_fingerprint.rs`,
+  13 tests, one Unix-gated) plus the frozen digest matrix
+  (`tests/git_subject_digest_golden.rs`, 2 tests + 1 ignored recorder):**
+ fingerprint/subject equality across clean, unstaged, staged,
+  staged+unstaged, untracked, deleted, symlink, staged-rename, and dirty
+  nested-submodule states; single administrative-root exclusion including
+  prefix-sharing siblings; strict invalid/outside/root/missing/bare
+  exclusions; path/content/depth bounds; typed discovery failures; the
+  two-capture dirty-change sandwich primitive; equality with the
+  `RepositoryStore` subject a fingerprint will be bound to; schema-versioned
+  strict serde round-trip and validation.
+- **Unit-in-crate (`store.rs:1228-1478`, `git_subject.rs:436-549`):**
   deterministic S1/S2 regressions via the scripted seam (stable success,
   drift → `ClosureSubjectDrift`, S2 failure → `ClosureSubjectCapture`, all
   asserting no partial closure state), a visibility test pinning the

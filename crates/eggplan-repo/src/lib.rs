@@ -40,9 +40,45 @@
 //!     );
 //! }
 //! ```
+//!
+//! # Git subject fingerprint boundary
+//!
+//! `capture_git_subject_fingerprint` exposes the exact revision, clean/dirty
+//! state, and Eggplan-native dirty digest an external host must persist for
+//! later Eggplan exact-subject assessment. It shares one capture
+//! implementation with `GitSubjectSource::capture`, so both agree by
+//! construction, and it deliberately exposes no repository identity and no
+//! part of the dirty manifest.
+//!
+//! ```compile_fail
+//! fn _assert_fingerprint_is_repository_id_free(
+//!     fingerprint: eggplan_repo::GitSubjectFingerprintV1,
+//! ) -> String {
+//!     fingerprint.repository_id
+//! }
+//! ```
+//!
+//! ```compile_fail
+//! fn _assert_fingerprint_exposes_no_paths(
+//!     fingerprint: eggplan_repo::GitSubjectFingerprintV1,
+//! ) -> usize {
+//!     fingerprint.paths.len()
+//! }
+//! ```
+//!
+//! ```compile_fail
+//! fn _assert_fingerprint_exposes_no_manifest(
+//!     fingerprint: eggplan_repo::GitSubjectFingerprintV1,
+//! ) -> usize {
+//!     fingerprint.dirty_manifest.len()
+//! }
+//! ```
 
 mod git_subject;
 mod store;
 
-pub use git_subject::{GitSubjectError, GitSubjectOptions, GitSubjectSource};
+pub use git_subject::{
+    GitSubjectError, GitSubjectFingerprintV1, GitSubjectOptions, GitSubjectSource,
+    capture_git_subject_fingerprint,
+};
 pub use store::{PlanStore, RepoError, RepositoryStore, StoreOptions};

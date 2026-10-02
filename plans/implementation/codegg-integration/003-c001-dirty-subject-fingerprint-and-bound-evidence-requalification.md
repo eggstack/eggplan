@@ -1,6 +1,18 @@
 # CodeGG Integration M003 C001 — Dirty-Subject Fingerprint Contract and Bound-Evidence Requalification
 
-Status: ready for coordinated handoff
+Status: implemented — conditionally closed pending CodeGG requalification on the
+pinned revision
+
+Eggplan implementation revision:
+`352a0f782b0166aad8e850185019d78ec162d487`
+
+Closure record: `plans/closure/codegg-integration/003-c001-closed.md`
+
+This is a post-closure correctness corrective against the closed M003 contract.
+It does not rewrite the M003 closure, its conditional-closure narrative, or any
+historical observation. Remaining cross-repository conditions (CodeGG pin bump
+to `352a0f7` plus CodeGG hosted requalification) are named in the closure
+record.
 
 Repository baseline:
 

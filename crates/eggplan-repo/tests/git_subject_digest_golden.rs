@@ -122,11 +122,7 @@ fn apply(case: &str, root: &Path, repo: &Repository) {
         }
         "untracked_file" => fs::write(root.join("untracked.txt"), b"untracked\n").unwrap(),
         "deleted_tracked_file" => fs::remove_file(root.join("other.txt")).unwrap(),
-        "symlink_typechange" => {
-            use std::os::unix::fs::symlink;
-            fs::remove_file(root.join("other.txt")).unwrap();
-            symlink("tracked.txt", root.join("other.txt")).unwrap();
-        }
+        "symlink_typechange" => apply_symlink_typechange(root),
         "staged_rename" => {
             fs::rename(root.join("rename-me.txt"), root.join("renamed.txt")).unwrap();
             let mut index = repo.index().unwrap();
@@ -136,6 +132,21 @@ fn apply(case: &str, root: &Path, repo: &Repository) {
         }
         other => panic!("unknown golden case {other}"),
     }
+}
+
+/// Unix-only: Windows CI runners cannot create symlinks without elevated
+/// privileges, so the case is asserted on Linux/macOS and kept in the frozen
+/// fixture everywhere.
+#[cfg(unix)]
+fn apply_symlink_typechange(root: &Path) {
+    use std::os::unix::fs::symlink;
+    fs::remove_file(root.join("other.txt")).unwrap();
+    symlink("tracked.txt", root.join("other.txt")).unwrap();
+}
+
+#[cfg(not(unix))]
+fn apply_symlink_typechange(_root: &Path) {
+    unreachable!("symlink_typechange is never applied on a non-Unix platform")
 }
 
 /// Parent worktree with a committed submodule whose own tracked file is

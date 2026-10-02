@@ -55,7 +55,7 @@ Planning-system bootstrap:
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | active corrective | M001-M003 closed; C001 dirty-subject corrective ready | plans/subsystems/codegg-integration-roadmap.md |
+| CodeGG integration | active corrective | M001-M003 closed; C001 conditionally closed on the CodeGG requalification | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 provider SPI and M002 Eggwork/Eggsearch adapters closed; M003 ready for planning against rechecked Eggbench contract | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
@@ -77,7 +77,7 @@ Planning-system bootstrap:
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | closed | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | closure plans/closure/codegg-integration/002-closed.md; Eggplan bridge 088968b + 1291799, CodeGG adoption 3e992291/3c7438c7, CodeGG closure ffa1c15e |
 | CodeGG integration | M003 repository Plan binding contract | closed | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Eggplan contract implementation `3f7c603` qualified by hosted run `36868055136`; the CodeGG consumer is implemented at CodeGG `53dea47f` and hosted-qualified there by run `36938461935` (success), satisfying the former condition. Closure: plans/closure/codegg-integration/003-conditionally-closed.md |
-| CodeGG integration | M003 C001 dirty-subject fingerprint + bound-evidence requalification | ready | plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md | Coordinated CodeGG corrective registered at `dc9ae6cc`; preserve Eggplan digest bytes, expose bounded repository-ID-free fingerprint, require CodeGG to persist/use Eggplan-compatible dirty digest and qualify dirty bound evidence/closure. Historical M003 remains closed. |
+| CodeGG integration | M003 C001 dirty-subject fingerprint + bound-evidence requalification | conditionally closed | plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md | Eggplan fingerprint contract implemented at `352a0f7` (hosted run `37062437251`); CodeGG half implemented at `36ec9322` and conditionally closed there. Closure: plans/closure/codegg-integration/003-c001-closed.md. Remaining: CodeGG pin bump to `352a0f7` + hosted requalification. Historical M003 remains closed. |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -133,8 +133,13 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
      `3f7c603` and the CodeGG consuming implementation landed at CodeGG
      `53dea47f`, hosted-qualified there by run `36938461935` (success). Both
      sides of the cross-repository contract are closed; the CodeGG
-     integration roadmap is terminal.
-   - CodeGG M003 C001 dirty-subject fingerprint/evidence requalification is ready and may proceed independently of unrelated capability work;
+     integration roadmap is terminal for M003.
+   - CodeGG M003 C001 dirty-subject corrective is implemented on both sides
+     (Eggplan `352a0f7`, CodeGG `36ec9322`) and is conditionally closed until
+     CodeGG bumps its pin to `352a0f7` and requalifies hosted. This is a
+     named cross-repository condition, not an open Eggplan work item;
+     Projection/CLI M003, Eggstack M003, and other capability work need not
+     serialize on it;
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - Eggstack M003 Eggbench/CI/forge adapters are ready for planning after the
      recheck above.
@@ -147,7 +152,7 @@ Reviewed during planning; these are not dependency pins.
 
 | Project/standard | Reviewed baseline | Relevant boundary |
 |---|---|---|
-| CodeGG | 53dea47f414641c3f9756c3f8f181f6208be8115 (M003 implementation); aa21cfe1763d7ea00d11e582ed4108233e4088a9 (M003 closure) | M001-M003 closed. Post-closure review found dirty-digest representation mismatch for bound exact-subject evidence; C001 is registered to add an Eggplan-native fingerprint handoff without changing CodeGG execution ownership. |
+| CodeGG | 36ec9322 (C001 implementation); b5b3b14e (C001 conditional closure); 53dea47f414641c3f9756c3f8f181f6208be8115 (M003 implementation); aa21cfe1763d7ea00d11e582ed4108233e4088a9 (M003 closure) | M001-M003 closed. Post-closure review found dirty-digest representation mismatch for bound exact-subject evidence; C001 landed on both sides — Eggplan fingerprint contract at `352a0f7`, CodeGG provenance-v2/requalification at `36ec9322` (conditionally closed there). CodeGG still pins `3f7c603`; the pin bump to `352a0f7` plus hosted requalification is the named open condition. |
 | Eggwork | faaa0b905fa6bc43e46825fdd98530b5533a970f | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
 | Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
 | Eggbench | d870512a5a1af16276ff05286ff0b6e2366b7f8f | current .eggb manifest v2; execution status remains separate from comparison verdict |

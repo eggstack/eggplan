@@ -1,6 +1,7 @@
 # CodeGG Integration Roadmap
 
-Status: M001-M003 closed; post-closure C001 dirty-subject corrective ready
+Status: M001-M003 closed; C001 implemented and conditionally closed on the
+CodeGG requalification
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -157,10 +158,13 @@ closure conditional is satisfied and both sides are closed.
 
 ### C001 — Dirty-subject fingerprint contract and bound-evidence requalification
 
-Status: ready for coordinated handoff.
+Status: conditionally closed. Eggplan implementation `352a0f7` is hosted
+qualified; the CodeGG requalification on that exact revision is outstanding.
 
 Plan:
 `plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md`
+
+Closure: `plans/closure/codegg-integration/003-c001-closed.md`
 
 Coordinated CodeGG plan:
 `dbowm91/codegg:plans/implementation/eggplan-assessment-integration/005-m003-c001-dirty-subject-provenance-and-bound-evidence.md`
@@ -181,6 +185,26 @@ Legacy dirty provenance fails closed rather than being backfilled.
 The corrective also requires dirty execution -> observation -> item completion
 -> guarded closure qualification and reconciles stale M003 status/baseline
 documentation. Clean M003 behavior remains closed/current.
+
+State as of this roadmap update:
+
+- Eggplan exposes `GitSubjectFingerprintV1` (`SCHEMA_VERSION = 1`) and
+  `capture_git_subject_fingerprint` from `eggplan-repo`, sharing one capture
+  implementation with `GitSubjectSource::capture`. The digest bytes are frozen
+  by a golden matrix captured from the pre-C001 implementation at `52a4be76`.
+- CodeGG implemented its half at `dbowm91/codegg:36ec9322` (nested
+  `ExecutionSubjectRevision` v2 with `eggplan_dirty_digest`, E1/C/E2 binding
+  sandwich, bound dirty translation from the persisted Eggplan digest, legacy
+  dirty fail-closed) and closed it conditionally in
+  `dbowm91/codegg:plans/closure/eggplan-assessment-integration/005-m003-c001-status.md`.
+- Outstanding cross-repository conditions: CodeGG must bump its
+  `eggplan-core` / `eggplan-codegg-compat` / `eggplan-repo` pin from `3f7c603`
+  to `352a0f7`, route its capture helper through the fingerprint API, and
+  requalify hosted. Its own conditional closure owns that work; it is a
+  one-call substitution plus requalification, not a new contract.
+- No Eggplan plan is blocked by C001. Interoperability/distribution stays
+  deferred by its own disposition; Projection/CLI M003 still waits for real
+  repository use; Eggstack M003 still needs its Eggbench recheck.
 
 ## 5. Verification
 

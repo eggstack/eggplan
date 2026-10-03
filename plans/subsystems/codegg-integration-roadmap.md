@@ -1,7 +1,6 @@
 # CodeGG Integration Roadmap
 
-Status: M001-M003 closed; C001 implemented and conditionally closed on the
-CodeGG requalification
+Status: M001-M003 and C001 closed; the roadmap is terminal
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -158,9 +157,10 @@ closure conditional is satisfied and both sides are closed.
 
 ### C001 — Dirty-subject fingerprint contract and bound-evidence requalification
 
-Status: conditionally closed. Eggplan implementation `0dd33b7` is hosted
-qualified (run `37063328954`, all four jobs green); the CodeGG requalification
-on that exact revision is outstanding.
+Status: closed. Eggplan implementation `0dd33b7` is hosted qualified (run
+`37063328954`, all four jobs green), and CodeGG pinned that exact revision,
+consumed the fingerprint API, and requalified hosted (CodeGG `main`
+`3623f65e` + `b470865a`, CI run `37084905013` green).
 
 Plan:
 `plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md`
@@ -198,12 +198,13 @@ State as of this roadmap update:
   sandwich, bound dirty translation from the persisted Eggplan digest, legacy
   dirty fail-closed) and closed it conditionally in
   `dbowm91/codegg:plans/closure/eggplan-assessment-integration/005-m003-c001-status.md`.
-- Outstanding cross-repository conditions: CodeGG must bump its
-  `eggplan-core` / `eggplan-codegg-compat` / `eggplan-repo` pin from `3f7c603`
-  to `0dd33b7`, route its capture helper through the fingerprint API, and
-  requalify hosted. Its own conditional closure owns that work; it is a
-  one-call substitution plus requalification, not a new contract.
-- No Eggplan plan is blocked by C001. Interoperability/distribution stays
+- CodeGG discharged both former conditions: `eggplan-core` /
+  `eggplan-codegg-compat` / `eggplan-repo` moved from `3f7c603` to `0dd33b7`,
+  both Eggplan capture sites (attempt start/seal and the binding identity
+  sandwich) route through `capture_git_subject_fingerprint`, its ownership
+  guard now confines raw fingerprint calls to the same two owner modules, and
+  its dirty end-to-end matrix was requalified on the new pin.
+- No Eggplan plan was blocked by C001. Interoperability/distribution stays
   deferred by its own disposition; Projection/CLI M003 still waits for real
   repository use; Eggstack M003 still needs its Eggbench recheck.
 

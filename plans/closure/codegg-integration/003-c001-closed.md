@@ -1,18 +1,21 @@
 # CodeGG Integration M003 C001 Closure Record — Dirty-Subject Fingerprint Contract and Bound-Evidence Requalification
 
-Status: conditionally closed
+Status: closed
+
+Both cross-repository conditions recorded as conditional have been discharged by
+CodeGG PR `dbowm91/codegg#90` (merged; CodeGG `main` `3623f65e` + `b470865a`,
+canonical hosted run `37084905013`) and by this repository's requalification of
+the CodeGG evidence. The original conditional finding is preserved verbatim in
+section 1a as the record of what was outstanding when the first closure was
+written.
 
 Eggplan production implementation is complete, verified locally and on hosted
 Ubuntu/macOS/Windows plus Rust 1.89, and the frozen subject digest bytes are
-unchanged. Strict closure is blocked by two named cross-repository conditions
-that are outside Eggplan's authority and are recorded truthfully below. This is
-a post-closure correctness corrective: the M003 closure
+unchanged. This is a post-closure correctness corrective: the M003 closure
 (`plans/closure/codegg-integration/003-conditionally-closed.md`) and its
 preserved conditional-closure narrative are unchanged historical evidence.
 
-The cross-repository contract itself is complete and qualified on both sides;
-what is outstanding is that CodeGG has not yet repointed its pin at
-`0dd33b7` and requalified hosted against it.
+The cross-repository contract is now complete and qualified on both sides.
 
 Source implementation plan:
 `plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md`
@@ -47,6 +50,34 @@ Coordinated CodeGG plan:
 registered at CodeGG `dc9ae6ccf1cfa8dea51522ddc6bf33976562edb9`.
 
 ## 1. Executive finding
+
+C001 is **closed on both sides**. Eggplan exposes the exact dirty-subject
+primitive CodeGG was missing and proves it cannot have changed Eggplan's
+existing subject identity; CodeGG pinned this revision, routed both of its
+Eggplan capture sites through the new contract, and requalified the dirty bound
+evidence/closure path. All fifteen acceptance criteria are met with recorded
+evidence.
+
+The CodeGG side, in summary:
+
+- CodeGG `main` `3623f65e` moves `eggplan-core`, `eggplan-codegg-compat`, and
+  `eggplan-repo` from `3f7c603` to `0dd33b76`, updates the `EGGPLAN_PIN`
+  constant (`b470865a`), and replaces `store.subject_source().capture()` with
+  `capture_git_subject_fingerprint` in the attempt-start/seal helper and in both
+  halves of the binding identity sandwich. The read-only store validation is
+  retained, and its ownership guard now confines raw fingerprint calls to the
+  same two owner modules.
+- The binding identity tuple still comes from the store, because a fingerprint
+  carries no repository identity, and the assessment/guarded-closure paths still
+  read the repository's own current subject.
+- The CodeGG dirty matrix was rerun unchanged on the new pin: stable dirty
+  execution → observation → item completion → guarded closure, drift refusal,
+  and legacy-dirty fail-closed all pass, and the 34 pre-existing clean binding
+  cases are untouched.
+- CodeGG closure `dbowm91/codegg:plans/closure/eggplan-assessment-integration/005-m003-c001-status.md`
+  is now `closed` with its original conditional narrative preserved.
+
+## 1a. Original conditional finding (preserved verbatim as history)
 
 Eggplan now exposes the exact dirty-subject primitive CodeGG was missing, and
 proves it cannot have changed Eggplan's existing subject identity. Acceptance
@@ -181,10 +212,10 @@ treatment, symlink/deleted/submodule encodings, or the default bounds
 | 9 | Binding-time sandwich primitive | `fingerprint_detects_dirty_content_change_between_two_captures` proves E1 != E2 for same-HEAD, same-dirty-class, changed contents. Eggplan does not implement CodeGG's sandwich. |
 | 10 | Execution-time persistence contract | Host responsibility. Verified for the consumption shape only, out of tree: see section 6. |
 | 11 | Focused test matrix + golden fixture set | `crates/eggplan-repo/tests/git_subject_fingerprint.rs` (13 tests, one Unix-gated) plus `git_subject_digest_golden.rs`. Coverage: clean, unstaged, staged, staged+unstaged, untracked, deleted, symlink, staged rename, dirty nested submodule, excluded `.eggplan` subtree, path/content/depth bounds, invalid/outside exclusion. |
-| 12 | CodeGG consuming qualification | **Partially met — named conditions.** CodeGG implemented and locally qualified its half at `36ec9322`; the pin bump to `0dd33b7` and hosted requalification are outstanding. See section 7. |
+| 12 | CodeGG consuming qualification | **Met.** CodeGG implemented its half at `36ec9322`, then pinned `0dd33b7` and consumed the fingerprint API in `3623f65e` + `b470865a`, requalified by CodeGG hosted run `37084905013` (job `111109235288`) on `main` head `b470865a`. See sections 7 and 7a. |
 | 13 | Documentation reconciliation | Historical M003 plan header already reads "closed — CodeGG consumer landed" (reconciled in `6644725`); registry external CodeGG baseline advanced to the landed M003 implementation/closure plus the C001 commits; M003 closure narrative untouched; this record files C001 as a post-closure corrective. |
 | 14 | Verification | Section 8: local + MSRV pass; hosted qualification run `37063328954` (all four jobs) on head `0dd33b7`; earlier Windows failures `37062437251` and `37062837529` retained as non-passing evidence. |
-| 15 | Acceptance criteria | 1-6 and 10-11 met; 7-9 open. |
+| 15 | Acceptance criteria | 1-15 met. |
 | 16 | Stop conditions | None triggered. No historical digest byte changed, no manifest is exposed, no `SubjectRevision` equality was weakened, and no backfill or native-digest substitution exists in Eggplan. |
 | 17 | Closure evidence | This record. |
 
@@ -215,7 +246,7 @@ treatment, symlink/deleted/submodule encodings, or the default bounds
   exclusion. This validates public ergonomics and the exact-subject match; it is
   not a substitute for CodeGG's own requalification.
 
-## 7. CodeGG consuming side (recorded, not claimed as done)
+## 7. CodeGG consuming side (as first reviewed)
 
 Exact consuming state reviewed 2026-10-02 at `dbowm91/codegg` `origin/main`
 `13d64ffe`:
@@ -250,7 +281,8 @@ CodeGG dirty matrix reported by that record (their evidence, not re-run here):
 | `cargo test -p codegg --test work_plan_eggplan_differential` | 28 pass |
 | Hosted canonical CodeGG CI on the C001 head | CodeGG's record states pending; this repository observes CodeGG run `37051423825` (success) whose head `41513fd3` contains `36ec9322` and `b5b3b14e`. CodeGG's own record does not yet cite a run ID, so this is recorded as an observation, not as CodeGG's accepted evidence. |
 
-Missing on the CodeGG side, and therefore the open conditions:
+Missing on the CodeGG side at the time of this record's first write, and
+therefore the then-open conditions (both now discharged — see section 7a):
 
 1. Bump the `eggplan-core` / `eggplan-codegg-compat` / `eggplan-repo` pins from
    `3f7c603` to `0dd33b761e85f1364320a9208aaebd5be281c6a5` and route the capture
@@ -258,6 +290,28 @@ Missing on the CodeGG side, and therefore the open conditions:
 2. Rerun the CodeGG dirty matrix and hosted canonical CI on that pin, then
    promote `plans/closure/eggplan-assessment-integration/005-m003-c001-status.md`
    to closed.
+
+## 7a. CodeGG condition discharge (as later reviewed)
+
+Reviewed 2026-10-03 on CodeGG `main` after PR `dbowm91/codegg#90` merged:
+
+| Item | Evidence |
+|---|---|
+| Eggplan pins moved | CodeGG `main` `3623f65e`: `eggplan-core`, `eggplan-codegg-compat`, `eggplan-repo` all at `0dd33b761e85f1364320a9208aaebd5be281c6a5`; `EGGPLAN_PIN` constant updated in `b470865a` |
+| Fingerprint consumed at both sites | `src/execution_subject_capture.rs` (attempt start/seal) and `src/work_plan_repository_binding.rs` (E1/E2 sandwich) call `eggplan_repo::capture_git_subject_fingerprint`; `open_read_only` validation retained so a workspace without a real Eggplan store still yields no Eggplan-compatible digest |
+| Ownership preserved | The identity tuple still comes from the store (a fingerprint carries no repository identity); assessment and guarded-closure paths still read the repository's own current subject; `codegg-core` still has no Eggplan dependency; storage layout still v68 with no migration |
+| Guards strengthened | `check_execution_subject_ownership.py` rule 1d confines raw `capture_git_subject_fingerprint` calls to the two owner modules; rule 6 requires the sandwich to capture the Eggplan side twice through that API |
+| Dirty matrix requalified on the new pin | `cargo test -p codegg --test work_plan_repository_binding` 37 pass (34 pre-existing clean + 3 C001 dirty/drift/legacy); `cargo test --lib -- work_plan_repository_binding` 10 pass; `cargo test --lib -- work_plan_eggplan` 14 pass including `eggplan_pin_matches_manifest_and_lock`; `work_plan_eggplan_differential` 28 pass |
+| CodeGG local verification | fmt clean, `cargo clippy --workspace --all-targets --locked -- -D warnings` clean, `verify.sh quick` passed, all three Python ownership guards plus the core boundary script pass |
+| CodeGG hosted qualification | `CI` run `37084905013`, `verify` job `111109235288`, green on `main` head `b470865a`; PR run `37072794090` attempt 3, job `111070238089`, green on the byte-identical tree at `11354fc9` |
+| CodeGG failure evidence retained | `37069982736` failed the `EGGPLAN_PIN` manifest/lock assertion — a real defect of the bump, fixed in `b470865a`; attempts 1 and 2 of `37072794090` failed the unrelated tool-advisor `causal_active_m005::m005_holdout_structural_gates` single-sample 5 ms latency gate on two different holdouts, the same load-sensitive flake class already classified for CodeGG run `37047118019` |
+| CodeGG closure record | `dbowm91/codegg:plans/closure/eggplan-assessment-integration/005-m003-c001-status.md` is `closed`, with the original conditional finding and both original findings preserved verbatim as history |
+
+No Eggplan-side code changed to accept this evidence, and no Eggplan digest
+byte, schema, or invariant was affected by the CodeGG pin bump: Eggplan's own
+golden matrix is the proof that the bumped fingerprint contract returns the same
+digest bytes the previous store-subject call returned for the same root,
+options, and exclusion.
 
 ## 8. Verification
 
@@ -363,7 +417,21 @@ record and explicitly attributed there.
 
 ## 13. Unresolved findings and open conditions
 
+None outstanding. Both open conditions are discharged; the original table is
+preserved in section 13a.
+
 | Finding | Severity | Owner / disposition |
+|---|---|---|
+| CodeGG must pin `0dd33b7` and consume `capture_git_subject_fingerprint` | resolved | Discharged in `3623f65e` + `b470865a`; see section 7a. |
+| CodeGG hosted requalification of the dirty bound evidence/closure path on the C001 pin | resolved | CodeGG `CI` run `37084905013` green on `main`; see section 7a. |
+| `excluded_path: Option<&Path>` requires `Some(&path)` at call sites instead of the plan's suggested `Option<impl AsRef<Path>>` | low (ergonomics) | Deliberate: `Option<impl Trait>` cannot infer its type from `None`. Documented in the public signature. CodeGG's real call sites use `Some(&state_root)`. |
+| `GitSubjectError` gained two variants | low | Additive; documented above. |
+| A CodeGG host that still calls `store.subject_source().capture()` instead of the fingerprint gets byte-identical digests today, but is not protected against a future Eggplan algorithm change | low | Registry gate 23 and the roadmap now name the fingerprint as the required host call. The golden matrix would fail loudly on such a change. |
+| No unresolved Eggplan-side defect | — | — |
+
+## 13a. Original open conditions (preserved verbatim as history)
+
+| Finding | Severity | Owner/disposition as first written |
 |---|---|---|
 | CodeGG must pin `0dd33b7` and consume `capture_git_subject_fingerprint`; until then the fingerprint contract has no real consumer | high (cross-repository closure) | CodeGG C001 (`005-m003-c001-...`), condition 1 in its closure record. Bounded substitution plus requalification. |
 | CodeGG hosted requalification of the dirty bound evidence/closure path on the C001 pin | high (cross-repository closure) | CodeGG C001, condition 2. CodeGG's own record does not yet cite a run ID. |
@@ -372,14 +440,18 @@ record and explicitly attributed there.
 | A CodeGG host that still calls `store.subject_source().capture()` instead of the fingerprint gets byte-identical digests today, but is not protected against a future Eggplan algorithm change | low | Registry gate 23 and the roadmap now name the fingerprint as the required host call. The golden matrix would fail loudly on such a change. |
 | No unresolved Eggplan-side defect | — | — |
 
+The third row is the only one that remains a live observation rather than a
+closed condition, and it is a deliberate API-shape decision rather than a
+defect. The fifth row is now retired: CodeGG consumes the fingerprint API at
+both sites.
+
 ## 14. Roadmap disposition
 
-- Eggplan implementation plan C001: `conditionally closed`. Production
-  implementation complete; the two cross-repository conditions are named and
-  bounded above.
-- CodeGG integration subsystem roadmap: M001-M003 closed; C001 conditionally
-  closed. The roadmap becomes terminal again once CodeGG records its pin bump
-  and hosted requalification. No new milestone is opened.
+- Eggplan implementation plan C001: `closed`. Production implementation
+  complete, both cross-repository conditions discharged, all fifteen acceptance
+  criteria met.
+- CodeGG integration subsystem roadmap: M001-M003 and C001 closed; the roadmap
+  is terminal. No new milestone is opened.
 - Projection/CLI: M001-M002 closed; M003 remains roadmap-level work waiting for
   real repository use. Not unblocked by C001.
 - Eggstack integrations: M001-M002 closed; M003 remains `ready for planning`
@@ -397,13 +469,15 @@ record and explicitly attributed there.
 - Subsystem roadmap table: CodeGG integration `active corrective`, current
   milestone "M001-M003 closed; C001 conditionally closed on the CodeGG
   requalification".
-- Dependency-ready table: C001 `ready` → `conditionally closed`, linked to this
-  record, implementation `0dd33b7`, hosted run `37063328954`, and the two
-  remaining CodeGG conditions. Two earlier Windows CI failures
+- Dependency-ready table: C001 `ready` → `conditionally closed` → `closed`,
+  linked to this record, Eggplan implementation `0dd33b7`, hosted run
+  `37063328954`, and the CodeGG consumption evidence `3623f65e` / `b470865a`
+  with CodeGG hosted run `37084905013`. Two earlier Windows CI failures
   (`37062437251`, `37062837529`) are retained in the record as non-passing
-  evidence.
+  evidence, as are the CodeGG-side failures summarized in section 7a.
 - External interface research baselines: CodeGG row advanced from the M003-only
-  baseline to the landed C001 implementation/closure commits.
+  baseline to the landed C001 implementation/closure commits and the merged pin
+  bump.
 - Key design gate 23 now names `capture_git_subject_fingerprint` as the host
   call and points at the frozen golden matrix.
 - Current execution order item 9: C001 is now implemented on both sides and

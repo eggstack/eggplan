@@ -55,8 +55,8 @@ C001 is **closed on both sides**. Eggplan exposes the exact dirty-subject
 primitive CodeGG was missing and proves it cannot have changed Eggplan's
 existing subject identity; CodeGG pinned this revision, routed both of its
 Eggplan capture sites through the new contract, and requalified the dirty bound
-evidence/closure path. All fifteen acceptance criteria are met with recorded
-evidence.
+evidence/closure path. All eleven acceptance criteria of plan §15 are met
+with recorded evidence.
 
 The CodeGG side, in summary:
 
@@ -215,7 +215,7 @@ treatment, symlink/deleted/submodule encodings, or the default bounds
 | 12 | CodeGG consuming qualification | **Met.** CodeGG implemented its half at `36ec9322`, then pinned `0dd33b7` and consumed the fingerprint API in `3623f65e` + `b470865a`, requalified by CodeGG hosted run `37084905013` (job `111109235288`) on `main` head `b470865a`. See sections 7 and 7a. |
 | 13 | Documentation reconciliation | Historical M003 plan header already reads "closed — CodeGG consumer landed" (reconciled in `6644725`); registry external CodeGG baseline advanced to the landed M003 implementation/closure plus the C001 commits; M003 closure narrative untouched; this record files C001 as a post-closure corrective. |
 | 14 | Verification | Section 8: local + MSRV pass; hosted qualification run `37063328954` (all four jobs) on head `0dd33b7`; earlier Windows failures `37062437251` and `37062837529` retained as non-passing evidence. |
-| 15 | Acceptance criteria | 1-15 met. |
+| 15 | Acceptance criteria | All 11 met: 1-6 and 10-11 by this repository, 7-9 by the CodeGG work in section 7a. |
 | 16 | Stop conditions | None triggered. No historical digest byte changed, no manifest is exposed, no `SubjectRevision` equality was weakened, and no backfill or native-digest substitution exists in Eggplan. |
 | 17 | Closure evidence | This record. |
 
@@ -448,7 +448,7 @@ both sites.
 ## 14. Roadmap disposition
 
 - Eggplan implementation plan C001: `closed`. Production implementation
-  complete, both cross-repository conditions discharged, all fifteen acceptance
+  complete, both cross-repository conditions discharged, all eleven acceptance
   criteria met.
 - CodeGG integration subsystem roadmap: M001-M003 and C001 closed; the roadmap
   is terminal. No new milestone is opened.

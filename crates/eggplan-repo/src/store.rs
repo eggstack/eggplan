@@ -692,9 +692,7 @@ impl RepositoryStore {
 
     fn load_unlocked(&self, id: &PlanId) -> Result<Plan, RepoError> {
         let mut counters = crate::SnapshotCounters::default();
-        Ok(self
-            .load_snapshot_unlocked(id, &mut counters)?
-            .plan)
+        Ok(self.load_snapshot_unlocked(id, &mut counters, false)?.plan)
     }
 
     /// Single-pass deep load: decodes and validates the Plan, its observations,
@@ -702,10 +700,11 @@ impl RepositoryStore {
     ///
     /// `load_unlocked` is this function with the extra values dropped, so the
     /// two paths cannot drift into different validation.
-    fn load_snapshot_unlocked(
+    pub(crate) fn load_snapshot_unlocked(
         &self,
         id: &PlanId,
         counters: &mut crate::SnapshotCounters,
+        include_records: bool,
     ) -> Result<crate::LoadedPlanSnapshot, RepoError> {
         check_dir(&self.root)?;
         check_dir(&self.root.join("plans"))?;
@@ -780,8 +779,8 @@ impl RepositoryStore {
             (true, Ok(meta)) if !meta.file_type().is_symlink() && meta.is_file() => {
                 let closure_bytes = fs::read(&closure_path)?;
                 counters.closure_files_decoded += 1;
-                let record: ClosureRecord = serde_json::from_slice(&closure_bytes)
-                    .map_err(|e| RepoError::Corrupt {
+                let record: ClosureRecord =
+                    serde_json::from_slice(&closure_bytes).map_err(|e| RepoError::Corrupt {
                         path: closure_path.clone(),
                         reason: e.to_string(),
                     })?;
@@ -883,6 +882,13 @@ impl RepositoryStore {
             }
             (false, Err(error)) if error.kind() == std::io::ErrorKind::NotFound => {}
             (false, Err(error)) => return Err(RepoError::Io(error)),
+        }
+        // A closed Plan already loaded its records for closure validation. An
+        // open Plan has not, and a caller that asked for records gets them now,
+        // still exactly once for this load.
+        if include_records && loaded_observations.is_empty() {
+            loaded_observations = self.list_observations_counted(id, counters)?;
+            loaded_supersessions = self.list_supersessions_counted(id, counters)?;
         }
         counters.plans_validated += 1;
         let effective = effective_observations(&loaded_observations, &loaded_supersessions)
@@ -1094,6 +1100,36 @@ impl PlanStore for RepositoryStore {
 }
 
 impl RepositoryStore {
+    /// Deterministic Plan-ID enumeration without any deep load.
+    ///
+    /// `PlanStore::list` keeps its documented behavior of validating every
+    /// Plan; the snapshot needs the identifiers only, because it performs its
+    /// own single deep load immediately afterwards.
+    pub(crate) fn plan_ids(&self) -> Result<Vec<PlanId>, RepoError> {
+        check_dir(&self.root)?;
+        check_dir(&self.root.join("plans"))?;
+        let mut ids = Vec::new();
+        for entry in fs::read_dir(self.root.join("plans"))? {
+            let entry = entry?;
+            let kind = entry.file_type()?;
+            if kind.is_symlink() {
+                return Err(RepoError::UnsafePath(entry.path()));
+            }
+            if !kind.is_dir() {
+                continue;
+            }
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| RepoError::Config("non-Unicode plan directory name".into()))?;
+            ids.push(PlanId::new(name).map_err(|e| RepoError::Config(e.to_string()))?);
+        }
+        ids.sort();
+        Ok(ids)
+    }
+}
+
+impl RepositoryStore {
     /// Bounded, cooperatively consistent read model for one repository-wide
     /// inspection. See [`crate::InspectionSnapshot`].
     ///
@@ -1109,11 +1145,16 @@ impl RepositoryStore {
         let subject_source = self.subject_source();
         let guard = crate::snapshot::acquire_shared_lock(&self.root, self.options.lock_timeout)?;
 
-        let subject_at_start = crate::snapshot::capture_subject(&subject_source, &mut counters).ok();
+        let subject_at_start =
+            crate::snapshot::capture_subject(&subject_source, &mut counters).ok();
 
+        // Enumerate without deep-loading: the deep load happens exactly once
+        // per selected Plan below. Calling `PlanStore::list` here would decode
+        // every Plan and discard the result, then decode the retained prefix a
+        // second time.
         let all_ids = match selection {
             InspectionSelection::One(id) => vec![id.clone()],
-            _ => self.list()?,
+            InspectionSelection::Repository { .. } => self.plan_ids()?,
         };
         debug_assert!(
             crate::snapshot::selection_is_deterministic(&all_ids),
@@ -1121,21 +1162,15 @@ impl RepositoryStore {
         );
         let total_plans = all_ids.len();
         let retain_limit = selection.retain_limit().unwrap_or(total_plans);
-        let validate_all = matches!(selection, InspectionSelection::AllValidated { .. });
 
-        let selected: Vec<PlanId> = match selection {
-            // Only the bounded prefix is touched at all, so a corrupt plan
-            // beyond it stays invisible exactly as it was before.
-            InspectionSelection::Bounded { limit } => all_ids.into_iter().take(*limit).collect(),
-            _ => all_ids,
-        };
+        let selected = all_ids;
 
         let mut plans = Vec::with_capacity(selected.len().min(retain_limit));
         let mut observations_counted = 0;
         let mut supersessions_counted = 0;
         let mut closures_counted = 0;
         for (index, id) in selected.iter().enumerate() {
-            let loaded = self.load_snapshot_unlocked(id, &mut counters)?;
+            let loaded = self.load_snapshot_unlocked(id, &mut counters, true)?;
             observations_counted += loaded.observations.len();
             supersessions_counted += loaded.supersessions.len();
             closures_counted += usize::from(loaded.closure.is_some());
@@ -1145,7 +1180,7 @@ impl RepositoryStore {
             } else {
                 // Validated and counted, then released: `check` keeps full
                 // integrity coverage without an unbounded in-memory projection.
-                debug_assert!(validate_all);
+                debug_assert!(selection.is_repository_wide());
             }
         }
 
@@ -1153,15 +1188,17 @@ impl RepositoryStore {
         let abandoned_staging_files = self.abandoned_staging_files()?;
 
         let snapshot = crate::snapshot::seal(
-            self.repository_id.clone(),
-            subject_at_start,
-            plans,
-            total_plans,
-            observations_counted,
-            supersessions_counted,
-            closures_counted,
-            pending_closures,
-            abandoned_staging_files,
+            crate::snapshot::SealedInput {
+                repository_id: self.repository_id.clone(),
+                subject_at_start,
+                plans,
+                total_plans,
+                observations_counted,
+                supersessions_counted,
+                closures_counted,
+                pending_closures,
+                abandoned_staging_files,
+            },
             &subject_source,
             counters,
         )?;
@@ -1231,14 +1268,14 @@ impl RepositoryStore {
     }
 }
 
-struct LockGuard(File);
+pub(crate) struct LockGuard(File);
 impl Drop for LockGuard {
     fn drop(&mut self) {
         let _ = self.0.unlock();
     }
 }
 
-fn acquire_lock(root: &Path, timeout: Duration) -> Result<LockGuard, RepoError> {
+pub(crate) fn acquire_lock(root: &Path, timeout: Duration) -> Result<LockGuard, RepoError> {
     let path = root.join(".lock");
     if let Ok(meta) = fs::symlink_metadata(&path)
         && (meta.file_type().is_symlink() || !meta.is_file())
@@ -1396,14 +1433,8 @@ mod tests {
     use super::*;
     use crate::GitSubjectError;
     use eggplan_core::{
-        AcceptanceCriterion, AssessmentStatus, ClosureCandidate, ClosureId, CriterionId,
-        EvidenceCardinality, EvidenceKind, EvidenceObservation, EvidenceObservationId,
-        EvidenceObservationInput, EvidenceProviderId, EvidenceRequirement, EvidenceStatus, Plan,
-        PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus, ProviderDescriptor,
-        ProviderPolicyEntry, ProviderRegistry, SubjectRevision, SubjectState, VerificationDigest,
-        assess_plan, effective_observations,
+        ClosureCandidate, ClosureId, Plan, PlanId, PlanStatus, SubjectRevision, SubjectState,
     };
-    use git2::{Repository, Signature};
     use std::collections::VecDeque;
     use std::sync::Mutex;
     use tempfile::tempdir;
@@ -1433,117 +1464,14 @@ mod tests {
         }
     }
 
-    fn init_git_repo(root: &Path) -> Repository {
-        let repo = Repository::init(root).unwrap();
-        fs::write(root.join("tracked.txt"), b"base\n").unwrap();
-        let mut index = repo.index().unwrap();
-        index.add_path(Path::new("tracked.txt")).unwrap();
-        index.write().unwrap();
-        let tree_id = index.write_tree().unwrap();
-        let tree = repo.find_tree(tree_id).unwrap();
-        let sig = Signature::now("Eggplan Test", "eggplan@example.invalid").unwrap();
-        repo.commit(Some("HEAD"), &sig, &sig, "initial", &tree, &[])
-            .unwrap();
-        drop(tree);
-        repo
-    }
-
-    fn close_ready_store(root: &Path) -> (RepositoryStore, Plan, SubjectRevision) {
-        let store = RepositoryStore::open(root).unwrap();
-        let subject = store.subject_source().capture().unwrap();
-        let binding = VerificationDigest::new(format!("sha256:{}", "c".repeat(64))).unwrap();
-        let mut plan = Plan::new(
-            PlanId::new("ep_revalidate").unwrap(),
-            "revalidate closure subject",
-            vec![PlanItem {
-                id: PlanItemId::new("epi_revalidate").unwrap(),
-                position: 0,
-                parent: None,
-                dependencies: vec![],
-                status: PlanItemStatus::Completed,
-                description: "revalidate closure subject".into(),
-                criteria: vec![AcceptanceCriterion {
-                    id: CriterionId::new("epc_revalidate").unwrap(),
-                    statement: "designated test passed".into(),
-                    human_judgment_allowed: false,
-                    requirements: vec![EvidenceRequirement {
-                        description: "designated test invocation".into(),
-                        kind: EvidenceKind::Test,
-                        provider: None,
-                        subject_policy: eggplan_core::SubjectPolicy::Exact,
-                        cardinality: EvidenceCardinality::Any,
-                        min_count: 1,
-                        allow_human_judgment: false,
-                        expected_verification_digest: Some(binding.clone()),
-                    }],
-                }],
-                blocker: None,
-                next_action: None,
-            }],
-        )
-        .unwrap();
-        plan.subject = Some(subject.clone());
-        store.create(&plan).unwrap();
-        plan.revision = 1;
-        plan.status = PlanStatus::Active;
-        let plan = store.compare_and_swap(&plan.id, 0, &plan).unwrap();
-        let observation = EvidenceObservation::finalize(EvidenceObservationInput {
-            id: EvidenceObservationId::new("epe_revalidate_pass").unwrap(),
-            provider_id: EvidenceProviderId::new("epp_test").unwrap(),
-            kind: EvidenceKind::Test,
-            status: EvidenceStatus::Passed,
-            subject: subject.clone(),
-            observed_at_unix_ms: 11,
-            invocation_ref: Some("cargo test".into()),
-            verification_digest: Some(binding),
-            result_metadata: Default::default(),
-            artifacts: vec![],
-        })
-        .unwrap();
-        store.append_observation(&plan.id, &observation).unwrap();
-        (store, plan, subject)
-    }
+    use crate::test_support::{init_git_repo, ready_plan, seed_observations};
 
     fn build_complete_candidate(
         store: &RepositoryStore,
         plan: &Plan,
         subject: &SubjectRevision,
     ) -> ClosureCandidate {
-        let policy = vec![ProviderPolicyEntry {
-            provider_id: EvidenceProviderId::new("epp_test").unwrap(),
-            class: "host".into(),
-            allowed_kinds: [EvidenceKind::Test].into_iter().collect(),
-        }];
-        let observations = store.list_observations(&plan.id).unwrap();
-        let supersessions = store.list_supersessions(&plan.id).unwrap();
-        let effective: Vec<_> = effective_observations(&observations, &supersessions)
-            .unwrap()
-            .into_iter()
-            .cloned()
-            .collect();
-        let mut providers = ProviderRegistry::default();
-        providers
-            .register_trusted(
-                ProviderDescriptor::new(
-                    EvidenceProviderId::new("epp_test").unwrap(),
-                    String::from("host"),
-                    [EvidenceKind::Test],
-                )
-                .unwrap(),
-            )
-            .unwrap();
-        let assessment = assess_plan(plan, subject, &effective, &providers);
-        assert_eq!(assessment.status, AssessmentStatus::Complete);
-        ClosureCandidate::build(
-            plan,
-            subject.clone(),
-            assessment,
-            &observations,
-            &supersessions,
-            policy,
-            12,
-        )
-        .unwrap()
+        crate::test_support::complete_candidate(store, plan, subject, None, None)
     }
 
     fn assert_no_partial_closure_state(store: &RepositoryStore, plan_id: &PlanId) {
@@ -1551,6 +1479,14 @@ mod tests {
         let plan_dir = store.root().join("plans").join(plan_id.as_str());
         assert!(!plan_dir.join("closure.json").exists());
         assert!(!plan_dir.join("closure.pending.json").exists());
+    }
+
+    fn close_ready_store(root: &Path) -> (RepositoryStore, Plan, SubjectRevision) {
+        let store = RepositoryStore::open(root).unwrap();
+        let subject = store.subject_source().capture().unwrap();
+        let plan = ready_plan(&store, "ep_revalidate", &subject);
+        seed_observations(&store, &plan, &subject, 1);
+        (store, plan, subject)
     }
 
     #[test]

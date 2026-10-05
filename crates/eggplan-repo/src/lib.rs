@@ -74,9 +74,41 @@
 //! }
 //! ```
 
+//! # Repository inspection snapshot boundary
+//!
+//! `RepositoryStore::inspection_snapshot` is the only supported multi-plan read
+//! entry point. It captures the Git subject exactly twice per inspection using
+//! the repository's configured `GitSubjectSource`, refuses to return a
+//! snapshot whose subject drifted, and exposes no injectable subject authority.
+//! Its algorithmic counters are crate-private instrumentation.
+//!
+//! ```compile_fail
+//! use eggplan_repo::SnapshotCounters;
+//! fn _assert_counters_are_private(_: SnapshotCounters) {}
+//! ```
+//!
+//! ```compile_fail
+//! fn _assert_no_injected_inspection_subject(
+//!     store: &eggplan_repo::RepositoryStore,
+//!     capture: &dyn eggplan_repo::SubjectCapture,
+//! ) {
+//!     let _ = (store, capture);
+//! }
+//! ```
+//!
+//! ```compile_fail
+//! fn _assert_snapshot_is_not_serialized(
+//!     snapshot: eggplan_repo::InspectionSnapshot,
+//! ) -> String {
+//!     serde_json::to_string(&snapshot).unwrap()
+//! }
+//! ```
+
 mod git_subject;
 pub(crate) mod snapshot;
 mod store;
+#[cfg(test)]
+pub(crate) mod test_support;
 
 pub use git_subject::{
     GitSubjectError, GitSubjectFingerprintV1, GitSubjectOptions, GitSubjectSource,

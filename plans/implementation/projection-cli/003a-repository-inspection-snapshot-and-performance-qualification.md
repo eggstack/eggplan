@@ -1,6 +1,6 @@
 # Projection and CLI M003a — Repository Inspection Snapshot and Performance Qualification
 
-Status: ready
+Status: closing
 
 Repository baseline: 71904570e908a15c099f9b2804cabfbccf9ae51a
 

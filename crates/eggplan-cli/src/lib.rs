@@ -13,7 +13,7 @@ use eggplan_projection::{
     OutputEnvelope, PlanDetail, PlanSummary, graph_projection, readiness_projection, reason_code,
     registry_projection, summarize_plan,
 };
-use eggplan_repo::{PlanStore, RepoError, RepositoryStore};
+use eggplan_repo::{InspectionSelection, PlanStore, RepoError, RepositoryStore};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -412,36 +412,54 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
         "status" => {
             require_positions(&args, 0, 1)?;
             let store = read_store(&state_root, &command, args.json)?;
-            let ids = if let Some(raw) = args.positional.first() {
-                vec![plan_id(raw, &command, args.json)?]
-            } else {
-                store
-                    .list()
-                    .map_err(|error| repo_failure(&command, error, args.json))?
+            let selection = match args.positional.first() {
+                Some(raw) => InspectionSelection::One(plan_id(raw, &command, args.json)?),
+                // Repository-wide status retains 100 projected plans.
+                None => InspectionSelection::Repository { retain: Some(100) },
             };
-            let total_plans = ids.len();
+            let snapshot = store
+                .inspection_snapshot(&selection)
+                .map_err(|error| repo_failure(&command, error, args.json))?;
             let mut warnings = Vec::new();
-            let plans = ids
-                .into_iter()
-                .take(100)
-                .map(|id| {
-                    let plan = store
-                        .get(&id)
-                        .map_err(|error| repo_failure(&command, error, args.json))?;
-                    let (subject, assessment, closure) =
-                        summary_context(&store, &plan, None, &command, args.json)?;
-                    if subject.is_none() {
-                        warnings.push("current_subject_unavailable".into());
-                    }
-                    Ok(summarize_plan(&plan, subject, assessment.as_ref(), closure))
+            let empty_registry = ProviderRegistry::default();
+            let plans = snapshot
+                .plans()
+                .iter()
+                .map(|loaded| {
+                    let (subject, assessment) = match snapshot.subject() {
+                        Some(subject) => (
+                            Some(subject.clone()),
+                            Some(assess_plan(
+                                loaded.plan(),
+                                subject,
+                                loaded.effective(),
+                                &empty_registry,
+                            )),
+                        ),
+                        None => {
+                            warnings.push("current_subject_unavailable".into());
+                            (None, None)
+                        }
+                    };
+                    Ok(summarize_plan(
+                        loaded.plan(),
+                        subject,
+                        assessment.as_ref(),
+                        loaded.closure().is_some(),
+                    ))
                 })
                 .collect::<Result<Vec<_>, CliFailure>>()?;
             let data = StatusData {
                 plans,
-                total_plans,
-                truncated: total_plans > 100,
+                total_plans: snapshot.total_plans(),
+                truncated: snapshot.truncated(),
             };
-            success(&args, data, warnings, format!("{total_plans} plan(s)"))
+            success(
+                &args,
+                data,
+                warnings,
+                format!("{} plan(s)", snapshot.total_plans()),
+            )
         }
         "ready" => {
             require_positions(&args, 1, 1)?;
@@ -594,48 +612,33 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
         RepositoryStore::open(root).map_err(|error| repo_failure(command, error, args.json))?;
         store = read_store(root, command, args.json)?;
     }
-    let ids = if let Some(raw) = args.positional.first() {
-        vec![plan_id(raw, command, args.json)?]
-    } else {
-        store
-            .list()
-            .map_err(|error| repo_failure(command, error, args.json))?
-    };
     let policy = args
         .options
         .get("--provider-policy")
         .map(|path| load_policy(path, args.json))
         .transpose()?;
+    let selection = match args.positional.first() {
+        Some(raw) => InspectionSelection::One(plan_id(raw, command, args.json)?),
+        // `check` deep-validates every plan and retains 100 projections.
+        None => InspectionSelection::Repository { retain: Some(100) },
+    };
+    let snapshot = store
+        .inspection_snapshot(&selection)
+        .map_err(|error| repo_failure(command, error, args.json))?;
     let empty_registry = ProviderRegistry::default();
     let registry = policy
         .as_ref()
         .map_or(&empty_registry, |policy| &policy.registry);
-    let mut observation_count = 0;
-    let mut supersession_count = 0;
-    let mut closure_count = 0;
+    let observation_count = snapshot.observations_counted();
+    let supersession_count = snapshot.supersessions_counted();
+    let closure_count = snapshot.closures_counted();
     let mut checked_plans = Vec::new();
-    for id in &ids {
-        let plan = store
-            .get(id)
-            .map_err(|error| repo_failure(command, error, args.json))?;
-        let observations = store
-            .list_observations(id)
-            .map_err(|error| repo_failure(command, error, args.json))?;
-        let supersessions = store
-            .list_supersessions(id)
-            .map_err(|error| repo_failure(command, error, args.json))?;
-        observation_count += observations.len();
-        supersession_count += supersessions.len();
-        let closure = store
-            .closure_record(id)
-            .map_err(|error| repo_failure(command, error, args.json))?;
-        closure_count += usize::from(closure.is_some());
-        let current_subject = store.subject_source().capture().ok();
-        let (state, assessment_status, reason_codes) = if let Some(subject) = &current_subject {
-            let effective = effective_observations(&observations, &supersessions)
-                .map_err(|message| failure(command, "corrupt_evidence", message, args.json))?;
-            let effective: Vec<_> = effective.into_iter().cloned().collect();
-            let assessment = assess_plan(&plan, subject, &effective, registry);
+    for loaded in snapshot.plans() {
+        let plan = loaded.plan();
+        let closure = loaded.closure();
+        let current_subject = snapshot.subject();
+        let (state, assessment_status, reason_codes) = if let Some(subject) = current_subject {
+            let assessment = assess_plan(plan, subject, loaded.effective(), registry);
             let mut codes: Vec<_> = assessment.reasons.iter().map(reason_code).collect();
             codes.extend(
                 assessment
@@ -657,11 +660,11 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
             let state = if has_stale_subject {
                 "stale"
             } else {
-                assessment_state(assessment.status, &observations)
+                assessment_state(assessment.status, loaded.active_observations())
             };
             (state.to_string(), Some(assessment.status), codes)
         } else {
-            warnings.push(format!("current_subject_unavailable:{id}"));
+            warnings.push(format!("current_subject_unavailable:{}", plan.id));
             (
                 "unavailable".into(),
                 None,
@@ -669,7 +672,7 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
             )
         };
         checked_plans.push(CheckedPlan {
-            plan_id: id.clone(),
+            plan_id: plan.id.clone(),
             integrity: "valid".into(),
             state,
             assessment_status,
@@ -677,15 +680,11 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
             current_subject_available: current_subject.is_some(),
         });
     }
-    let abandoned = store
-        .abandoned_staging_files()
-        .map_err(|error| repo_failure(command, error, args.json))?
-        .len();
-    let plans_truncated = checked_plans.len() > 100;
-    checked_plans.truncate(100);
+    let abandoned = snapshot.abandoned_staging_files().len();
+    let plans_truncated = snapshot.truncated();
     let data = CheckData {
-        repository_id: store.repository_id().into(),
-        plans_checked: ids.len(),
+        repository_id: snapshot.repository_id().into(),
+        plans_checked: snapshot.total_plans(),
         observations_checked: observation_count,
         supersessions_checked: supersession_count,
         closures_checked: closure_count,
@@ -702,7 +701,7 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
         warnings,
         format!(
             "checked {} plan(s), {observation_count} observation(s), {closure_count} closure(s)",
-            ids.len()
+            snapshot.total_plans()
         ),
     )
 }
@@ -1174,39 +1173,30 @@ fn registry_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, C
     }
     require_positions(args, 1, 1)?;
     let store = read_store(root, "registry render", args.json)?;
-    let ids = store
-        .list()
+    // `registry render` projects every plan, so retention is unbounded by
+    // design; this matches the pre-snapshot behavior exactly.
+    let snapshot = store
+        .inspection_snapshot(&InspectionSelection::Repository { retain: None })
         .map_err(|error| repo_failure("registry render", error, args.json))?;
-    let mut plans = Vec::with_capacity(ids.len());
+    let mut plans = Vec::with_capacity(snapshot.plans().len());
     let mut warnings = Vec::new();
     let empty_registry = ProviderRegistry::default();
-    let has_plans = !ids.is_empty();
-    for id in ids {
-        let plan = store
-            .get(&id)
-            .map_err(|error| repo_failure("registry render", error, args.json))?;
-        let closure = store
-            .closure_record(&id)
-            .map_err(|error| repo_failure("registry render", error, args.json))?
-            .is_some();
-        let assessment = if let Ok(subject) = store.subject_source().capture() {
-            let observations = store
-                .list_observations(&id)
-                .map_err(|error| repo_failure("registry render", error, args.json))?;
-            let supersessions = store
-                .list_supersessions(&id)
-                .map_err(|error| repo_failure("registry render", error, args.json))?;
-            let effective =
-                effective_observations(&observations, &supersessions).map_err(|message| {
-                    failure("registry render", "corrupt_evidence", message, args.json)
-                })?;
-            let effective: Vec<_> = effective.into_iter().cloned().collect();
-            Some(assess_plan(&plan, &subject, &effective, &empty_registry))
-        } else {
-            warnings.push(format!("current_subject_unavailable:{id}"));
-            None
+    let has_plans = !snapshot.plans().is_empty();
+    for loaded in snapshot.plans() {
+        let closure = loaded.closure().is_some();
+        let assessment = match snapshot.subject() {
+            Some(subject) => Some(assess_plan(
+                loaded.plan(),
+                subject,
+                loaded.effective(),
+                &empty_registry,
+            )),
+            None => {
+                warnings.push(format!("current_subject_unavailable:{}", loaded.plan().id));
+                None
+            }
         };
-        plans.push((plan, closure, assessment));
+        plans.push((loaded.plan().clone(), closure, assessment));
     }
     let projection = registry_projection(store.repository_id(), plans);
     let human = format!(
@@ -1589,6 +1579,14 @@ fn repo_failure(command: &str, error: RepoError, json: bool) -> CliFailure {
         RepoError::InvalidPlan { reason, .. } => ("invalid_plan", reason),
         RepoError::UnsafePath(_) => ("unsafe_path", "repository contains an unsafe path".into()),
         RepoError::LockTimeout => ("lock_timeout", "repository lock timed out".into()),
+        RepoError::SubjectDrift => (
+            "subject_drifted_during_inspection",
+            "git subject changed while the repository was being inspected".into(),
+        ),
+        RepoError::InspectionSubject(_) => (
+            "subject_unavailable",
+            "git subject could not be captured during repository inspection".into(),
+        ),
         other => ("repository_error", other.to_string()),
     };
     failure(command, code, message, json)

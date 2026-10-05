@@ -3,11 +3,11 @@
 Index: [overview](overview.md) · Normative companion: [markdown-interchange](markdown-interchange.md).
 Status context: projection/CLI M002 (loss-aware Markdown import + deterministic render) is closed
 (`plans/subsystems/projection-cli-roadmap.md:41-56`, registered closed with closure evidence at
-`plans/registry.md:76`); fixtures re-pinned to CodeGG head
+`plans/registry.md:77`); fixtures re-pinned to CodeGG head
 `5f4532659dbf0df2cd9f2b3bdb024217d2ea7868` (`crates/eggplan-markdown/tests/fixtures.rs:10-17`).
 Roadmap M003 (ergonomics/performance, `plans/subsystems/projection-cli-roadmap.md:58`) has **no**
 registered implementation plan and no closure evidence — the registry records it as waiting for real
-repository use (`plans/registry.md:57`, `plans/registry.md:142`). Nothing in this crate should be
+repository use (`plans/registry.md:57`, `plans/registry.md:180`). Nothing in this crate should be
 read as M003 evidence.
 
 ## 1. Crate role: bounded parser/renderer, never authority

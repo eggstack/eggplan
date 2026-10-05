@@ -156,20 +156,20 @@ form a control surface, not documentation decoration:
   into a passing result because it appears in the source plan. The full
   evidence vocabulary is pass/fail/timeout/environmental block/skipped/not
   run/unavailable external evidence, recorded truthfully (`003 §7`,
-  `AGENTS.md` hygiene rule, `registry.md:241`).
+  `AGENTS.md` hygiene rule, `registry.md:279`).
 - **Corrective-plan convention.** Later findings never silently rewrite an
   accepted closure except for factual errata; a new corrective plan references
   its predecessor, enumerates every unclosed finding, identifies controlling
   semantics, adds regression evidence that would have detected the defect, and
   updates registry/roadmap lineage (`003 §9` `:107`–`:116`). Evidence M002
   C001/C002/C003 is the worked example, including explicit non-blocking
-  scoping (`registry.md:103`–`:108`, `:245`–`:246`).
-- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:169`–
-  `:235` (canonical JSON freeze, provider-identity authority, append-only
+  scoping (`registry.md:105`–`:110`, `:283`–`:284`).
+- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:205`–
+  `:265` (canonical JSON freeze, provider-identity authority, append-only
   evidence, finalizer-owned subject capture, test-seam containment,
   Markdown-import limits, staged CodeGG adoption, and the frozen
   `capture_git_subject_fingerprint` digest contract at gate 23) plus the
-  hygiene rules at `registry.md:237`–`:246` (register before handoff,
+  hygiene rules at `registry.md:275`–`:284` (register before handoff,
   preserve historical closure/use corrective plans, record exact evidence and
   unrun/blocked checks, sync/deterministic core, no hidden model reasoning in
   persisted schemas, non-blocking hygiene must not serialize independent
@@ -185,9 +185,15 @@ Layout and hygiene, verified by enumeration rather than asserted:
   `NNN-cNNN-short-title.md` / `NNN-cNNN-closed.md`.
 - `implementation/` and `closure/` use the same five subsystem directories
   (`codegg-integration`, `eggstack-integration`, `evidence-closure`,
-  `foundation-core`, `projection-cli`), 17 implementation plans against 17
-  closure records. Every plan in `registry.md:64`–`:82` resolves to an existing
-  closure file; no plan lacks one, and no closure record is orphaned.
+  `foundation-core`, `projection-cli`), 19 implementation plans against 17
+  closure records as of `60a5f92`. The two-plan difference is correct, not a gap:
+  Evidence M002 C004 and CodeGG M003 C002 are registered with status `ready` and
+  have no closure record yet, because
+  `plans/003-planning-process.md` §7 requires a closure record to distinguish
+  planned from actually-run commands and must never be written from a plan. Every
+  `closed` row in the registry resolves to an existing closure file, and no
+  closure record is orphaned. Re-derive both counts by enumeration rather than
+  trusting this line — they change whenever a plan is registered or closed.
 - The two "historical" qualifications are real and bounded, not
   discrepancies: Foundation M002 is `conditionally closed` (registry
   `:67`, platform caveat resolved by M003) and CodeGG M003's
@@ -235,14 +241,17 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    `crates/eggplan-repo/src/lib.rs` are the one authority check that runs on
    every OS.
 4. **`registry.md` cites a plan path that does not exist.**
-   `registry.md:120` names
+   `registry.md:154` names
    `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
    as the "upstream provenance predecessor", but `plans/implementation/`
    contains only the five subsystem directories; no such file or directory is
    present. The underlying work closed in the CodeGG repository, so this is a
    cross-repository pointer rendered as an in-repo path, and a reader cannot
    tell "never lived here" from "lost". Every other implementation-plan
-   citation in the registry resolves.
+   citation in the registry resolves. A registered corrective now owns marking
+   the path as a CodeGG repository path: CodeGG M003 C002
+   (`plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md`,
+   §7, status `ready`).
 5. **`check-codegg-compat-boundary.sh` is asymmetric about manifest
    sections.** Only the `eggplan-repo` guard is `[dependencies]`-scoped, so a
    dev-dependency on `eggplan-repo` is deliberately allowed. The CodeGG and

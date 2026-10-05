@@ -1,6 +1,7 @@
 # CodeGG Integration Roadmap
 
-Status: M001-M003 and C001 closed; the roadmap is terminal
+Status: M001-M003 and C001 closed; the roadmap is terminal. C002 is an open
+non-blocking tooling corrective, not a reopened milestone.
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -207,6 +208,35 @@ State as of this roadmap update:
 - No Eggplan plan was blocked by C001. Interoperability/distribution stays
   deferred by its own disposition; Projection/CLI M003 still waits for real
   repository use; Eggstack M003 still needs its Eggbench recheck.
+
+### C002 — Compatibility boundary-guard completeness
+
+Status: ready; registered at `60a5f92`. Open tooling corrective, non-blocking.
+
+Plan: plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md
+
+Closure: not yet written. A closure record is created only from real evidence
+after implementation, per plans/003-planning-process.md §7.
+
+A code-verified architecture review of the M003 ownership boundary found that
+`scripts/check-codegg-compat-boundary.sh:34` fails on process, network, and
+database access but not on filesystem access, so a `std::fs` use in
+`crates/eggplan-codegg-compat/src` would pass CI. The manifest guards at `:19`
+and `:24` are also not `[dependencies]`-scoped while their failure messages claim
+"production dependencies"; the `eggplan-repo` guard at `:9-17` is section-scoped,
+which is what keeps the crate's legitimate dev-dependency on `eggplan-repo`
+legal.
+
+The bridge itself is already pure: no `std::fs`, `File::`, `std::process`,
+network, or database access in its `src/`, and no production repository I/O. The
+defect is in the enforcement, not in the crate. C002 closes the guard gap, makes
+each failure message state what was actually scanned, and adds deterministic
+synthetic self-proofs following the `prove(...)` pattern already established in
+`scripts/check-closure-authority-boundary.sh:44-49`.
+
+C002 does not reopen M003 or C001, does not change the bridge's dependency set or
+any mapped semantics, and does not gate the terminal CodeGG roadmap or any other
+subsystem.
 
 ## 5. Verification
 

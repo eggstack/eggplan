@@ -12,7 +12,7 @@ was resolved by M003 (`plans/registry.md:66-68`,
 C001/C002/C003 are closed (`plans/registry.md:71-74`,
 `plans/subsystems/evidence-closure-roadmap.md`); and CodeGG integration M003
 C001, the dirty-subject fingerprint work described in §3a, is closed on the
-Eggplan side at `0dd33b7` (`plans/registry.md:80`). This note reviews the code
+Eggplan side at `0dd33b7` (`plans/registry.md:81`). This note reviews the code
 as read; it is not closure evidence.
 
 ## 1. Crate role
@@ -192,7 +192,7 @@ administrative state still changes identity — all per
 `capture_git_subject_fingerprint` (`git_subject.rs:118-137`) expose the exact
 revision, clean/dirty state, and Eggplan-native dirty digest an external host
 must persist for later exact-subject assessment. Added by CodeGG integration
-M003 C001 (`plans/registry.md:80`; the algorithm bytes were frozen from the
+M003 C001 (`plans/registry.md:81`; the algorithm bytes were frozen from the
 pre-C001 implementation, see the next bullet).
 
 - **Versioned and strict.** `SCHEMA_VERSION == 1`; `deny_unknown_fields`;

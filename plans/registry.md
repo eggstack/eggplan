@@ -53,9 +53,9 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | closed/current | M002 and C001/C002/C003 closed; non-blocking C003 hygiene complete | plans/subsystems/evidence-closure-roadmap.md |
+| Evidence/closure | corrective required | M002 and C001/C002/C003 closed; C004 registered and ready — open durability defect: ordinary CAS can rewrite a Closed Plan, desynchronizing it from its ClosureRecord and leaving the state root unopenable | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
-| CodeGG integration | closed/current | M001-M003 and C001 closed; the roadmap is terminal | plans/subsystems/codegg-integration-roadmap.md |
+| CodeGG integration | closed/current | M001-M003 and C001 closed; the roadmap is terminal. C002 registered and ready as non-blocking tooling hardening: the bridge source is already pure, but `check-codegg-compat-boundary.sh` does not grep filesystem access | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 provider SPI and M002 Eggwork/Eggsearch adapters closed; M003 ready for planning against rechecked Eggbench contract | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
@@ -72,12 +72,14 @@ Planning-system bootstrap:
 | Evidence | M002 C001 finalization subject revalidation | closed | plans/implementation/evidence-closure/002-c001-finalization-subject-revalidation.md | historical closure plans/closure/evidence-closure/002-c001-closed.md |
 | Evidence | M002 C002 finalization test-seam containment + closure evidence reconciliation | closed | plans/implementation/evidence-closure/002-c002-finalization-test-seam-containment-and-closure-evidence-reconciliation.md | closure plans/closure/evidence-closure/002-c002-closed.md; preserves M002/C001 historical closures |
 | Evidence | M002 C003 closure reference + authority-guard hygiene | closed | plans/implementation/evidence-closure/002-c003-closure-reference-and-authority-guard-hygiene.md | closure plans/closure/evidence-closure/002-c003-closed.md; non-blocking maintenance |
+| Evidence | M002 C004 Closed-Plan CAS immutability | ready | plans/implementation/evidence-closure/002-c004-closed-plan-cas-immutability.md | open corrective; no closure record until implemented. Restores design gate 10: ordinary CAS must not modify a Closed Plan |
 | Projection/CLI | M001 CLI control surface + derived registry | closed | plans/implementation/projection-cli/001-cli-control-surface-and-derived-registry.md | closure plans/closure/projection-cli/001-closed.md |
 | Projection/CLI | M002 loss-aware Markdown import + deterministic render | closed | plans/implementation/projection-cli/002-loss-aware-markdown-import-and-deterministic-render.md | closure plans/closure/projection-cli/002-closed.md |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | closed | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | closure plans/closure/codegg-integration/002-closed.md; Eggplan bridge 088968b + 1291799, CodeGG adoption 3e992291/3c7438c7, CodeGG closure ffa1c15e |
 | CodeGG integration | M003 repository Plan binding contract | closed | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Eggplan contract implementation `3f7c603` qualified by hosted run `36868055136`; the CodeGG consumer is implemented at CodeGG `53dea47f` and hosted-qualified there by run `36938461935` (success), satisfying the former condition. Closure: plans/closure/codegg-integration/003-conditionally-closed.md |
 | CodeGG integration | M003 C001 dirty-subject fingerprint + bound-evidence requalification | closed | plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md | Eggplan fingerprint contract implemented at `0dd33b7` (hosted run `37063328954`, all four jobs green; earlier Windows failures `37062437251`/`37062837529` retained as non-passing evidence); CodeGG half implemented at `36ec9322`, pinned `0dd33b7` and consumed the API in `3623f65e` + `b470865a` (PR `dbowm91/codegg#90`, hosted `CI` `37084905013` green on `main`). Closure: plans/closure/codegg-integration/003-c001-closed.md. Historical M003 remains closed. |
+| CodeGG integration | M003 C002 compatibility boundary-guard completeness | ready | plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md | open corrective; no closure record until implemented. Non-blocking tooling hardening — the bridge source is already pure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 
@@ -107,12 +109,44 @@ The non-blocking maintenance correction is closed:
 
 C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
 
+Two corrective plans are registered and open as of `60a5f92`, both raised by a
+code-verified architecture review rather than by a failed or skipped check. All
+planned verification was run and green at that baseline; both defects are
+inference- and reachability-established, not test failures.
+
+- Evidence M002 C004 — ready, blocking within its own subsystem. Ordinary
+  compare-and-swap accepts a `Closed` → `Closed` rewrite at
+  `crates/eggplan-repo/src/store.rs:928-937`: the guarded-closure guard only
+  fires when the current status is not `Closed`, and the transition check
+  short-circuits when `next.status == current.status`, so
+  `plan_transition_allowed` is never consulted and has no `Closed` row anyway.
+  `Plan::validate` does not inspect status. `atomic_write` commits at
+  `revision + 1` before the re-read fails `ClosureRecord::validate`, which pins
+  revision and digest, so the plan and the whole state root stop opening with no
+  recovery path. Blast radius is durable availability, not closure bypass: no
+  record is forged and no authority is gained. `tests/repository.rs:291-311`
+  covers only `Draft` → `Closed`.
+- CodeGG M003 C002 — ready, non-blocking tooling hardening.
+  `scripts/check-codegg-compat-boundary.sh:34` guards process, network, and
+  database access but not filesystem access, so a `std::fs` use in the bridge
+  source would pass CI. The bridge source is already pure; the defect is in the
+  enforcement. The same script's manifest guards are not `[dependencies]`-scoped
+  while their failure messages claim "production dependencies".
+
+C004 gates further Evidence/closure work until closed. CodeGG M003 C002 does not
+gate the CodeGG integration roadmap, which stays terminal, nor any other
+subsystem.
+
 ## Current execution order
 
 1. Foundation M001/M002/M003 — closed/current foundation.
 2. Evidence M001 + C001 — closed; v2 verification binding is current.
-3. Evidence M002 + C001 + C002 — closed/current guarded closure and subject
-   authority.
+3. Evidence M002 + C001 + C002 + C003 — closed guarded closure, subject
+   authority, and guard hygiene. **Next priority: Evidence M002 C004**
+   (`plans/implementation/evidence-closure/002-c004-closed-plan-cas-immutability.md`,
+   status ready) — restore Closed-Plan CAS immutability. C004 gates further
+   Evidence/closure work. It does not gate Projection/CLI, CodeGG, or Eggstack
+   capability plans, which remain independently closable.
 4. CodeGG Integration M001 — historically closed.
 5. Eggstack Provider SPI M001 — historically closed.
 6. Projection/CLI M001 — historically closed.
@@ -139,6 +173,10 @@ C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002.
      the pin bump in `3623f65e`/`b470865a`). The CodeGG integration roadmap is
      terminal; Projection/CLI M003, Eggstack M003, and other capability work
      never had to serialize on it;
+   - CodeGG M003 C002 boundary-guard completeness
+     (`plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md`,
+     status ready) is open and non-blocking. It hardens the static ownership
+     guard only; the bridge is already pure and the roadmap stays terminal;
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
    - Eggstack M003 Eggbench/CI/forge adapters are ready for planning after the
      recheck above.

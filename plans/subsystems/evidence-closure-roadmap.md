@@ -161,6 +161,39 @@ adds deterministic negative-proof coverage, and cleans stale registry wording.
 C003 does not gate Projection/CLI M002, CodeGG M002, or Eggstack M002; those
 capability handoffs may execute independently in parallel.
 
+### M002 C004 — Closed-Plan CAS immutability
+
+Status: ready; registered at `60a5f92`. Open correctness/persistence corrective.
+
+Plan: plans/implementation/evidence-closure/002-c004-closed-plan-cas-immutability.md
+
+Closure: not yet written. A closure record is created only from real evidence
+after implementation, per plans/003-planning-process.md §7.
+
+A code-verified architecture review of M002 found that ordinary
+compare-and-swap accepts a `Closed` → `Closed` rewrite at
+`crates/eggplan-repo/src/store.rs:928-937`. The guarded-closure guard fires only
+when the current status is not `Closed`, and the lifecycle check short-circuits
+when `next.status == current.status`, so `plan_transition_allowed` is never
+consulted — and it has no `Closed` row regardless, because `Closed` is terminal.
+`Plan::validate` does not inspect status, so nothing constrains the rewrite.
+`atomic_write` commits the new revision before the re-read fails
+`ClosureRecord::validate`, which pins revision and digest, leaving the plan and
+the whole state root unopenable with no recovery path.
+
+This contradicts design gate 10 and the corruption rule in
+architecture/evidence.md:85-86, and no test covered it —
+`tests/repository.rs:291-311` exercises only `Draft` → `Closed`.
+
+Blast radius is durable availability, not closure bypass: no ClosureRecord is
+forged, no evidence is fabricated, and the guarded finalizer still owns the only
+legitimate path to `Closed`. C004 restores the invariant that a canonical Closed
+Plan is immutable under ordinary CAS, in any direction.
+
+C004 gates further Evidence/closure work. It does not gate Projection/CLI,
+CodeGG, or Eggstack capability plans, which remain independently closable.
+C001, C002, and C003 closures remain preserved and unqualified.
+
 ### M003 — Policy extensions
 
 Deferred. Only after consumers demonstrate need: ancestry-aware subject reuse,

@@ -221,10 +221,10 @@ the mapping auditable.
    requalification at Eggplan `0dd33b7` (run `37063328954`) and CodeGG
    `36ec9322`, with `0dd33b7` pinned and consumed in `3623f65e`/`b470865a`
    (PR `dbowm91/codegg#90`, hosted `CI` `37084905013` green on `main`).
-   `plans/registry.md:78-80` and
+   `plans/registry.md:79-81` and
    `plans/subsystems/codegg-integration-roadmap.md:3` agree: M001–M003 and C001
    closed, roadmap terminal. Note the two distinct C001s in the registry — CodeGG
-   M003 C001 (`plans/registry.md:80`) and Evidence M002 C001
+   M003 C001 (`plans/registry.md:81`) and Evidence M002 C001
    (`plans/registry.md:72`) are unrelated rows.
 2. Trust boundary is caller-side: the `EvidenceResolver` trait
    (`lib.rs:355-361`) is arbitrary host code. In-crate guards (subject/kind/ID

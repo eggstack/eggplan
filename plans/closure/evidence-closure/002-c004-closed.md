@@ -14,9 +14,13 @@ Reviewed baseline: `3d726496cc2e4e76f48000310e2c96829878106a`
 
 Implementation commit: `623dde976b83be32c737fccaeb09a239245d8325`
 
-Hosted qualification: not run for this pass. See "Verification executed" for the
-exact reason; every command in the plan's §8 list was run locally, including
-both MSRV rows, and all passed.
+Hosted qualification: GitHub Actions run
+[37263917788](https://github.com/eggstack/eggplan/actions/runs/37263917788) at
+`1ac569d`, conclusion `success`. Jobs: `native (ubuntu-latest)`
+[111616612004], `native (macos-latest)` [111616612123], `native (windows-latest)`
+[111616612034], `msrv` [111616611752] — all `success`. The Windows job runs
+`check` and `test` only, with `fmt` and the five boundary guards skipped, per
+`.github/workflows/ci.yml`.
 
 ## Executive finding
 
@@ -131,12 +135,16 @@ plan's §8 list was run; none is reported from the plan alone.
 | `bash scripts/check-projection-cli-boundary.sh` | pass |
 | `git diff --check` | pass — no whitespace errors |
 
-Not run: hosted Linux/macOS/Windows qualification and the hosted MSRV job. No
-push-triggered run identifier is recorded here because this record was authored
-before the branch was pushed. Per `plans/003-planning-process.md` §7 this is
-recorded as *not run* rather than inferred as passing; the C004 defect was
-reproducible with a local integration test, and the local MSRV rows cover the
-toolchain gate that the hosted job exists to enforce.
+Not run: nothing in the plan's §8 list. Hosted native (Linux/macOS/Windows) and
+hosted MSRV qualification were additionally run after the branch was pushed:
+GitHub Actions run
+[37263917788](https://github.com/eggstack/eggplan/actions/runs/37263917788) at
+`1ac569d`, all four jobs `success`. Those job identifiers were added to this
+record as a factual amendment after the fact; the record was first authored
+before the push, at which point hosted qualification was correctly recorded as
+not run rather than inferred as passing. Per `plans/003-planning-process.md` §7
+the amendment replaces a "not run" entry with the observed result and does not
+convert a planned command into a passing one.
 
 ## Invariant review
 

@@ -1,17 +1,21 @@
 # Deep dive: `eggplan-core` domain
 
 Index: [overview](overview.md) · Normative companions: [core](core.md), [evidence](evidence.md).
-Status context: foundation milestones M001–M003 are closed; evidence-closure M001–M002 plus
-correctives C001–C003 are closed; policy extensions (M003) are deferred.
+Status context (per `plans/registry.md`, the authority for milestone status): foundation
+M001 and M003 are closed and M002 is recorded *conditionally closed* (its platform caveat
+was resolved by M003); evidence-closure M001–M002 plus correctives C001–C003 are closed —
+note there are two distinct C001s, the evidence-closure one and the CodeGG M003 one; the
+interoperability/distribution roadmap is deferred.
 
 ## 1. Role and boundary
 
 `eggplan-core` owns deterministic domain data and pure validation: typed IDs, plan/item/
 criterion/requirement schemas, bounds, transitions, graph readiness, canonical serialization
 and digests, pure assessment, closure-candidate/record shapes, and supersession lineage.
-Crate docs state the boundary up front (`src/lib.rs:1-6`): no filesystem, process, network,
-database, scheduler, or model-runtime responsibilities. The dependency list enforces it
-(`crates/eggplan-core/Cargo.toml:9-14`): only `serde`, `serde_json`, `sha2`, `thiserror`,
+Crate docs state the boundary up front (`src/lib.rs:3-6`, under the `forbid(unsafe_code)`
+attribute on line 1): no filesystem, process, network, database, scheduler, or
+model-runtime responsibilities. The dependency list enforces it
+(`crates/eggplan-core/Cargo.toml:10-14`): only `serde`, `serde_json`, `sha2`, `thiserror`,
 `uuid`. Persistence, Git subject capture, and closure finalization belong to `eggplan-repo`;
 observation acquisition belongs to provider adapters. Notably, core's `ProviderRegistry`
 (`src/evidence.rs:140-160`) only records host-supplied trust — observation text can never
@@ -22,8 +26,13 @@ enroll its own provider.
 - `lib.rs` — re-exports, `is_execution_evidence()` (`src/lib.rs:33-42`, the five bound
   kinds: Command, Test, StaticAnalysis, DelegatedRun, Benchmark), and the `bounds` module
   (`src/lib.rs:46-67`): Unicode-scalar text limits, `MAX_ITEMS = 512`,
-  `MAX_DEPENDENCIES = 64`, `MAX_CRITERIA = 128`, `MAX_REQUIREMENTS = 32`, plus observation
-  metadata/artifact caps. `#![forbid(unsafe_code)]` (`src/lib.rs:1`).
+  `MAX_DEPENDENCIES = 64`, `MAX_CRITERIA = 128`, `MAX_REQUIREMENTS = 32`, plus the
+  observation-side caps `MAX_ARTIFACT_REFS = 64`, `MAX_OBSERVATION_METADATA = 32`,
+  `OBSERVATION_METADATA_VALUE_CHARS = 2_000`, `INVOCATION_REF_CHARS = 2_000`, and
+  `MAX_OBSERVATIONS_PER_PLAN = 10_000` (`src/lib.rs:66`). `MAX_OBSERVATIONS_PER_PLAN`
+  is *declared* here but never enforced in this crate — it is applied only by the
+  repository (`eggplan-repo/src/store.rs:969,1078`), so `assess_plan` itself is
+  observation-count-unbounded. `#![forbid(unsafe_code)]` (`src/lib.rs:1`).
 - `identity.rs` — `TypedId` trait (`src/identity.rs:76-81`) and `define_id!` macro
   (`src/identity.rs:83-148`): `ep_` / `epi_` / `epc_` / `epp_` / `epe_` / `epcl_` / `eps_`
   prefixes, ≤96 chars, ASCII alphanumerics plus `-`/`_`. `VerificationDigest`
@@ -87,9 +96,11 @@ provider mismatch (skipped, not `invalid`); human-judgment policy — kind requi
 `"human"` (`src/assessment.rs:281-289`); corrupt digest; subject inequality
 (`StaleSubject`); verification-digest presence/mismatch. Only survivors count as
 `eligible`; `Any` needs `min_count` Passed, `All` needs all eligible Passed
-(`src/assessment.rs:321-334`). Unsatisfied status within a requirement prefers failed →
-blocked → in-flight → inconclusive → missing/unavailable → stale → missing
-(`src/assessment.rs:335-374`); across requirements/criteria/items/plans, `highest()`
+(`src/assessment.rs:321-334`). The unsatisfied status is chosen in strict order: an
+`invalid` flag short-circuits to InvalidOrStale *before* any ordinary status
+(`src/assessment.rs:337-338`), then failed → blocked → in-flight → inconclusive →
+missing/unavailable → stale → missing (`src/assessment.rs:339-374`); across
+requirements/criteria/items/plans, `highest()`
 ranks InvalidOrStale 9 > Failed 8 > Blocked 7 > InFlight 6 > Missing 5 >
 AwaitingHumanJudgment 4 > Inconclusive 3 > ActionableWorkRemaining 2 > Complete 1
 (`src/assessment.rs:394-409`). Item labels never self-certify: evidence-complete but
@@ -115,8 +126,10 @@ There is no `tests/` integration directory — only `tests/fixtures/` plus inlin
 (`src/schema.rs:143-170`, `src/evidence.rs:371-435`), digest sensitivity and tamper
 rejection (`src/evidence.rs:476-497`), strict-schema rejection (§3 refs), per-status
 determinism, stale/dirty/untrusted rejection, cardinality and human-judgment policy,
-supersession cycles, and v2-binding enforcement for all five execution kinds
-(`src/model.rs:512-559`, `src/assessment.rs:511-653`).
+supersession cycles, and v2-binding enforcement for all five execution kinds on both
+the plan side and the observation side (`src/model.rs:512-559`,
+`src/evidence.rs:457-472`). The separate `src/assessment.rs:511-653` range covers only
+exact-binding matching and the legacy-unbound rejection path, not the five-kind loop.
 
 ## 6. Review findings
 
@@ -140,7 +153,7 @@ Gaps / risks / surprises:
    Related: `ClosureCandidate` carries no self `content_digest` (supersession records
    and `ClosureRecord` do); candidate integrity rests on the record digest covering it.
 3. **Precedence asymmetry is subtle**: within one requirement Inconclusive outranks
-   NotRun/Skipped/Unavailable (`src/assessment.rs:355-368`), but across requirements
+   NotRun/Skipped/Unavailable (`src/assessment.rs:354-365`), but across requirements
    `highest()` ranks Missing (5) above Inconclusive (3). Deterministic and probably
    intended, but no comment or test pins the intent — a future edit could flip either
    side without failing.
@@ -151,10 +164,35 @@ Gaps / risks / surprises:
    (`src/closure.rs:313-343`); candidate/record round-trips are presumably exercised
    from `eggplan-repo`, which is correct layering but means this crate alone does not
    prove its closure shapes. I did not verify the repo-side coverage (out of scope).
+6. **`MAX_EXTENSION_VALUE_CHARS` (`src/lib.rs:62`) is referenced nowhere in the
+   workspace** — a dead constant. Provenance-shaped values are bounded instead by the
+   near-identical twin `PROVENANCE_CHARS` (`src/lib.rs:52`), so the intended bound for
+   extension values is either unenforced or silently the provenance one.
+7. **`MAX_OBSERVATIONS_PER_PLAN` is declared but not enforced here** — core publishes the
+   cap (`src/lib.rs:66`) but only `eggplan-repo` applies it
+   (`eggplan-repo/src/store.rs:969,1078`). `assess_plan` is therefore
+   observation-count-unbounded, so a caller that assembles observations in memory pays
+   unbounded sort/fold cost. Declaring a bound in the domain crate that the domain
+   function ignores is a live trap for future embedders.
+8. **The four assessment output types deserialize without `deny_unknown_fields`**
+   (`src/assessment.rs:48-80`: `RequirementAssessment`, `CriterionAssessment`,
+   `ItemAssessment`, `PlanAssessment`) — inconsistent with the fail-closed posture every
+   other persisted type in the crate takes. Latent only, because no in-workspace path
+   parses an assessment from bytes; it becomes a real gap the moment an assessment is
+   round-tripped through storage or a transport.
+9. **`ClosureCandidate::build` copies supersession digests without validating them**
+   (`src/closure.rs:184-187` maps straight to `content_digest` with no `validate()`
+   call, unlike the satisfying-observation path above it). The repository compensates by
+   re-validating before trusting the candidate
+   (`eggplan-repo/src/store.rs:405,451-456,776-784`), so this is defence-in-depth
+   resting entirely on the caller rather than on core.
 
-No inconsistencies with [core](core.md) or [evidence](evidence.md) were found; the
-code matches both documents, including the v1/v2 binding rules and the "candidate
-builds, repository finalizes" authority split.
+No substantive inconsistencies with [evidence](evidence.md) were found; the code matches
+it, including the v1/v2 binding rules and the "candidate builds, repository finalizes"
+authority split. One documentation gap does exist in [core](core.md) itself: its bounds
+table omits all five observation-side caps and the dead `MAX_EXTENSION_VALUE_CHARS`, so a
+reader sizing a payload from `core.md` alone would miss them. Reported rather than edited
+— `core.md` is a normative doc outside this deep dive's ownership.
 
 ## 7. Verification pointers
 

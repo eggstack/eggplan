@@ -15,8 +15,10 @@ is the thin command adapter over `eggplan-core`, `eggplan-repo`,
 `eggplan-projection`, and `eggplan-markdown`
 (`crates/eggplan-cli/Cargo.toml:8-14`). `main.rs:1-3` only forwards argv to
 `eggplan_cli::run`. Neither crate may execute work, acquire evidence, run a
-network/runtime/MCP service, or edit `plans/registry.md` — enforced by
-`scripts/check-projection-cli-boundary.sh:10-30`.
+network/runtime/MCP service — enforced by
+`scripts/check-projection-cli-boundary.sh:10-30`, which also gates
+`eggplan-markdown` (`check-projection-cli-boundary.sh:15-18`). The script
+polices dependencies and process spawning only, not file writes; see finding 4.
 
 ## 2. Projection walkthrough
 
@@ -46,9 +48,9 @@ network/runtime/MCP service, or edit `plans/registry.md` — enforced by
 
 ## 3. CLI walkthrough
 
-- Entry: `run` prints pretty JSON envelope to stdout on success
-  (`crates/eggplan-cli/src/lib.rs:225-241`) and a JSON error envelope (exit 2) in
-  `--json` mode, else `command: code: message` to stderr
+- Entry: `run` prints pretty JSON envelope to stdout and returns exit 0 on
+  success (`crates/eggplan-cli/src/lib.rs:225-241`), and a JSON error envelope
+  (exit 2) in `--json` mode, else `command: code: message` to stderr
   (`lib.rs:242-256`). `execute` defaults `--state-root` to `.eggplan`
   (`lib.rs:258-266`).
 - Arg parsing is hand-rolled: `parse_args` (`lib.rs:268-328`), value options
@@ -65,6 +67,12 @@ network/runtime/MCP service, or edit `plans/registry.md` — enforced by
     newline-joined ID list) are pure reads via `open_read_only`.
   - `activate` / `item update` do explicit `--expected-revision` pre-checks, then
     `compare_and_swap` (`lib.rs:839-883`, `lib.rs:885-973`).
+  - `--expected-revision` is required by exactly the three revisioned mutations —
+    `activate` (`lib.rs:841`), `item update` (`lib.rs:898`), `close`
+    (`lib.rs:1079`) — and `validate_command_options` (`lib.rs:490-562`) rejects it
+    for every other command, so it cannot be smuggled in or dropped. Creation
+    commands (`init`, `new`, `markdown import`) are not revisioned and take no
+    such flag.
   - `evidence list|show|supersessions` are read-only briefs capped at 100 rows
     (`lib.rs:975-1062`; caps `lib.rs:27-32`; brief shape `lib.rs:86-97`).
   - `assess` requires `--provider-policy`, reads via `compute_assessment`
@@ -75,11 +83,20 @@ network/runtime/MCP service, or edit `plans/registry.md` — enforced by
     `ClosureId` — no caller-supplied subject (`lib.rs:1077-1132`).
     `closure show` returns the bounded `ClosureSummary` (`lib.rs:1134-1164`,
     `lib.rs:1347-1358`).
-  - `check` (`lib.rs:564-708`) opens read-only (`lib.rs:1443-1445`), fails with
-    `recovery_required` unless `--recover-pending` is explicit (`lib.rs:572-596`),
-    classifies per plan via `assessment_state` (`lib.rs:1323-1345`), flags stale
-    closures (`lib.rs:647-656`), and warns on unavailable subjects and abandoned
-    staging files.
+  - `check` (`lib.rs:564-708`) opens read-only (`lib.rs:1443-1445`) and fails with
+    `recovery_required` unless `--recover-pending` is explicit (`lib.rs:572-596`);
+    that flag re-opens through the mutating `RepositoryStore::open`
+    (`lib.rs:574`, `lib.rs:594`), so read-only is a default, not an invariant.
+    It classifies per plan via `assessment_state` (`lib.rs:1323-1345`) into 10
+    states — `complete`, `incomplete`, `unavailable`, `stale`, `invalid_or_stale`,
+    `in_flight`, `blocked`, `failed`, `inconclusive`, `awaiting_human_judgment` —
+    where `stale` is contributed by `check` itself (`lib.rs:657-658`) and
+    `unavailable` also covers an uncapturable subject (`lib.rs:666`). Stale
+    closures are flagged with the reason code `closure_subject_stale`
+    (`lib.rs:647-656`). It warns on unavailable subjects and abandoned staging
+    files, and accepts an optional `--provider-policy` (`lib.rs:501`,
+    `lib.rs:604-612`) that is used in memory for the report only; absent it, the
+    empty registry cannot promote any observation to trusted proof.
   - `registry render` (`lib.rs:1166-1221`) derives from canonical state with an
     empty provider registry and always warns
     `assessment_uses_empty_provider_registry` when plans exist (`lib.rs:1216-1219`).
@@ -115,7 +132,8 @@ network/runtime/MCP service, or edit `plans/registry.md` — enforced by
 ## 5. Test strategy
 
 - Projection: `crates/eggplan-projection/tests/projections.rs` — stability,
-  core-derived readiness/graph/summary, truncation flags, reason-code mapping.
+  core-derived readiness/graph/summary, truncation flags, reason-code mapping,
+  and versioned-envelope/bounded-warning assertions.
 - CLI: `crates/eggplan-cli/tests/commands.rs` — binary integration via
   `CARGO_BIN_EXE_eggplan` with a `json_ok` helper asserting
   `schema_version == 1 && ok == true` (`commands.rs:21-32`): smoke
@@ -133,20 +151,38 @@ input handling; stable closure-subject diagnostic codes.
 
 Gaps/risks/surprises:
 
-1. `assessment_state` (`lib.rs:1323-1345`) can emit `"inconclusive"`, which is not
-   in the `check` classification list in `cli-control-surface.md:63-70`. Either
-   the doc or the code needs updating; machine consumers matching the doc list
-   will see an undocumented state.
-2. Stale-subject naming is asymmetric: `check` reports `closure_subject_stale`
-   (`lib.rs:647-656`) while finalization reports `closure_subject_changed`
-   (`lib.rs:1567-1570`). Consider aligning names or documenting the distinction.
+1. The `check` state vocabulary is 10 values and both documents now agree, so
+   this is no longer an open gap: `assessment_state` (`lib.rs:1323-1345`) returns
+   `complete`, `incomplete`, `unavailable`, `invalid_or_stale`, `in_flight`,
+   `blocked`, `failed`, `inconclusive`, `awaiting_human_judgment`, and `check`
+   adds `stale` (`lib.rs:657-658`); `cli-control-surface.md:67-74` lists the same
+   ten. Worth stating explicitly: `closure_subject_stale` is a *reason code*
+   (`lib.rs:651`), not an eleventh state — it is what forces `stale`.
+2. Stale-subject naming is asymmetric: `check` reports the reason code
+   `closure_subject_stale` (`lib.rs:647-656`) while finalization reports
+   `closure_subject_changed` (`lib.rs:1567-1570`). The distinction is now spelled
+   out in `cli-control-surface.md:27-31`, so it is documented rather than
+   accidental, but the two names still invite machine-consumer confusion.
 3. Diagnostic codes are string literals scattered across `failure(...)` call sites
    plus `repo_failure`; there is no central code registry or stability test, so
    typo/drift risk is real. Pretty-printed (`to_string_pretty`) JSON envelopes
    (`lib.rs:231-249`) are also a mild surprise against the compact-canonical-JSON
    domain contract — fine for envelopes, but worth stating explicitly. Truncation
    caps are duplicated between projection (`lib.rs:12-16`) and CLI
-   (`lib.rs:27-32`, `take(100)` at `lib.rs:426,684`) rather than shared.
+   (`lib.rs:27-32`, `take(100)`/`truncate(100)` at `lib.rs:426,685`) rather than shared.
+4. The only arbitrary-path write in the CLI is `markdown render --output`
+   (`lib.rs:727-732`), and it is unchecked: no containment, no symlink
+   rejection, and no size cap, unlike `read_bounded` (`lib.rs:1447-1481`). So
+   `registry render` indeed never edits `plans/registry.md`, but
+   `markdown render PLAN --output plans/registry.md` can still clobber it. The
+   "cannot edit the registry" property holds for the projection path only, not
+   for the process as a whole.
+5. `check` is described as read-only, but `--recover-pending` deliberately
+   takes the mutating open path (`lib.rs:574`, `lib.rs:594`) to run
+   `recover_pending_closures` (`crates/eggplan-repo/src/store.rs:262`). This
+   matches `cli-control-surface.md:76-78` and is the intended recovery contract,
+   but "read-only" is a default rather than an invariant and should not be
+   restated without that qualifier.
 
 ## Verification pointers
 

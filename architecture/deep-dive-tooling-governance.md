@@ -23,18 +23,27 @@ text/regex guards — not type-system or Cargo-feature enforcement.
 
 ### `check-codegg-compat-boundary.sh` (mechanism: `awk` + `rg`)
 
-- `awk` state machine tracks the `[dependencies]` section of
+Five guards, only the first of which is section-scoped:
+
+- `awk` state machine (`:9`) tracks the `[dependencies]` section of
   `crates/eggplan-codegg-compat/Cargo.toml` and fails if `eggplan-repo =`
   appears there (dev-dependencies are out of scope for that test).
 - `rg` fails on `codegg | codegg-core =` at line start in the same manifest:
-  the bridge must not depend on CodeGG.
+  the bridge must not depend on CodeGG. Not section-scoped, so a dev- or
+  build-dependency declaration would also fail.
+- `rg` fails on `tokio | sqlx | reqwest | hyper | ureq | surf | isahc =` at
+  line start in the manifest: no async, database, or network client may enter
+  the bridge's dependency graph at all (also not section-scoped).
 - `rg` fails on `pub (struct | enum | trait | type)
   (WorkOrder | Goal | GoalVerification | TodoState | WorkPlanCheckpoint |
   ContextEpoch | AgentRunExecutor | JobExecutor | WorktreePolicy |
   SandboxPolicy)` in `src/`: the bridge owns only the WorkPlan assessment
   seam, not scheduler/runtime identity.
+- `rg` fails on `std::process | Command::new | tokio:: | reqwest:: | hyper:: |
+  sqlx:: | std::net | TcpStream | UdpSocket` anywhere in `src/`: production
+  bridge source stays free of process, network, and database access.
 
-### `check-integrations-boundary.sh` (mechanism: `grep -nE` / `grep -RInE`)
+### `check-integrations-boundary.sh` (mechanism: `grep -nE` / `grep -RInE` / `grep -q`)
 
 - Manifest: fails on `eggwork | eggsearch | eggbench | eggsact | tokio |
   reqwest | hyper | mcp | async.runtime` in
@@ -72,9 +81,12 @@ text/regex guards — not type-system or Cargo-feature enforcement.
 - `pub(crate)` forms deliberately do not match. The script header states
   compile-fail doctests remain the primary public-API boundary; this script
   catches accidental source-level exposures.
-- Includes a deterministic synthetic self-test (`prove(...)`) for
-  direct/grouped re-exports, alternate finalizers, and crate-private forms
-  before scanning the real files.
+- Includes a deterministic synthetic self-test (`prove(...)`, `:44`–`:49`)
+  for direct/grouped re-exports of all three hidden types, alternate
+  finalizers, and crate-private forms before scanning the real files. A final
+  case asserts that a commented-out `pub use store::SubjectCapture;` and a
+  plain `pub fn finalize_closure()` are both accepted, so comment-stripping
+  and the `_with_` suffix rule are proven, not assumed.
 
 ## 2. CI matrix (` .github/workflows/ci.yml`, 41 lines)
 
@@ -109,33 +121,88 @@ Focused variants: `cargo test -p <crate>` and `cargo test -p <crate> <filter>`. 
 `plans/README.md`, `plans/003-planning-process.md`, and `plans/registry.md`
 form a control surface, not documentation decoration:
 
+- **Authority order is explicit and terminating.** `003 §2` (`:13`–`:21`) ranks
+  current long-term specification and terminology → accepted ADRs → master
+  roadmap → subsystem roadmap → implementation plan → closure/corrective
+  records for what actually landed → registry as compact projection, and
+  `plans/README.md:19`–`:39` renders the same ladder graphically. An
+  implementation plan cannot silently override a long-term invariant or an
+  accepted ADR (`003 §2`). This matches the chain in `AGENTS.md` and the
+  document set: four canonical direction docs (`000`–`003`), four accepted
+  ADRs, six subsystem roadmaps.
 - **Registry as control surface.** `plans/registry.md` holds canonical
   direction, the 11-state status vocabulary (`proposed … deferred`), accepted
   ADRs, subsystem status, registered plans, external review baselines, and the
   current execution order. Per `003 §10`–`§11` it links to authority rather
   than duplicating plan content (manual until a future generated registry).
-- **Implementation-plan-before-handoff.** `plans/README.md` ("Register an
+- **Implementation-plan-before-handoff.** `plans/README.md:67` ("Register an
   implementation plan before handing it to an implementation agent") and
-  `003 §3` step 6 require a bounded, registered plan with baseline SHA,
-  readiness/dependencies, exact verification commands, and named closure
-  evidence before any implementation agent starts.
+  `003 §3` step 6 (`:33`, "Register it before execution") require a bounded,
+  registered plan before any implementation agent starts. The content of such
+  a plan is fixed by `003 §11` (`:138`–`:161`: status, repository baseline,
+  source roadmap, applicable ADRs, readiness/dependencies, exact verification
+  commands, closure evidence required) and its `ready` status is gated by
+  `003 §5` (`:52`–`:60`), which requires named closure evidence and required
+  verification that "can actually establish the claimed boundary".
 - **Closure-evidence rule.** A milestone closes only on the evidence its
-  source plan names (`plans/README.md` "Core planning rule", `003 §8`).
-  Compilation/formatting alone never closes correctness/security/persistence/
-  integration work. `conditionally closed` is allowed only with explicitly
-  named, bounded missing external evidence. Evidence vocabulary
-  (pass/fail/timeout/blocked/skipped/not-run/unavailable) must be recorded
-  truthfully (`003 §7`, `AGENTS.md` hygiene rule).
+  source plan names (`plans/README.md:51`–`:54` "Core planning rule",
+  `003 §8` `:95`–`:99`). Compilation/formatting alone never closes
+  correctness/security/persistence/**recovery**/integration work.
+  `conditionally closed` is allowed only with production implementation
+  complete and explicitly named, bounded missing external evidence — and
+  "the underlying missing evidence remains missing" (`003 §8` `:101`–`:103`).
+  `003 §7` (`:75`–`:91`) requires a closure record to distinguish *planned*
+  commands from *commands actually run*, and never convert a planned command
+  into a passing result because it appears in the source plan. The full
+  evidence vocabulary is pass/fail/timeout/environmental block/skipped/not
+  run/unavailable external evidence, recorded truthfully (`003 §7`,
+  `AGENTS.md` hygiene rule, `registry.md:241`).
 - **Corrective-plan convention.** Later findings never silently rewrite an
   accepted closure except for factual errata; a new corrective plan references
-  its predecessor, adds regression evidence, and updates registry/roadmap
-  lineage (`003 §9`). Evidence M002 C001/C002/C003 is the worked example,
-  including explicit non-blocking scoping.
-- **Design gates and hygiene.** Twenty numbered gates in `registry.md`
-  (canonical JSON freeze, provider-identity authority, append-only evidence,
-  finalizer-owned subject capture, test-seam containment, Markdown-import
-  limits, staged CodeGG adoption) plus hygiene rules (register before
-  handoff, sync/deterministic core, no hidden model reasoning in schemas).
+  its predecessor, enumerates every unclosed finding, identifies controlling
+  semantics, adds regression evidence that would have detected the defect, and
+  updates registry/roadmap lineage (`003 §9` `:107`–`:116`). Evidence M002
+  C001/C002/C003 is the worked example, including explicit non-blocking
+  scoping (`registry.md:103`–`:108`, `:245`–`:246`).
+- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:169`–
+  `:235` (canonical JSON freeze, provider-identity authority, append-only
+  evidence, finalizer-owned subject capture, test-seam containment,
+  Markdown-import limits, staged CodeGG adoption, and the frozen
+  `capture_git_subject_fingerprint` digest contract at gate 23) plus the
+  hygiene rules at `registry.md:237`–`:246` (register before handoff,
+  preserve historical closure/use corrective plans, record exact evidence and
+  unrun/blocked checks, sync/deterministic core, no hidden model reasoning in
+  persisted schemas, non-blocking hygiene must not serialize independent
+  handoffs).
+
+Layout and hygiene, verified by enumeration rather than asserted:
+
+- Naming is mechanical (`plans/README.md:60`–`:65`): ADR
+  `adrs/ADR-NNNN-short-title.md`, subsystem roadmap
+  `subsystems/<subsystem>-roadmap.md`, implementation plan
+  `implementation/<subsystem>/NNN-short-title.md`, closure record
+  `closure/<subsystem>/NNN-status.md`. Corrective work extends both to
+  `NNN-cNNN-short-title.md` / `NNN-cNNN-closed.md`.
+- `implementation/` and `closure/` use the same five subsystem directories
+  (`codegg-integration`, `eggstack-integration`, `evidence-closure`,
+  `foundation-core`, `projection-cli`), 17 implementation plans against 17
+  closure records. Every plan in `registry.md:64`–`:82` resolves to an existing
+  closure file; no plan lacks one, and no closure record is orphaned.
+- The two "historical" qualifications are real and bounded, not
+  discrepancies: Foundation M002 is `conditionally closed` (registry
+  `:67`, platform caveat resolved by M003) and CodeGG M003's
+  `003-conditionally-closed.md` has since been satisfied by hosted
+  qualification while the registry row still reads `closed` (`:79`).
+  Projection/CLI M003 is not a registered plan at all — it is unstarted work
+  awaiting real repository use (`:57`, `:142`).
+- `plans/` contains no non-Markdown files, no empty directories, and no
+  scratch artifacts across 55 files.
+- `plans/archive/` is currently README-only. Its policy (`archive/README.md`)
+  is to retain completed/superseded *interim* planning, preserve relative
+  structure, never archive canonical specs or accepted ADRs just because their
+  first implementation completed, and keep historical closure discoverable
+  under `plans/closure/`. The `archived` status in the vocabulary is therefore
+  defined but unused.
 
 ## 5. Review findings
 
@@ -153,15 +220,37 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    on Linux/macOS runners. The scripts use `rg`/`grep`/`awk`/`python3`,
    which explains the skip, but the authority boundary (`SubjectCapture`,
    `finalize_closure_with_*`) is exactly what should hold on every OS.
-2. **`fmt` only on Linux + abbreviated `README` gate.** Formatting is
-   unenforced on macOS/Windows CI, and a developer following only the
-   `README.md` dev-checks block runs two of five guards — missing the
-   integrations, codegg-compat, and closure-authority gates entirely.
+2. **`fmt` only on Linux.** Formatting is enforced only by the
+   `ubuntu-latest` leg of the `native` matrix, so a formatting violation can
+   reach `macos-latest`/`windows-latest` green. (`AGENTS.md`, `README.md`, and
+   `ci.yml` agree on the verify order and on the full five-guard gate, so a
+   contributor following either document runs the same gate CI does; an
+   earlier draft of this note wrongly claimed the `README.md` dev-checks block
+   listed only two guards — `README.md:47`–`:55` lists all five.)
 3. **Textual guards are necessary but brittle.** `grep`/`rg` catch direct
    uses but not renamed imports, feature-unified transitive deps, or new
    paths (e.g. a new `src/` file outside the two files the closure guard
    scans). The remainder rests on the doctest and review layers, which CI
-   does run cross-platform via `cargo test`.
+   does run cross-platform via `cargo test` — six `compile_fail` doctests in
+   `crates/eggplan-repo/src/lib.rs` are the one authority check that runs on
+   every OS.
+4. **`registry.md` cites a plan path that does not exist.**
+   `registry.md:120` names
+   `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
+   as the "upstream provenance predecessor", but `plans/implementation/`
+   contains only the five subsystem directories; no such file or directory is
+   present. The underlying work closed in the CodeGG repository, so this is a
+   cross-repository pointer rendered as an in-repo path, and a reader cannot
+   tell "never lived here" from "lost". Every other implementation-plan
+   citation in the registry resolves.
+5. **`check-codegg-compat-boundary.sh` is asymmetric about manifest
+   sections.** Only the `eggplan-repo` guard is `[dependencies]`-scoped, so a
+   dev-dependency on `eggplan-repo` is deliberately allowed. The CodeGG and
+   async/db/network guards are plain line-start matches over the whole
+   manifest, so a dev- or build-dependency on `codegg` or `tokio` fails the
+   guard — while all three messages say "production dependencies". The
+   enforcement is stricter than the wording; either the intent or the wording
+   is wrong, and the file gives no way to tell which.
 
 ## Verification pointers
 

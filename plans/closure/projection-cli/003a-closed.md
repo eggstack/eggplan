@@ -172,9 +172,9 @@ All commands ran on Linux at `2c32ffe` and passed:
 cargo fmt --all -- --check
 cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked                      # 261 passed, 0 ignored
+cargo test --workspace --locked                      # 261 passed, 3 ignored
 cargo +1.89.0 check --workspace --all-targets --locked
-cargo +1.89.0 test --workspace --locked              # 261 passed
+cargo +1.89.0 test --workspace --locked              # 261 passed, 3 ignored
 bash scripts/check-core-boundary.sh                  # passed
 bash scripts/check-codegg-compat-boundary.sh         # passed
 bash scripts/check-integrations-boundary.sh          # passed
@@ -189,6 +189,16 @@ passed, zero failures) to confirm the suite is stable under parallel load.
 Per-crate test counts at `2c32ffe`: `eggplan-core` 34, `eggplan-repo` 77,
 `eggplan-projection` 4, `eggplan-integrations` 76, `eggplan-cli` 31,
 `eggplan-markdown` 16, `eggplan-codegg-compat` 23.
+
+The 3 ignored tests are the 2 characterization harnesses introduced by this
+milestone (`characterization_snapshot_matrix`,
+`characterization_dirty_subject_dominates_and_does_not_scale_with_plans`) plus
+the 1 pre-existing ignored test in `git_subject_digest_golden.rs`. The CI-gated
+`characterization_counter_matrix_runs_in_ci` is *not* ignored: it asserts the
+counter matrix on every run, and only the wall-time replay is opt-in.
+
+`eggplan-repo`'s 77 is 30 lib tests + 9 doctests + 38 integration tests across
+`repository.rs`, `git_subject_fingerprint.rs`, and `git_subject_digest_golden.rs`.
 
 New in this milestone: 30 `eggplan-repo` lib tests (23 snapshot regressions, 1
 CI-gated characterization matrix, 2 ignored evidence harnesses, plus shared

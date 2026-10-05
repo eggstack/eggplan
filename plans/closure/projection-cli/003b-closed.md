@@ -110,7 +110,8 @@ success.
 pagination. Both are bounded at 100 and both consume the M003a inspection
 snapshot — explicit ID sets via `InspectionSelection::Subset`, keyset pagination
 via `InspectionSelection::After` — so neither reintroduces per-Plan subject
-capture.
+capture. `list_uses_the_inspection_snapshot_rather_than_per_plan_reads` pins that
+directly: subject capture stays constant across Plan counts rather than scaling.
 
 Keyset pagination applies the cursor **inside the read model, before retention**.
 That is what lets a caller page through a repository larger than one page without
@@ -144,9 +145,9 @@ because it would couple the shell to repository discovery and its latency.
 | Plan requirement | Evidence |
 |---|---|
 | §2 compatibility rule | `tests/commands.rs` — all 7 pre-existing CLI tests pass unchanged except the help fixture, which was regenerated from the metadata table. `help_snapshot_is_stable_and_human_output_needs_no_ansi` additionally proves no ANSI is emitted. |
-| §3 batch query surface | `list_is_ordered_by_plan_id_and_bounded`, `list_limit_truncates_and_reports_counts_and_cursor`, `status_accepts_a_bounds_ded_explicit_id_set`, `single_id_status_semantics_are_unchanged`, `empty_repository_lists_nothing_without_failing`. |
+| §3 batch query surface | `list_is_ordered_by_plan_id_and_bounded`, `list_limit_truncates_and_reports_counts_and_cursor`, `status_accepts_a_bounded_explicit_id_set`, `single_id_status_semantics_are_unchanged`, `empty_repository_lists_nothing_without_failing`. |
 | §4 compact plan projection | `list_is_ordered_by_plan_id_and_bounded` asserts the exact field set and asserts absent fields (`items`, `evidence`, `blocker`, `description`, `result_metadata`). |
-| §5 pagination/selection | `keyset_pagination_neither_duplicates_nomits`, `status_filter_uses_canonical_values_only`, `list_bounds_are_enforced`. Keyset is strictly greater; no opaque cursor exists. |
+| §5 pagination/selection | `keyset_pagination_neither_duplicates_nomits`, `status_filter_uses_canonical_values_only`, `list_bounds_are_enforced`, `list_uses_the_inspection_snapshot_rather_than_per_plan_reads`. Keyset is strictly greater; no opaque cursor exists. |
 | §6 provider-policy reads | `no_policy_reports_untrusted_while_a_policy_changes_only_interpretation` (evidence identical, only interpretation differs, and the no-policy run says so), `malformed_provider_policy_preserves_typed_diagnostics`, `provider_ids_in_observations_never_self_authorize`. |
 | §7 command metadata source | `metadata_drives_help_validation_and_completions_together` and the extended help test; `src/commands.rs` is the only inventory. |
 | §8 shell completions | `completion_scripts_are_generated_for_all_four_shells`, `completion_generation_is_deterministic_and_has_no_side_effects` (identical with and without a state root; state root byte-identical afterwards), `unknown_completion_shell_is_a_usage_error`, `completion_generation_uses_no_process_filesystem_or_network_api` (source-level proof). |
@@ -176,9 +177,9 @@ All commands ran on Linux at `2c32ffe` and passed:
 cargo fmt --all -- --check
 cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked                      # 261 passed, 0 ignored
+cargo test --workspace --locked                      # 261 passed, 3 ignored
 cargo +1.89.0 check --workspace --all-targets --locked
-cargo +1.89.0 test --workspace --locked              # 261 passed
+cargo +1.89.0 test --workspace --locked              # 261 passed, 3 ignored
 bash scripts/check-core-boundary.sh                  # passed
 bash scripts/check-codegg-compat-boundary.sh         # passed
 bash scripts/check-integrations-boundary.sh          # passed

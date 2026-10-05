@@ -1,4 +1,4 @@
-use crate::{GitSubjectError, GitSubjectSource};
+use crate::{GitSubjectError, GitSubjectSource, InspectionSelection};
 use eggplan_core::{
     AssessmentStatus, ClosureCandidate, ClosureId, ClosureRecord, EvidenceError,
     EvidenceObservation, EvidenceObservationId, EvidenceSupersessionRecord, Plan, PlanId,
@@ -107,6 +107,10 @@ pub enum RepoError {
     ClosureSubjectDrift,
     #[error("closure subject capture failed: {0}")]
     ClosureSubjectCapture(#[source] GitSubjectError),
+    #[error("git subject drifted during repository inspection")]
+    SubjectDrift,
+    #[error("git subject capture failed during repository inspection: {0}")]
+    InspectionSubject(#[source] GitSubjectError),
 }
 
 /// Subject capture seam used by guarded closure finalization.
@@ -533,6 +537,15 @@ impl RepositoryStore {
         &self,
         plan_id: &PlanId,
     ) -> Result<Vec<EvidenceSupersessionRecord>, RepoError> {
+        let mut counters = crate::SnapshotCounters::default();
+        self.list_supersessions_counted(plan_id, &mut counters)
+    }
+
+    fn list_supersessions_counted(
+        &self,
+        plan_id: &PlanId,
+        counters: &mut crate::SnapshotCounters,
+    ) -> Result<Vec<EvidenceSupersessionRecord>, RepoError> {
         let dir = self.supersessions_dir(plan_id);
         match fs::symlink_metadata(&dir) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -555,6 +568,7 @@ impl RepositoryStore {
                         reason: e.to_string(),
                     }
                 })?;
+            counters.supersession_files_decoded += 1;
             record.validate().map_err(|reason| RepoError::Corrupt {
                 path: entry.path(),
                 reason,
@@ -677,6 +691,22 @@ impl RepositoryStore {
     }
 
     fn load_unlocked(&self, id: &PlanId) -> Result<Plan, RepoError> {
+        let mut counters = crate::SnapshotCounters::default();
+        Ok(self
+            .load_snapshot_unlocked(id, &mut counters)?
+            .plan)
+    }
+
+    /// Single-pass deep load: decodes and validates the Plan, its observations,
+    /// its supersessions, and its closure exactly once and returns all of them.
+    ///
+    /// `load_unlocked` is this function with the extra values dropped, so the
+    /// two paths cannot drift into different validation.
+    fn load_snapshot_unlocked(
+        &self,
+        id: &PlanId,
+        counters: &mut crate::SnapshotCounters,
+    ) -> Result<crate::LoadedPlanSnapshot, RepoError> {
         check_dir(&self.root)?;
         check_dir(&self.root.join("plans"))?;
         let dir = self.plan_dir(id);
@@ -702,6 +732,7 @@ impl RepositoryStore {
             });
         }
         let bytes = fs::read(&path)?;
+        counters.plan_files_decoded += 1;
         let stored: StoredPlan =
             serde_json::from_slice(&bytes).map_err(|e| RepoError::Corrupt {
                 path: path.clone(),
@@ -734,6 +765,9 @@ impl RepositoryStore {
                 reason: "stored plan ID differs from directory ID".into(),
             });
         }
+        let mut loaded_closure: Option<ClosureRecord> = None;
+        let mut loaded_observations: Vec<EvidenceObservation> = Vec::new();
+        let mut loaded_supersessions: Vec<EvidenceSupersessionRecord> = Vec::new();
         let closure_path = dir.join("closure.json");
         let pending_path = dir.join("closure.pending.json");
         if pending_path.exists() {
@@ -744,7 +778,9 @@ impl RepositoryStore {
             fs::symlink_metadata(&closure_path),
         ) {
             (true, Ok(meta)) if !meta.file_type().is_symlink() && meta.is_file() => {
-                let record: ClosureRecord = serde_json::from_slice(&fs::read(&closure_path)?)
+                let closure_bytes = fs::read(&closure_path)?;
+                counters.closure_files_decoded += 1;
+                let record: ClosureRecord = serde_json::from_slice(&closure_bytes)
                     .map_err(|e| RepoError::Corrupt {
                         path: closure_path.clone(),
                         reason: e.to_string(),
@@ -755,8 +791,10 @@ impl RepositoryStore {
                         path: closure_path.clone(),
                         reason,
                     })?;
-                let observations = self.list_observations_unlocked(id)?;
-                let supersessions = self.list_supersessions_unlocked(id)?;
+                let observations = self.list_observations_counted(id, counters)?;
+                let supersessions = self.list_supersessions_counted(id, counters)?;
+                loaded_observations = observations.clone();
+                loaded_supersessions = supersessions.clone();
                 effective_observations(&observations, &supersessions).map_err(|reason| {
                     RepoError::Corrupt {
                         path: closure_path.clone(),
@@ -829,6 +867,7 @@ impl RepositoryStore {
                         reason: "closure assessment cannot be reproduced".into(),
                     });
                 }
+                loaded_closure = Some(record);
             }
             (true, _) => {
                 return Err(RepoError::Corrupt {
@@ -845,7 +884,22 @@ impl RepositoryStore {
             (false, Err(error)) if error.kind() == std::io::ErrorKind::NotFound => {}
             (false, Err(error)) => return Err(RepoError::Io(error)),
         }
-        Ok(plan)
+        counters.plans_validated += 1;
+        let effective = effective_observations(&loaded_observations, &loaded_supersessions)
+            .map_err(|reason| RepoError::Corrupt {
+                path: self.plan_path(id),
+                reason,
+            })?
+            .into_iter()
+            .cloned()
+            .collect();
+        Ok(crate::LoadedPlanSnapshot {
+            plan,
+            observations: loaded_observations,
+            supersessions: loaded_supersessions,
+            effective,
+            closure: loaded_closure,
+        })
     }
 }
 
@@ -1040,9 +1094,95 @@ impl PlanStore for RepositoryStore {
 }
 
 impl RepositoryStore {
+    /// Bounded, cooperatively consistent read model for one repository-wide
+    /// inspection. See [`crate::InspectionSnapshot`].
+    ///
+    /// This is the only place the repository layer exposes multi-plan read
+    /// facts. It captures the Git subject exactly twice regardless of Plan
+    /// count, decodes each selected canonical file exactly once, and refuses to
+    /// hand back a snapshot whose subject drifted across the scan.
+    pub fn inspection_snapshot(
+        &self,
+        selection: &InspectionSelection,
+    ) -> Result<crate::InspectionSnapshot, RepoError> {
+        let mut counters = crate::SnapshotCounters::default();
+        let subject_source = self.subject_source();
+        let guard = crate::snapshot::acquire_shared_lock(&self.root, self.options.lock_timeout)?;
+
+        let subject_at_start = crate::snapshot::capture_subject(&subject_source, &mut counters).ok();
+
+        let all_ids = match selection {
+            InspectionSelection::One(id) => vec![id.clone()],
+            _ => self.list()?,
+        };
+        debug_assert!(
+            crate::snapshot::selection_is_deterministic(&all_ids),
+            "plan selection order must be deterministic"
+        );
+        let total_plans = all_ids.len();
+        let retain_limit = selection.retain_limit().unwrap_or(total_plans);
+        let validate_all = matches!(selection, InspectionSelection::AllValidated { .. });
+
+        let selected: Vec<PlanId> = match selection {
+            // Only the bounded prefix is touched at all, so a corrupt plan
+            // beyond it stays invisible exactly as it was before.
+            InspectionSelection::Bounded { limit } => all_ids.into_iter().take(*limit).collect(),
+            _ => all_ids,
+        };
+
+        let mut plans = Vec::with_capacity(selected.len().min(retain_limit));
+        let mut observations_counted = 0;
+        let mut supersessions_counted = 0;
+        let mut closures_counted = 0;
+        for (index, id) in selected.iter().enumerate() {
+            let loaded = self.load_snapshot_unlocked(id, &mut counters)?;
+            observations_counted += loaded.observations.len();
+            supersessions_counted += loaded.supersessions.len();
+            closures_counted += usize::from(loaded.closure.is_some());
+            if index < retain_limit {
+                counters.plans_retained += 1;
+                plans.push(loaded);
+            } else {
+                // Validated and counted, then released: `check` keeps full
+                // integrity coverage without an unbounded in-memory projection.
+                debug_assert!(validate_all);
+            }
+        }
+
+        let pending_closures = self.pending_closures()?;
+        let abandoned_staging_files = self.abandoned_staging_files()?;
+
+        let snapshot = crate::snapshot::seal(
+            self.repository_id.clone(),
+            subject_at_start,
+            plans,
+            total_plans,
+            observations_counted,
+            supersessions_counted,
+            closures_counted,
+            pending_closures,
+            abandoned_staging_files,
+            &subject_source,
+            counters,
+        )?;
+        drop(guard);
+        Ok(snapshot)
+    }
+}
+
+impl RepositoryStore {
     fn list_observations_unlocked(
         &self,
         plan_id: &PlanId,
+    ) -> Result<Vec<EvidenceObservation>, RepoError> {
+        let mut counters = crate::SnapshotCounters::default();
+        self.list_observations_counted(plan_id, &mut counters)
+    }
+
+    fn list_observations_counted(
+        &self,
+        plan_id: &PlanId,
+        counters: &mut crate::SnapshotCounters,
     ) -> Result<Vec<EvidenceObservation>, RepoError> {
         let dir = self.evidence_dir(plan_id);
         match fs::symlink_metadata(&dir) {
@@ -1073,6 +1213,7 @@ impl RepositoryStore {
                 return Err(RepoError::UnsafePath(entry.path()));
             }
             let observation = load_observation(&entry.path())?;
+            counters.observation_files_decoded += 1;
             let expected = format!("{}.json", observation.id());
             if name != expected {
                 return Err(RepoError::Corrupt {
@@ -1141,7 +1282,20 @@ fn validate_repository_config(config: &RepositoryConfig) -> Result<(), RepoError
     Ok(())
 }
 
-fn is_lock_contention(error: &std::io::Error) -> bool {
+/// Shared-lock contention detection.
+///
+/// `File::try_lock_shared` is an inherent `std` method stable at this crate's
+/// MSRV (1.89), so it is what actually runs; it reports contention as a distinct
+/// `TryLockError::WouldBlock` rather than an `io::ErrorKind::WouldBlock`. The
+/// `fs2` trait import is therefore not on the locking path at all.
+pub(crate) fn is_shared_lock_contention(error: &std::fs::TryLockError) -> bool {
+    match error {
+        std::fs::TryLockError::WouldBlock => true,
+        std::fs::TryLockError::Error(inner) => is_lock_contention(inner),
+    }
+}
+
+pub(crate) fn is_lock_contention(error: &std::io::Error) -> bool {
     if error.kind() == std::io::ErrorKind::WouldBlock {
         return true;
     }

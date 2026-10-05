@@ -56,7 +56,7 @@ Planning-system bootstrap:
 | Evidence/closure | closed/current | M002 and C001/C002/C003/C004 closed; the C004 durability defect is resolved — ordinary CAS can no longer modify a Closed Plan, so no reachable path desynchronizes it from its ClosureRecord | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | active/current | M001/M002 closed; M003a inspection/performance and M003b batch/compact/completions are planned and ready | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001-M003 and C001/C002 closed; the roadmap is terminal. C002 closed the boundary guard's filesystem gap: `check-codegg-compat-boundary.sh` now fails on filesystem access, every guard message states its actual scan scope, and all five guards have synthetic self-proofs. The bridge source was already pure; the defect was in the enforcement | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | active/current | M001/M002 closed; M003a closed at `674264d`; M003b GitHub CI/forge/artifact adapter implementation landed and is closing | plans/subsystems/eggstack-integration-roadmap.md |
+| Eggstack integrations | active/current | M001, M002, M003a (`674264d`), and M003b (`93d65b0`) closed; Eggsact and Eggup candidates unchanged and deferred | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -85,7 +85,7 @@ Planning-system bootstrap:
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 | Eggstack integrations | M003a Eggbench verified bundle + comparison evidence | closed | plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md | closure plans/closure/eggstack-integration/003a-closed.md; Eggplan `674264d`, hosted run `37350383159`; Eggbench fixture baseline `30a38251` (CI `37143714313`, live `37143714261`) |
-| Eggstack integrations | M003b GitHub CI/forge + artifact evidence | closing | plans/implementation/eggstack-integration/003b-github-ci-forge-and-artifact-evidence.md | implementation landed against GitHub REST API `2022-11-28`; hosted qualification pending |
+| Eggstack integrations | M003b GitHub CI/forge + artifact evidence | closed | plans/implementation/eggstack-integration/003b-github-ci-forge-and-artifact-evidence.md | closure plans/closure/eggstack-integration/003b-closed.md; Eggplan `93d65b0`, hosted run `37351818356`; qualified against GitHub REST API `2022-11-28` |
 
 ## Corrective history and current maintenance
 
@@ -187,7 +187,7 @@ subsystem. Neither gated the terminal CodeGG roadmap or any other subsystem.
      hardened the static ownership guard only; the bridge was already pure, the
      roadmap stayed terminal, and nothing serialized on it;
    - Projection/CLI M003 is now split into ready M003a inspection/performance and M003b batch/compact/completion plans; completion/projection work may proceed in parallel while repository-wide batch execution consumes the M003a read model;
-   - Eggstack M003a is closed at Eggplan `674264d`, hosted-qualified by run `37350383159`. The dual-green gate was rechecked on 2026-10-05 and `30a38251...` remains the newest exact Eggbench SHA with both ordinary CI and live qualification green; every revision above it on main has both workflows failing or cancelled, so the current head stayed research evidence. M003b was never serialized behind that gate and landed independently.
+   - Eggstack M003a is closed at Eggplan `674264d`, hosted-qualified by run `37350383159`. The dual-green gate was rechecked on 2026-10-05 and `30a38251...` remains the newest exact Eggbench SHA with both ordinary CI and live qualification green; every revision above it on main has both workflows failing or cancelled, so the current head stayed research evidence. M003b was never serialized behind that gate, landed independently, and is closed at Eggplan `93d65b0` hosted-qualified by run `37351818356`. It was qualified against GitHub REST API version `2022-11-28` using both live authenticated responses and GitHub's published OpenAPI description. That cross-check corrected an assumption in the plan: GitHub does supply `artifact.digest` as `sha256:<hex>`, but only for `upload-artifact` v4 or newer and null otherwise, so the adapter records it when present and never infers one.
 10. Interoperability/distribution remains deferred until the local capability
     wave is qualified.
 

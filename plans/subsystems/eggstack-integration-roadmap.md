@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: active / current; M003a closed; M003b planned and ready
+Status: active / current; M003a and M003b closed
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -165,15 +165,24 @@ See architecture/eggbench-adapter.md.
 
 #### M003b — GitHub CI/forge and artifact evidence
 
+Status: closed.
+
 Plan:
 plans/implementation/eggstack-integration/003b-github-ci-forge-and-artifact-evidence.md
 
-Normalize host-acquired GitHub Actions/check/status/revision/artifact facts with
-exact tested-SHA and verification binding. Preserve artifact SHA-256 without
-downloading payloads. GitHub/Sigstore attestation verification remains
+Closure: plans/closure/eggstack-integration/003b-closed.md
+
+Normalized host-acquired GitHub Actions/check/status/revision/artifact facts with
+exact tested-SHA, clean-subject enforcement, and host verification binding, under
+two providers: `epp_github_actions` (execution-derived) and `epp_github_forge`
+(provenance, with verification binding forbidden so an artifact digest can never
+be replayed as a verification digest). Qualified against GitHub REST API version
+`2022-11-28`. Artifact SHA-256 is preserved when GitHub supplies it without
+downloading any payload. GitHub/Sigstore attestation verification remains
 Interoperability M001.
 
-M003a and M003b can proceed independently after their own contract freeze.
+M003a and M003b proceeded independently after their own contract freeze; both
+are now closed, completing the M003 line.
 
 ## 5. Verification
 

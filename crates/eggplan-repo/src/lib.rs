@@ -75,10 +75,13 @@
 //! ```
 
 mod git_subject;
+pub(crate) mod snapshot;
 mod store;
 
 pub use git_subject::{
     GitSubjectError, GitSubjectFingerprintV1, GitSubjectOptions, GitSubjectSource,
     capture_git_subject_fingerprint,
 };
+pub(crate) use snapshot::SnapshotCounters;
+pub use snapshot::{InspectionSelection, InspectionSnapshot, LoadedPlanSnapshot};
 pub use store::{PlanStore, RepoError, RepositoryStore, StoreOptions};

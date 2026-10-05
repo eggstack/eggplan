@@ -1,6 +1,6 @@
 # Projection and CLI Roadmap
 
-Status: closed / current; M003 deferred until real repository use
+Status: active / current; M003a and M003b planned and ready
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -57,8 +57,34 @@ plans/closure/projection-cli/002-closed.md.
 
 ### M003 — Ergonomics and performance
 
-Roadmap-level after real repositories use M001/M002: shell completions, batch
-queries, compact projections, and performance characterization.
+Status: planned / ready.
+
+Real repository use exposed two separable work lines.
+
+#### M003a — Repository inspection snapshot and performance qualification
+
+Plan:
+plans/implementation/projection-cli/003a-repository-inspection-snapshot-and-performance-qualification.md
+
+Replace repeated per-Plan Git subject capture and repeated canonical-state reads
+in repository-wide status/registry/check paths with one bounded ephemeral
+repository inspection snapshot. Use cooperative read locking plus subject S1/S2
+revalidation, preserve deep integrity checks, and qualify algorithmic complexity
+with non-gating wall-time characterization.
+
+#### M003b — Batch queries, compact projections, and shell completions
+
+Plan:
+plans/implementation/projection-cli/003b-batch-compact-projections-and-shell-completions.md
+
+Add bounded multi-Plan queries, a new explicit compact projection,
+provider-policy-aware read assessment, and deterministic Bash/Zsh/Fish/
+PowerShell completion generation from one command metadata source. Existing
+machine response shapes remain compatible.
+
+M003b command metadata/compact DTO work may proceed in parallel with M003a.
+Repository-wide batch execution must consume the M003a inspection snapshot
+rather than restoring repeated per-Plan reads.
 
 ## 5. Verification
 

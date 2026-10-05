@@ -193,7 +193,7 @@ The earlier `architecture/codegg-compat.md` recheck note that cited
 unchanged" was accurate for `crates/codegg-core/src/work_plan/` but was read as
 a claim that no WorkPlan path had moved. Provenance, verified by read-only
 git: the note was introduced with the live bridge at `088968b` and removed at
-`1291799`, so the current `architecture/codegg-compat.md` (135 lines) no longer
+`1291799`, so the current `architecture/codegg-compat.md` no longer
 carries it and this paragraph is the surviving record. `5f4532659…` was
 `dbowm91/codegg` `origin/main` at that time; the same commit is separately
 pinned as the reviewed CodeGG head for the Markdown CodeGG subset
@@ -293,7 +293,7 @@ the mapping auditable.
     process/network/database, so `std::fs`, `File::open`, and `read_to_string`
     in `src/` would have passed CI; `src/` contained none (verified by grep), so
     this was a guard gap, not a live defect. `no_impure_source`
-    (`scripts/check-codegg-compat-boundary.sh:64-66`) now matches the
+    (`scripts/check-codegg-compat-boundary.sh:77-79`) now matches the
     fully-qualified and `use`-imported filesystem forms plus `std::path` and
     `tempfile::`, and a synthetic self-proof asserts each one fails. Closed by
     `plans/closure/codegg-integration/003-c002-closed.md`.

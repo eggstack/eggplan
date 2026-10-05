@@ -55,7 +55,7 @@ polices dependencies and process spawning only, not file writes; see finding 4.
   (`lib.rs:258-266`).
 - Arg parsing is hand-rolled: `parse_args` (`lib.rs:268-328`), value options
   (`lib.rs:330-343`), per-command allow-lists in `validate_command_options`
-  (`lib.rs:490-562`), usage string (`lib.rs:1600-1602`).
+  (`lib.rs:490-562`), usage string (`lib.rs:1604-1606`).
 - Command groups in `dispatch` (`lib.rs:345-488`):
   - `init` opens/creates the store (`lib.rs:349-358`); `new` parses strict Plan
     JSON, requires revision 0 + Draft, then `create` (`lib.rs:359-388`).

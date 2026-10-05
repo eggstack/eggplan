@@ -31,7 +31,7 @@ enroll its own provider.
   `OBSERVATION_METADATA_VALUE_CHARS = 2_000`, `INVOCATION_REF_CHARS = 2_000`, and
   `MAX_OBSERVATIONS_PER_PLAN = 10_000` (`src/lib.rs:66`). `MAX_OBSERVATIONS_PER_PLAN`
   is *declared* here but never enforced in this crate — it is applied only by the
-  repository (`eggplan-repo/src/store.rs:969,1078`), so `assess_plan` itself is
+  repository (`eggplan-repo/src/store.rs:974,1083`), so `assess_plan` itself is
   observation-count-unbounded. `#![forbid(unsafe_code)]` (`src/lib.rs:1`).
 - `identity.rs` — `TypedId` trait (`src/identity.rs:76-81`) and `define_id!` macro
   (`src/identity.rs:83-148`): `ep_` / `epi_` / `epc_` / `epp_` / `epe_` / `epcl_` / `eps_`
@@ -127,9 +127,10 @@ There is no `tests/` integration directory — only `tests/fixtures/` plus inlin
 rejection (`src/evidence.rs:476-497`), strict-schema rejection (§3 refs), per-status
 determinism, stale/dirty/untrusted rejection, cardinality and human-judgment policy,
 supersession cycles, and v2-binding enforcement for all five execution kinds on both
-the plan side and the observation side (`src/model.rs:539-586`,
-`src/evidence.rs:457-472`). The separate `src/assessment.rs:511-653` range covers only
-exact-binding matching and the legacy-unbound rejection path, not the five-kind loop.
+the plan side and the observation side (`src/model.rs:551-598`,
+`src/evidence.rs:457-472`). The separate `src/assessment.rs:511-653` range covers
+exact-binding matching, the any/all cardinality exclusion of mismatched
+observations, and both legacy-unbound rejection paths, not the five-kind loop.
 
 ## 6. Review findings
 
@@ -170,7 +171,7 @@ Gaps / risks / surprises:
    extension values is either unenforced or silently the provenance one.
 7. **`MAX_OBSERVATIONS_PER_PLAN` is declared but not enforced here** — core publishes the
    cap (`src/lib.rs:66`) but only `eggplan-repo` applies it
-   (`eggplan-repo/src/store.rs:969,1078`). `assess_plan` is therefore
+   (`eggplan-repo/src/store.rs:974,1083`). `assess_plan` is therefore
    observation-count-unbounded, so a caller that assembles observations in memory pays
    unbounded sort/fold cost. Declaring a bound in the domain crate that the domain
    function ignores is a live trap for future embedders.

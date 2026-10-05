@@ -53,7 +53,7 @@ item transitions. Closed and completed states are terminal. Readiness is a
 stable position-then-ID ordering and is only a derived statement about
 dependencies; it grants no execution authority.
 
-## Evidence schema v1
+## Evidence schema v1 and v2
 
 Evidence observations have typed `epe_` IDs, provider IDs, a closed evidence
 kind/status vocabulary, exact SubjectRevision, Unix-millisecond observation
@@ -61,6 +61,14 @@ time, bounded optional invocation/result metadata, and bounded artifact refs.
 An observation is finalized by hashing compact canonical JSON for its content
 fields; the `content_digest` field itself is excluded from that digest.
 `evidence-v1-digests.json` freezes status and evidence-kind digest fixtures.
+
+`EVIDENCE_SCHEMA_VERSION` is 2. Schema v1 is frozen and remains readable with
+its original canonical bytes and content digests; v2 adds a required
+`VerificationDigest` on execution-derived evidence kinds. A v1 execution
+observation without a binding is legacy policy and is reported as
+`legacy_unbound_execution_requirement` — it cannot satisfy a criterion, and v1
+observations cannot satisfy a bound v2 execution requirement. See
+[evidence architecture](evidence.md) for the binding rules.
 
 Finalized observation fields are private and have read-only accessors. A
 provider ID in an observation is not authority: pure assessment receives an

@@ -49,7 +49,7 @@ matching the [repository](repository.md) and
   `ObservationConflict`; `list_observations_unlocked`
   (`store.rs:1043-1090`) sorts by typed ID, skips `.tmp-*` staging remnants,
   and rejects non-`.json` entries. Limits: 10,000 observations per plan
-  (`store.rs:974,1078` via core bounds), 1 MiB per observation
+  (`store.rs:974,1083` via core bounds), 1 MiB per observation
   (`store.rs:26,1168-1173`), 16 MiB per plan (`store.rs:25,696-700`).
 - **Closure finalizer as subject authority.** `finalize_closure`
   (`store.rs:360-369`) is the only public finalizer; it builds a

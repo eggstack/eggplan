@@ -53,7 +53,7 @@ Planning-system bootstrap:
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
-| Evidence/closure | closed with condition | M002 and C001/C002/C003/C004 closed; the C004 durability defect is resolved — ordinary CAS can no longer modify a Closed Plan, so no reachable path desynchronizes it from its ClosureRecord | plans/subsystems/evidence-closure-roadmap.md |
+| Evidence/closure | closed/current | M002 and C001/C002/C003/C004 closed; the C004 durability defect is resolved — ordinary CAS can no longer modify a Closed Plan, so no reachable path desynchronizes it from its ClosureRecord | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | closed/current | M001 and M002 closed; M003 waits for real repository use | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001-M003 and C001/C002 closed; the roadmap is terminal. C002 closed the boundary guard's filesystem gap: `check-codegg-compat-boundary.sh` now fails on filesystem access, every guard message states its actual scan scope, and all five guards have synthetic self-proofs. The bridge source was already pure; the defect was in the enforcement | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | closed/current | M001 provider SPI and M002 Eggwork/Eggsearch adapters closed; M003 ready for planning against rechecked Eggbench contract | plans/subsystems/eggstack-integration-roadmap.md |
@@ -164,9 +164,10 @@ subsystem. Neither gated the terminal CodeGG roadmap or any other subsystem.
    hosted canonical run `36760308368`. Differential adoption and
    verification-digest derivation are no longer outstanding.
 8. Projection/CLI M002 and Eggstack M002 are closed, independent of the CodeGG
-   provenance handoff. Eggstack M003 is ready for planning after rechecking
-   Eggbench at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`. Evidence M002 C003
-   closed as non-blocking hygiene without gating either capability plan.
+   provenance handoff. Eggstack M003 is ready for planning against the
+   rechecked Eggbench contract at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`.
+   Evidence M002 C003 closed as non-blocking hygiene without gating either
+   capability plan.
 9. After positive M002 closures:
    - Eggplan's M003 pure contract is closed: hosted qualification at
      `3f7c603` and the CodeGG consuming implementation landed at CodeGG
@@ -182,8 +183,8 @@ subsystem. Neither gated the terminal CodeGG roadmap or any other subsystem.
      hardened the static ownership guard only; the bridge was already pure, the
      roadmap stayed terminal, and nothing serialized on it;
    - Projection/CLI M003 ergonomics/performance may be planned from real use;
-   - Eggstack M003 Eggbench/CI/forge adapters are ready for planning after the
-     recheck above.
+   - Eggstack M003 Eggbench/CI/forge adapters are ready for planning against
+     the rechecked Eggbench contract recorded above.
 10. Interoperability/distribution remains deferred until the local capability
     wave is qualified.
 

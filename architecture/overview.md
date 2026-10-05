@@ -14,7 +14,8 @@ review. Current milestone status lives in `plans/registry.md`, never here.
 
 Workspace: edition 2024, MSRV 1.89, `--locked` everywhere. Seven crates in
 `crates/`, five static boundary scripts in `scripts/`, the planning system in
-`plans/`, agent workflow in `AGENTS.md`.
+`plans/`, user-facing guides in `docs/`, agent workflow in `AGENTS.md` with
+reusable procedures in `.skills/`.
 
 ## Component map
 
@@ -97,7 +98,8 @@ Canonical state lives on disk under the state root (`.eggplan` by convention):
 
 1. **Canonical bytes are the contract.** Compact `serde_json` in declared field
    order (`BTreeMap` key order); digests are `sha256:<64 hex>`. Golden fixtures
-   freeze bytes — pretty JSON is not the contract. Schema v1 is frozen and
+   freeze bytes — pretty JSON is not the contract. Plan and evidence schemas are
+   at version 2; v1 stays frozen and byte-stable, both versions parse, and
    unknown fields are rejected, not an extension point.
 2. **Subject equality is applicability.** A passing observation for any other
    source tree is stale history, never current proof. Only the closure
@@ -146,3 +148,7 @@ Planning authority, in order: `plans/000-long-term-specification.md` →
 `plans/002-long-term-roadmap.md` → subsystem roadmaps → implementation plans →
 closure evidence in `plans/closure/`. A plan is not evidence that a capability
 exists, and a milestone is not closed without its required closure evidence.
+
+These documents describe the design and are authoritative for it. Adopter-facing
+guides live in `docs/`; they may simplify but must never contradict what is
+written here. Reusable maintenance procedures live in `.skills/`.

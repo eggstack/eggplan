@@ -23,7 +23,7 @@ CodeGG adoption commits: `3e992291b6024fae29f2512ad2fa42a209fe7ca9`
 fix found during qualification, part of the qualified tree)
 
 CodeGG closure commit: `ffa1c15e654776c3ebe1022f4ce7de2582bc5d98`
-(`plans/closure/eggplan-assessment-integration/003-m002-status.md`)
+(`dbowm91/codegg` `plans/closure/eggplan-assessment-integration/003-m002-status.md`)
 
 ## Executive finding
 
@@ -60,7 +60,7 @@ No Eggplan repository state is created by CodeGG.
 | 6. WorkPlanStore/Goal/Todo/checkpoint/scheduler ownership remains CodeGG | `git diff a3c87fc..ffa1c15e -- crates/codegg-core/src/work_plan/` is empty. See the ownership invariance section below. |
 | 7. No Eggplan repository state is created by CodeGG | `eggplan-repo` absent from the CodeGG production graph; the facade is pure over the snapshot and never persists. |
 | 8. Current long-horizon trajectory tests remain green | `long_horizon_trajectory_qualification` (27 tests) passed in CodeGG local verification and in hosted run `36760308368`. |
-| 9. Both repositories record exact revisions and hosted CI evidence | This record; `plans/closure/eggplan-assessment-integration/003-m002-status.md`; hosted runs 36763541044 (Eggplan) and 36760308368 (CodeGG). |
+| 9. Both repositories record exact revisions and hosted CI evidence | This record; `dbowm91/codegg` `plans/closure/eggplan-assessment-integration/003-m002-status.md`; hosted runs 36763541044 (Eggplan) and 36760308368 (CodeGG). |
 
 ## Dependency graph, before and after
 
@@ -236,7 +236,7 @@ not treated as the qualification subject.
 
 CodeGG verification is recorded in CodeGG's own closure and was not re-executed
 from this repository; the commands and results above are quoted from
-`plans/closure/eggplan-assessment-integration/003-m002-status.md`, with the
+`dbowm91/codegg` `plans/closure/eggplan-assessment-integration/003-m002-status.md`, with the
 hosted run independently re-verified from this repository
 (`gh run view 36760308368` → `conclusion: success`,
 `headSha: 3c7438c738a142fdd0c4e79684d7d1154fe52a99`, workflow `CI`, event
@@ -405,3 +405,14 @@ landed on `main`; the landed revisions are `3e992291` (implementation),
 canonical run `36760308368`. This is a factual correction of superseded
 revision identifiers only. No plan finding, criterion, or historical closure
 conclusion changes.
+
+A later maintenance refactor of `crates/eggplan-codegg-compat/src/lib.rs`
+(the M003 repository-Plan binding work) moved four cited definitions, so the
+`file:line` references in this record no longer point at the same lines. The
+original citations are preserved as accepted; the current locations are
+`normalize_snapshot` at `:638` (cited `:430`), `normalize_fixture` at `:620`
+(cited `:412`), `requires_verification_binding` at `:598` (cited `:390-399`),
+and the execution-binding gate at `:775-784` (cited `:566-575`). Every
+substantive claim above still holds: both mappers exist, `normalize_fixture`
+remains the only SHA-gated path, and the gate is unchanged. This is citation
+drift only; no acceptance criterion or closure conclusion changes.

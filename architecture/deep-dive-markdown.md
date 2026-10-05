@@ -230,7 +230,7 @@ Gaps/risks (all verified against source, not speculation):
    (`src/lib.rs:643-708`). The ignored human section is therefore unnamed. The
    observations/policy/subject/closure dimensions cannot be named at all: the payload has no
    such fields and `deny_unknown_fields` (`src/lib.rs:63`) makes an attempt a hard error, so the
-   report has nothing to record even though [markdown-interchange](markdown-interchange.md:63-65)
+   report has nothing to record even though [markdown-interchange](markdown-interchange.md)
    promises dropped fields are named. If unsure whether this is intentional, say so — but as
    implemented the asymmetry is real.
 2. **CodeGG `Status:`/baseline parse position is narrower than the doc table implies.**

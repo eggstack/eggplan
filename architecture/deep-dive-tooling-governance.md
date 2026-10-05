@@ -234,7 +234,7 @@ Layout and hygiene, verified by enumeration rather than asserted:
   Projection/CLI M003 is not a registered plan at all — it is unstarted work
   awaiting real repository use (`:57`, `:142`).
 - `plans/` contains no non-Markdown files, no empty directories, and no
-  scratch artifacts across 55 files.
+  scratch artifacts across 59 files.
 - `plans/archive/` is currently README-only. Its policy (`archive/README.md`)
   is to retain completed/superseded *interim* planning, preserve relative
   structure, never archive canonical specs or accepted ADRs just because their
@@ -247,7 +247,8 @@ Layout and hygiene, verified by enumeration rather than asserted:
 **Strengths.** Layered defense: compiler + clippy `-D warnings` + five
 fast textual guards + compile-fail doctests + evidence-gated planning.
 Guards encode real ADR decisions (provider trust, subject authority, CodeGG
-non-ownership) in CI rather than prose. `--locked`, frozen schema v1, and
+non-ownership) in CI rather than prose. `--locked`, a frozen and byte-stable
+schema v1 alongside v2 as the current write version, and
 compact-canonical-JSON golden fixtures keep builds and digests reproducible.
 
 **Gaps/risks.**

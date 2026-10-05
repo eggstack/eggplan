@@ -1,6 +1,6 @@
 # Evidence and Closure M002 C004 — Closed-Plan CAS Immutability
 
-Status: ready
+Status: closed (see plans/closure/evidence-closure/002-c004-closed.md)
 
 Repository baseline: 60a5f9212d3e6feab8acb45fb6acbfdbd56264aa
 

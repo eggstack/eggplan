@@ -1,6 +1,6 @@
 # CodeGG Integration M003 C002 — Compatibility Boundary Guard Completeness
 
-Status: ready
+Status: closed (see plans/closure/codegg-integration/003-c002-closed.md)
 
 Repository baseline: 60a5f9212d3e6feab8acb45fb6acbfdbd56264aa
 

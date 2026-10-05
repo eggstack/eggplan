@@ -5,6 +5,13 @@ bounded plans, derives dependency readiness, records observations through
 future provider adapters, and assesses closure from structured state. It does
 not schedule or execute work.
 
+New here? Start with the [user documentation](docs/README.md) — [getting
+started](docs/getting-started.md), [CLI reference](docs/cli-reference.md),
+[evidence and closure](docs/evidence-and-closure.md), and
+[provider policy](docs/provider-policy.md). Design rationale lives in
+`architecture/`; agent and maintainer workflow lives in `AGENTS.md` and
+`.skills/`.
+
 The Rust workspace contains `eggplan-core`, a dependency-light domain library
 with immutable evidence and deterministic assessment; `eggplan-repo`, the
 local Plan store, append-only evidence ledger, and Git subject adapter;
@@ -12,8 +19,11 @@ local Plan store, append-only evidence ledger, and Git subject adapter;
 `eggplan-projection`, bounded derived summaries; and `eggplan-cli`, the
 `eggplan` command-line control surface. `eggplan-markdown` provides bounded,
 loss-aware Markdown intent import and deterministic rendering.
-`eggplan-codegg-compat` is a pure one-way CodeGG WorkPlan assessment bridge
-with no repository or scheduler ownership. See
+`eggplan-codegg-compat` is a pure two-direction CodeGG bridge: one direction
+normalizes a bounded CodeGG WorkPlan snapshot into a transient Eggplan
+assessment, and the other projects a bindable Eggplan Plan into a bounded
+CodeGG mirror contract. Neither direction performs repository I/O or evidence
+acquisition, and neither lets CodeGG write Eggplan canonical state. See
 [core architecture](architecture/core.md),
 [repository architecture](architecture/repository.md), the
 [evidence architecture](architecture/evidence.md), the

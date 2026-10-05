@@ -1,6 +1,6 @@
 # Evidence and Closure M002 C001 — Finalization Subject Revalidation
 
-Status: ready for handoff
+Status: closed (see plans/closure/evidence-closure/002-c001-closed.md)
 
 Repository baseline: 7fd3034bd847fb32889b679e7a2092e38ac16356
 

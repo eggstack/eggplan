@@ -27,12 +27,20 @@ recorded in a dated amendment below.
 
 ## Executive finding
 
-C002 closed two enforcement defects in
-`scripts/check-codegg-compat-boundary.sh`. The source guard now fails on
-filesystem access, not only process/network/database, and every guard's failure
-message now states the exact file and section it scanned. All five guards gained
-deterministic synthetic self-proofs that run against fixtures in a temporary
-directory.
+C002 closed two planned enforcement defects in
+`scripts/check-codegg-compat-boundary.sh` and, in the process, found and fixed a
+third and more serious one that was not in the plan. The source guard now fails on
+filesystem access, not only process/network/database; every guard's failure
+message now states the exact file and section it scanned; and all five guards
+gained deterministic synthetic self-proofs that run against fixtures in a
+temporary directory.
+
+Those self-proofs are what surfaced the unplanned finding: ripgrep is absent from
+the GitHub runner images, so **both** `rg`-based guards had been silently
+passing in CI without scanning anything — including the pre-existing
+`check-core-boundary.sh`. That is the reason this pass also changed
+`.github/workflows/ci.yml`. It is written up below as
+C-CODEGG-C002-04 and is the single most consequential result of this corrective.
 
 Recorded plainly, as the plan's handoff notes require: **the production bridge
 was always pure.** `crates/eggplan-codegg-compat/src/lib.rs` imports only

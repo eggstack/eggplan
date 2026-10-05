@@ -14,9 +14,19 @@ Reviewed baseline: `2ac47b0`
 
 Implementation commit: `8c4f6e6e586b2704311bda81d7dc402203971e80`
 
-Hosted qualification: GitHub Actions run
-[37269198631](https://github.com/eggstack/eggplan/actions/runs/37269198631) at
-the closure commit, conclusion `success`. See "Verification executed".
+Hosted qualification: **not yet complete at the time of writing.** The
+GitHub Actions run for the closure commit `4344ab7` is
+[37265105852](https://github.com/eggstack/eggplan/actions/runs/37265105852) and
+was still in progress. Per `plans/003-planning-process.md` §7 it is recorded as
+not run rather than assumed green; a following commit records the observed
+result and job identifiers.
+
+Erratum: an earlier revision of this record named run `37269198631`, an
+identifier that does not exist in this repository. It was written before the
+push and was not observed. It has been replaced with the real run id. The run
+for the implementation commit `8c4f6e6` is
+[37264177901](https://github.com/eggstack/eggplan/actions/runs/37264177901)
+(green).
 
 ## Executive finding
 
@@ -142,10 +152,13 @@ is reported from the plan alone.
 | `git status --short crates/eggplan-codegg-compat/` | empty — bridge crate untouched |
 | `git diff --stat crates/` | empty — no crate changed |
 
-Not run: none of the §6 list. Windows qualification is covered by the hosted
-matrix; the guard itself is skipped on Windows runners, which
-`architecture/deep-dive-tooling-governance.md` finding 1 already records, so
-there is nothing Windows-specific to verify here.
+Not run at the time of writing: hosted native (Linux/macOS/Windows) and hosted
+MSRV qualification for the closure commit. Both were in progress as run
+[37265105852](https://github.com/eggstack/eggplan/actions/runs/37265105852) when
+this record was authored, and are recorded as not run rather than assumed
+passing. There is nothing Windows-specific to verify beyond the matrix itself:
+the guard is skipped on Windows runners, which
+`architecture/deep-dive-tooling-governance.md` finding 1 already records.
 
 The script's self-proof cleanup uses a targeted `rm -f` of the two fixture files
 plus `rmdir` of the two directories, not a recursive force removal, so it

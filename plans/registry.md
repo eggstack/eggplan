@@ -56,7 +56,7 @@ Planning-system bootstrap:
 | Evidence/closure | closed/current | M002 and C001/C002/C003/C004 closed; the C004 durability defect is resolved — ordinary CAS can no longer modify a Closed Plan, so no reachable path desynchronizes it from its ClosureRecord | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | active/current | M001/M002 closed; M003a inspection/performance and M003b batch/compact/completions are planned and ready | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001-M003 and C001/C002 closed; the roadmap is terminal. C002 closed the boundary guard's filesystem gap: `check-codegg-compat-boundary.sh` now fails on filesystem access, every guard message states its actual scan scope, and all five guards have synthetic self-proofs. The bridge source was already pure; the defect was in the enforcement | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | active/current | M001/M002 closed; M003a implementation landed and is closing; M003b GitHub CI/forge/artifact adapter is planned and ready | plans/subsystems/eggstack-integration-roadmap.md |
+| Eggstack integrations | active/current | M001/M002 closed; M003a Eggbench adapter closed at `674264d`; M003b GitHub CI/forge/artifact adapter is planned and ready | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -84,7 +84,7 @@ Planning-system bootstrap:
 | CodeGG integration | M003 C002 compatibility boundary-guard completeness | closed | plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md | closure plans/closure/codegg-integration/003-c002-closed.md; non-blocking tooling hardening — the bridge source was already pure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
-| Eggstack integrations | M003a Eggbench verified bundle + comparison evidence | closing | plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md | implementation landed against Eggbench `30a38251bccb5157beb68202ffe630f6253771e0` (CI `37143714313`, live `37143714261`); hosted qualification pending |
+| Eggstack integrations | M003a Eggbench verified bundle + comparison evidence | closed | plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md | closure plans/closure/eggstack-integration/003a-closed.md; Eggplan `674264d`, hosted run `37350383159`; Eggbench fixture baseline `30a38251` (CI `37143714313`, live `37143714261`) |
 | Eggstack integrations | M003b GitHub CI/forge + artifact evidence | ready | plans/implementation/eggstack-integration/003b-github-ci-forge-and-artifact-evidence.md | independent of Eggbench fixture gate; attestation verification remains deferred |
 
 ## Corrective history and current maintenance
@@ -187,7 +187,7 @@ subsystem. Neither gated the terminal CodeGG roadmap or any other subsystem.
      hardened the static ownership guard only; the bridge was already pure, the
      roadmap stayed terminal, and nothing serialized on it;
    - Projection/CLI M003 is now split into ready M003a inspection/performance and M003b batch/compact/completion plans; completion/projection work may proceed in parallel while repository-wide batch execution consumes the M003a read model;
-   - Eggstack M003 is now split into ready M003a Eggbench and M003b GitHub CI/forge/artifact plans. M003a must freeze a compatible dual-green Eggbench exact SHA before fixtures; M003b can proceed independently.
+   - Eggstack M003a is closed at Eggplan `674264d`, hosted-qualified by run `37350383159`. The dual-green gate was rechecked on 2026-10-05 and `30a38251...` remains the newest exact Eggbench SHA with both ordinary CI and live qualification green; every revision above it on main has both workflows failing or cancelled, so the current head stayed research evidence. M003b remains ready and was never serialized behind that gate.
 10. Interoperability/distribution remains deferred until the local capability
     wave is qualified.
 
@@ -200,7 +200,7 @@ Reviewed during planning; these are not dependency pins.
 | CodeGG | 3623f65e + b470865a (C001 pin bump and fingerprint consumption, on `main`); 36ec9322 (C001 provenance v2); b5b3b14e (C001 conditional closure, later closed); 53dea47f414641c3f9756c3f8f181f6208be8115 (M003 implementation); aa21cfe1763d7ea00d11e582ed4108233e4088a9 (M003 closure) | M001-M003 and C001 closed on both sides. Post-closure review found dirty-digest representation mismatch for bound exact-subject evidence; Eggplan's bounded repository-ID-free fingerprint contract landed at `0dd33b7` and CodeGG consumes it at both capture sites on the same pin. CodeGG integration is terminal. |
 | Eggwork | faaa0b905fa6bc43e46825fdd98530b5533a970f | protocol-neutral execution snapshots/results/generation/artifact records; executor/scheduler remain outside Eggplan |
 | Eggsearch | dfa90e050c5434f3346902aeb4074901c58e90d1 | deterministic EvidenceBundle source/provider/trust/gap metadata; full runtime must not become an Eggplan dependency |
-| Eggbench | current reviewed 1a5e03610f5c70218501d9e1dca7a101ae1c7870; latest dual-green candidate 30a38251bccb5157beb68202ffe630f6253771e0 (CI 37143714313, live 37143714261) | manifest v2 remains current; comparison receipt v4; execution, performance/correctness, and aggregate verdict semantics remain distinct. M003a must pin the newest compatible dual-green exact SHA before fixture freeze |
+| Eggbench | current reviewed head 1a5e03610f5c70218501d9e1dca7a101ae1c7870 (both workflows failing); implemented fixture baseline 30a38251bccb5157beb68202ffe630f6253771e0 (CI 37143714313, live 37143714261) | manifest v2 remains current; comparison receipt v4; execution, performance/correctness, and aggregate verdict semantics remain distinct. M003a rechecked on 2026-10-05 and froze the newest compatible dual-green exact SHA as its fixture baseline; `inspect --json` exposes no manifest digest, so the verifying host supplies it |
 | Eggsact | 40959b704431430668e9ca2bfe959a8ef32495d8 | deterministic in-process/preflight utilities |
 | Eggup | cf5b3d3819c168eb2dbf841daa8332f3eb28c915 | future verified distribution/update consumer |
 | SLSA | v1.2 approved provenance docs reviewed 2026-09-22 | subject + provenance separation |

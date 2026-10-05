@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: active / current; M003a and M003b planned and ready
+Status: active / current; M003a closed; M003b planned and ready
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -140,17 +140,28 @@ Planning re-check on 2026-10-05:
   correctness evidence, and final aggregate verdict.
 
 The current reviewed Eggbench head had both hosted workflow families fail, so it
-is not a closure-grade fixture pin. M003a must re-check current main and freeze
-the newest compatible exact SHA with green ordinary and live qualification.
+is not a closure-grade fixture pin. M003a re-checked `main` on 2026-10-05 and
+froze the newest compatible exact SHA with green ordinary and live qualification
+(`30a38251...`), satisfying this gate as written.
 
 #### M003a — Eggbench verified bundle and comparison evidence
+
+Status: closed.
 
 Plan:
 plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md
 
-Normalize host-verified immutable bundle identity and comparison receipts while
+Closure: plans/closure/eggstack-integration/003a-closed.md
+
+Normalized host-verified immutable bundle identity and comparison receipts while
 keeping Artifact integrity separate from Benchmark success. Eggplan does not
-depend on or execute Eggbench.
+depend on or execute Eggbench. The upstream baseline gate was rechecked on
+2026-10-05 and `30a38251...` was frozen as the fixture baseline. The adapter
+keeps execution status, comparison verdict, and comparison validity as separate
+inputs to a conservative status mapping; a receipt reporting `pass` under a
+critical comparability mismatch still normalizes to `Inconclusive`, and the
+legacy v1 overloaded `inconclusive` status is never disambiguated by inference.
+See architecture/eggbench-adapter.md.
 
 #### M003b — GitHub CI/forge and artifact evidence
 

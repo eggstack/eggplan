@@ -28,24 +28,39 @@ no WorkOrder/scheduler state, no storage, and no evidence acquisition:
   production-source rule, not a whole-crate one.
 - The boundary script enforces the dependency and ownership edges with FIVE
   guards, and only the first is `[dependencies]`-scoped
-  (`scripts/check-codegg-compat-boundary.sh`):
-  - `:9-17` `awk` — `eggplan-repo` must not appear under `[dependencies]`;
-    it deliberately allows the `[dev-dependencies]` entry at `Cargo.toml:14`.
-  - `:19-22` `rg` over the whole manifest — any `codegg`/`codegg-core`
-    dependency line, in *any* section, fails; it is not section-scoped.
-  - `:24-27` `rg` over the whole manifest — `tokio`/`sqlx`/`reqwest`/`hyper`/
-    `ureq`/`surf`/`isahc` dependency lines, also not section-scoped.
-  - `:29-32` `rg` over `src/` — a `pub struct|enum|trait|type` declaration
-    named `WorkOrder`, `Goal`, `GoalVerification`, `TodoState`,
-    `WorkPlanCheckpoint`, `ContextEpoch`, `AgentRunExecutor`, `JobExecutor`,
-    `WorktreePolicy`, or `SandboxPolicy`. It catches *declarations*, not
-    mentions, so a CodeGG type named in a doc comment or a private field type
-    is not a failure.
-  - `:34-37` `rg` over `src/` — `std::process`, `Command::new`, `tokio::`,
-    `reqwest::`, `hyper::`, `sqlx::`, `std::net`, `TcpStream`, `UdpSocket`,
-    i.e. no process/network/database access in production source. Notably it
-    does **not** grep `std::fs`, so on-disk I/O in `src/` is unenforced by
-    the script (it is absent today, but the guard has a hole).
+  (`scripts/check-codegg-compat-boundary.sh`). Each guard is a named function
+  and the header at `:7-29` states all five with their scan scope:
+  - `no_production_repo_dep` (`:32-40`) `awk` — `eggplan-repo` must not appear
+    under `[dependencies]`; it deliberately allows the `[dev-dependencies]`
+    entry at `Cargo.toml:14`.
+  - `no_codegg_dependency` (`:43-46`) `rg` over the whole manifest — any
+    `codegg`/`codegg-core` dependency line, in *any* section, fails; it is not
+    section-scoped.
+  - `no_client_dependency` (`:49-52`) `rg` over the whole manifest —
+    `tokio`/`sqlx`/`reqwest`/`hyper`/`ureq`/`surf`/`isahc`/`async-std`
+    dependency lines, also not section-scoped.
+  - `no_owned_identity` (`:56-59`) `rg` over `src/` — a
+    `pub struct|enum|trait|type` declaration named `WorkOrder`, `Goal`,
+    `GoalVerification`, `TodoState`, `WorkPlanCheckpoint`, `ContextEpoch`,
+    `AgentRunExecutor`, `JobExecutor`, `WorktreePolicy`, or `SandboxPolicy`. It
+    catches *declarations*, not mentions, so a CodeGG type named in a doc
+    comment or a private field type is not a failure.
+  - `no_impure_source` (`:64-67`) `rg` over `src/` — no process, **filesystem**,
+    network, or database access in production source. It matches both the
+    fully-qualified and the `use`-imported call forms, so `std::fs::read` and a
+    bare `fs::read` behind `use std::fs` are both caught, plus `File::open`,
+    `File::create`, `std::path`, and `tempfile::`. Filesystem coverage was added
+    by corrective C002; before it the alternation covered only process/network/
+    database, leaving on-disk I/O in `src/` unenforced.
+- `run_guards` (`:68-96`) applies all five to the real manifest and source tree
+  and exits on the first failure. Deterministic synthetic self-proofs
+  (`:101-247`) run the same functions against fixtures in a `mktemp -d`
+  directory, so every guard has a negative and a positive case and no tracked
+  file is ever modified; cleanup is a targeted non-recursive `rm -f`/`rmdir`.
+  Proof coverage: production-vs-dev `eggplan-repo`, `codegg` in both sections,
+  all eight client crates, all ten owned identities as `struct`/`enum`/`trait`,
+  incidental mentions (comment, private struct, `pub const` string), and
+  eighteen process/filesystem/network/database source forms.
 - CodeGG owns WorkPlan model/statuses, bounded projections, CAS storage, and
   all runtime (checkpoint, context-epoch, Todo, Goal, WorkOrder, AgentRun/Job,
   arbiter control flow) per `architecture/codegg-compat.md:71-85` and the
@@ -273,13 +288,15 @@ the mapping auditable.
    and `digest_json` is core's own well-formed 64-hex output. A
    `get(..32).ok_or(...)?` would make the guarantee structural rather than
    argued. No other production panic path found.
-10. The boundary script's source guards do not cover filesystem I/O: the
-    process/network/database regex at
-    `scripts/check-codegg-compat-boundary.sh:34` omits `std::fs`,
-    `File::open`, and `read_to_string`. `src/` contains none today (verified by
-    grep: no `std::fs`, `File::`, or `read_to_string`), so this is a guard gap,
-    not a live defect. The fix belongs in `scripts/`, which this review does not
-    own.
+10. The boundary script's source guards now cover filesystem I/O — **closed by
+    corrective C002**. The alternation previously matched only
+    process/network/database, so `std::fs`, `File::open`, and `read_to_string`
+    in `src/` would have passed CI; `src/` contained none (verified by grep), so
+    this was a guard gap, not a live defect. `no_impure_source`
+    (`scripts/check-codegg-compat-boundary.sh:64-67`) now matches the
+    fully-qualified and `use`-imported filesystem forms plus `std::path` and
+    `tempfile::`, and a synthetic self-proof asserts each one fails. Closed by
+    `plans/closure/codegg-integration/003-c002-closed.md`.
 11. `assess_codegg_snapshot` mutates `plan.status` after `normalize_snapshot`
     already ran `plan.validate()` (`lib.rs:911-916` vs `lib.rs:869`), so the
     result is never re-validated by core before `assess_plan` consumes it

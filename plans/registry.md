@@ -154,9 +154,10 @@ subsystem.
 4. CodeGG Integration M001 — historically closed.
 5. Eggstack Provider SPI M001 — historically closed.
 6. Projection/CLI M001 — historically closed.
-7. CodeGG M002 is closed on both sides. The upstream provenance predecessor
-   `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
-   closed in dbowm91/codegg at `418fdc85656e7e1faa57f71e5e7f10f7f4859c60`
+7. CodeGG M002 is closed on both sides. The upstream provenance predecessor is
+   `eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
+   **in the CodeGG repository `dbowm91/codegg` — not a path in this
+   repository.** It closed there at `418fdc85656e7e1faa57f71e5e7f10f7f4859c60`
    (hosted CI run `36106606574` green) and made subject provenance
    attempt-scoped. Eggplan then closed its pure bridge (088968b, test matrix
    1291799), and CodeGG closed staged adoption in `3e992291`/ffa1c15e with

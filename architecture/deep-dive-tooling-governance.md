@@ -23,25 +23,39 @@ text/regex guards — not type-system or Cargo-feature enforcement.
 
 ### `check-codegg-compat-boundary.sh` (mechanism: `awk` + `rg`)
 
-Five guards, only the first of which is section-scoped:
+Five guards, only the first of which is section-scoped. Each is a named
+function; the header at `:7-29` states all five with their scan scope, and every
+failure message names the file and section it scanned. Corrective C002 added the
+filesystem coverage in the fifth guard and the self-proofs; before it the
+messages claimed more than was checked.
 
-- `awk` state machine (`:9`) tracks the `[dependencies]` section of
-  `crates/eggplan-codegg-compat/Cargo.toml` and fails if `eggplan-repo =`
-  appears there (dev-dependencies are out of scope for that test).
-- `rg` fails on `codegg | codegg-core =` at line start in the same manifest:
-  the bridge must not depend on CodeGG. Not section-scoped, so a dev- or
-  build-dependency declaration would also fail.
-- `rg` fails on `tokio | sqlx | reqwest | hyper | ureq | surf | isahc =` at
-  line start in the manifest: no async, database, or network client may enter
-  the bridge's dependency graph at all (also not section-scoped).
-- `rg` fails on `pub (struct | enum | trait | type)
-  (WorkOrder | Goal | GoalVerification | TodoState | WorkPlanCheckpoint |
+- `no_production_repo_dep` (`:32-40`) `awk` state machine tracks the
+  `[dependencies]` section of `crates/eggplan-codegg-compat/Cargo.toml` and
+  fails if `eggplan-repo =` appears there (dev-dependencies are out of scope for
+  that test, which is what keeps the legal `Cargo.toml:14` entry legal).
+- `no_codegg_dependency` (`:43-46`) `rg` fails on `codegg | codegg-core =` at
+  line start in the same manifest: the bridge must not depend on CodeGG. Not
+  section-scoped, so a dev- or build-dependency declaration would also fail.
+- `no_client_dependency` (`:49-52`) `rg` fails on `tokio | sqlx | reqwest |
+  hyper | ureq | surf | isahc | async-std =` at line start in the manifest: no
+  async, database, or network client may enter the bridge's dependency graph at
+  all (also not section-scoped).
+- `no_owned_identity` (`:56-59`) `rg` fails on `pub (struct | enum | trait |
+  type) (WorkOrder | Goal | GoalVerification | TodoState | WorkPlanCheckpoint |
   ContextEpoch | AgentRunExecutor | JobExecutor | WorktreePolicy |
   SandboxPolicy)` in `src/`: the bridge owns only the WorkPlan assessment
-  seam, not scheduler/runtime identity.
-- `rg` fails on `std::process | Command::new | tokio:: | reqwest:: | hyper:: |
-  sqlx:: | std::net | TcpStream | UdpSocket` anywhere in `src/`: production
-  bridge source stays free of process, network, and database access.
+  seam, not scheduler/runtime identity. Declarations only, so comments and
+  private positions are not failures.
+- `no_impure_source` (`:64-67`) `rg` fails in `src/` on process, **filesystem**,
+  network, and database access: `std::process | Command::new | tokio:: |
+  reqwest:: | hyper:: | sqlx:: | async_std:: | std::net | TcpStream | UdpSocket
+  | std::fs | std::path | tempfile::`, the `use`-imported `fs::` call forms,
+  and `File::open | create | create_new | open_options`.
+- `run_guards` (`:68-96`) applies all five to the real tree. Self-proofs
+  (`:101-247`) run the same functions against `mktemp -d` fixtures with positive
+  and negative cases for every guard, and clean up with a targeted
+  non-recursive `rm -f`/`rmdir`. No tracked file is written, so the proofs are
+  safe to run in CI.
 
 ### `check-integrations-boundary.sh` (mechanism: `grep -nE` / `grep -RInE` / `grep -q`)
 
@@ -156,7 +170,7 @@ form a control surface, not documentation decoration:
   into a passing result because it appears in the source plan. The full
   evidence vocabulary is pass/fail/timeout/environmental block/skipped/not
   run/unavailable external evidence, recorded truthfully (`003 §7`,
-  `AGENTS.md` hygiene rule, `registry.md:279`).
+  `AGENTS.md` hygiene rule, `registry.md:280`).
 - **Corrective-plan convention.** Later findings never silently rewrite an
   accepted closure except for factual errata; a new corrective plan references
   its predecessor, enumerates every unclosed finding, identifies controlling
@@ -164,12 +178,12 @@ form a control surface, not documentation decoration:
   updates registry/roadmap lineage (`003 §9` `:107`–`:116`). Evidence M002
   C001/C002/C003 is the worked example, including explicit non-blocking
   scoping (`registry.md:105`–`:110`, `:287`–`:288`).
-- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:209`–
+- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:210`–
   `:277` (canonical JSON freeze, provider-identity authority, append-only
   evidence, finalizer-owned subject capture, test-seam containment,
   Markdown-import limits, staged CodeGG adoption, and the frozen
   `capture_git_subject_fingerprint` digest contract at gate 23) plus the
-  hygiene rules at `registry.md:279`–`:288` (register before handoff,
+  hygiene rules at `registry.md:280`–`:288` (register before handoff,
   preserve historical closure/use corrective plans, record exact evidence and
   unrun/blocked checks, sync/deterministic core, no hidden model reasoning in
   persisted schemas, non-blocking hygiene must not serialize independent
@@ -241,26 +255,31 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    does run cross-platform via `cargo test` — six `compile_fail` doctests in
    `crates/eggplan-repo/src/lib.rs` are the one authority check that runs on
    every OS.
-4. **`registry.md` cites a plan path that does not exist.**
-   `registry.md:158` names
+4. **`registry.md` cited a plan path that does not exist — closed by C002.**
+   `registry.md:158` named
    `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
    as the "upstream provenance predecessor", but `plans/implementation/`
-   contains only the five subsystem directories; no such file or directory is
-   present. The underlying work closed in the CodeGG repository, so this is a
-   cross-repository pointer rendered as an in-repo path, and a reader cannot
-   tell "never lived here" from "lost". Every other implementation-plan
-   citation in the registry resolves. A registered corrective now owns marking
-   the path as a CodeGG repository path: CodeGG M003 C002
-   (`plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md`,
-   §7, status `ready`).
-5. **`check-codegg-compat-boundary.sh` is asymmetric about manifest
-   sections.** Only the `eggplan-repo` guard is `[dependencies]`-scoped, so a
-   dev-dependency on `eggplan-repo` is deliberately allowed. The CodeGG and
-   async/db/network guards are plain line-start matches over the whole
-   manifest, so a dev- or build-dependency on `codegg` or `tokio` fails the
-   guard — while all three messages say "production dependencies". The
-   enforcement is stricter than the wording; either the intent or the wording
-   is wrong, and the file gives no way to tell which.
+   contains only the five subsystem directories; no such file or directory was
+   present. The underlying work closed in the CodeGG repository, so this was a
+   cross-repository pointer rendered as an in-repo path, and a reader could not
+   tell "never lived here" from "lost". C002 §7 qualified the path visibly as a
+   CodeGG repository path and kept the `418fdc85…` attribution, so it no longer
+   reads as a local path. Every implementation-plan citation in the registry now
+   either resolves or is explicitly external.
+5. **`check-codegg-compat-boundary.sh` asymmetry — resolved by C002.** Only the
+   `eggplan-repo` guard was `[dependencies]`-scoped, so a dev-dependency on
+   `eggplan-repo` was deliberately allowed. The CodeGG and async/db/network
+   guards were plain line-start matches over the whole manifest, so a dev- or
+   build-dependency on `codegg` or `tokio` failed the guard. That strictness was
+   kept deliberately — Option 1 of the C002 decision — and resolved by making
+   each message state its actual scan scope in the file header
+   (`:7-29`) and in the failure text, so the file no longer leaves a reader
+   guessing which the intent was. One correction to the earlier reading of this
+   finding: it claimed *all three* manifest guards said "production
+   dependencies". Only guard 3 did. Guard 1's message matched its
+   `[dependencies]` scope, and guard 2 said "compatibility crate", not
+   "production". All five messages now name the file and section scanned, which
+   makes the distinction structural rather than a matter of reading closely.
 
 ## Verification pointers
 

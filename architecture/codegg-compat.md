@@ -133,3 +133,17 @@ Run `scripts/check-codegg-compat-boundary.sh` to verify the crate has no
 CodeGG dependency or declarations for CodeGG-only runtime ownership. Existing
 Eggplan core/repository libraries remain the only persistence and assessment
 authority.
+
+The script enforces five guards and states each one with the scope it scans, so
+a failure message never claims more than was checked. One guard is
+`[dependencies]`-scoped: production dependencies must not include `eggplan-repo`.
+The other two manifest guards deliberately match *any* section, so a
+dev- or build-dependency on CodeGG, or on an async/database/network client,
+also fails. The section-scoped exception exists because the test suite
+legitimately declares `eggplan-repo` and `tempfile` as dev-dependencies to
+exercise the real store; the production dependency graph itself must not reach
+the persistence layer. The two source guards reject a public declaration of a
+CodeGG-owned identity, and any process, filesystem, network, or database access
+in the production source. Every guard has deterministic synthetic self-proofs
+that run against fixtures in a temporary directory, so a guard that stops
+detecting is caught by its own script.

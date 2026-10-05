@@ -21,9 +21,17 @@ Hosted qualification: run
 and `native (macos-latest)` job `111620146410` failed because ripgrep is absent
 from the runner images, while `msrv` `111620146275` and `native (windows-latest)`
 `111620146356` passed. That failure is the evidence for finding
-C-CODEGG-C002-04 and is retained here rather than superseded. The workflow fix
-and the tool precondition were applied afterwards, and the follow-up run is
-recorded in a dated amendment below.
+C-CODEGG-C002-04 and is retained here rather than superseded.
+
+Dated amendment, after the workflow fix and tool precondition: run
+[37265557533](https://github.com/eggstack/eggplan/actions/runs/37265557533) for
+`73df3f1` concluded **success** — all four jobs green, with
+`check-core-boundary.sh` and `check-codegg-compat-boundary.sh` running for real
+for the first time. Confirmed again on run
+[37265723272](https://github.com/eggstack/eggplan/actions/runs/37265723272) for
+`fa0da35`: `msrv` [111622025366](https://github.com/eggstack/eggplan/actions/runs/37265723272/job/111622025366),
+`native (macos-latest)` `111622025557`, `native (ubuntu-latest)`
+`111622025574`, `native (windows-latest)` `111622025625` — all `success`.
 
 ## Executive finding
 
@@ -152,7 +160,7 @@ carried the "all three" claim now records the correction inline.
 | 8. `architecture/codegg-compat.md` and `architecture/deep-dive-tooling-governance.md` describe the guard accurately | `codegg-compat.md` now describes all five guards, the deliberate asymmetry and why it exists, and the self-proofs. `deep-dive-tooling-governance.md` describes each named function with its new line range, the added filesystem coverage, and the self-proofs. `deep-dive-codegg-compat.md` finding 10 is marked closed and its guard list rewritten. |
 | 9. The `registry.md` citation is unambiguously a CodeGG repository path with attribution preserved | `plans/registry.md` item 7 now reads "in the CodeGG repository `dbowm91/codegg` — not a path in this repository" and drops the false `plans/implementation/` prefix. The `418fdc85656e7e1faa57f71e5e7f10f7f4859c60` attribution and hosted run `36106606574` are intact. |
 | 10. No production Rust source, dependency set, schema, or public API changes | `git status --short crates/eggplan-codegg-compat/` is empty at the implementation commit; `git diff --stat crates/` is empty. Only `scripts/`, `plans/`, `architecture/`, and `.github/workflows/ci.yml` changed. |
-| 11. Native and MSRV qualification pass with all five guards green | Locally, every §6 row passes. Hosted: see "New finding C-CODEGG-C002-04" — the first hosted run **failed**, because the runners have no ripgrep, which is what surfaced the finding. The workflow fix and the tool precondition were then applied and the run repeated; the result is recorded in "Hosted qualification" below. |
+| 11. Native and MSRV qualification pass with all five guards green | Locally, every §6 row passes. Hosted: the first run (`37265105852`) **failed** because the runners have no ripgrep, which is what surfaced finding C-CODEGG-C002-04. The workflow fix and the tool precondition were then applied, and runs `37265557533` and `37265723272` are green on all four jobs with both `rg`-based guards executing for real. |
 
 ## Production evidence
 

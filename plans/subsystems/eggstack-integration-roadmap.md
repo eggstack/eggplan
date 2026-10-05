@@ -1,6 +1,6 @@
 # Eggstack Integration Roadmap
 
-Status: closed / current; M003 ready for planning
+Status: active / current; M003a and M003b planned and ready
 
 Long-term references: plans/000-long-term-specification.md sections 16-17.
 
@@ -78,6 +78,19 @@ The reviewed execution DTO and EvidenceBundle contracts were unchanged at
 these heads. The commits since the prior review update sibling planning and
 closure records. Eggplan pins these heads as fixture/review provenance only.
 
+M003 planning re-check on 2026-10-05:
+
+- Eggbench current reviewed head:
+  `1a5e03610f5c70218501d9e1dca7a101ae1c7870`
+- latest exact dual-green candidate:
+  `30a38251bccb5157beb68202ffe630f6253771e0`
+  (CI `37143714313`, live `37143714261`)
+- GitHub forge integration is host-acquired DTO normalization only; no GitHub
+  client or credentials enter `eggplan-integrations`.
+
+These are planning baselines. M003a freezes an implementation fixture SHA only
+after rechecking exact hosted qualification.
+
 ## 4. Milestones
 
 ### M001 — Evidence provider SPI
@@ -111,12 +124,45 @@ architecture/eggwork-adapter.md and architecture/eggsearch-adapter.md.
 
 ### M003 — Eggbench plus CI/forge
 
-Status: ready for planning.
+Status: planned / ready.
 
-Add bundle, CI, commit, and artifact evidence and forge adapters. Eggbench was
-rechecked at `d870512a5a1af16276ff05286ff0b6e2366b7f8f`; its current manifest v2
-keeps execution status separate from comparison verdict. Plan the adapter
-against that current contract before implementation.
+Planning re-check on 2026-10-05:
+
+- current reviewed Eggbench head:
+  `1a5e03610f5c70218501d9e1dca7a101ae1c7870`;
+- newest exact head found with both ordinary CI and live external-tool
+  qualification green:
+  `30a38251bccb5157beb68202ffe630f6253771e0`
+  (CI `37143714313`, live `37143714261`);
+- current manifest remains v2;
+- experiment plans now extend through schema v10;
+- comparison receipts are schema v4 and distinguish performance verdict,
+  correctness evidence, and final aggregate verdict.
+
+The current reviewed Eggbench head had both hosted workflow families fail, so it
+is not a closure-grade fixture pin. M003a must re-check current main and freeze
+the newest compatible exact SHA with green ordinary and live qualification.
+
+#### M003a — Eggbench verified bundle and comparison evidence
+
+Plan:
+plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md
+
+Normalize host-verified immutable bundle identity and comparison receipts while
+keeping Artifact integrity separate from Benchmark success. Eggplan does not
+depend on or execute Eggbench.
+
+#### M003b — GitHub CI/forge and artifact evidence
+
+Plan:
+plans/implementation/eggstack-integration/003b-github-ci-forge-and-artifact-evidence.md
+
+Normalize host-acquired GitHub Actions/check/status/revision/artifact facts with
+exact tested-SHA and verification binding. Preserve artifact SHA-256 without
+downloading payloads. GitHub/Sigstore attestation verification remains
+Interoperability M001.
+
+M003a and M003b can proceed independently after their own contract freeze.
 
 ## 5. Verification
 

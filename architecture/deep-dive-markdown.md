@@ -7,7 +7,7 @@ Status context: projection/CLI M002 (loss-aware Markdown import + deterministic 
 `5f4532659dbf0df2cd9f2b3bdb024217d2ea7868` (`crates/eggplan-markdown/tests/fixtures.rs:10-17`).
 Roadmap M003 (ergonomics/performance, `plans/subsystems/projection-cli-roadmap.md:58`) has **no**
 registered implementation plan and no closure evidence — the registry records it as waiting for real
-repository use (`plans/registry.md:57`, `plans/registry.md:183`). Nothing in this crate should be
+repository use (`plans/registry.md:57`, `plans/registry.md:184`). Nothing in this crate should be
 read as M003 evidence.
 
 ## 1. Crate role: bounded parser/renderer, never authority

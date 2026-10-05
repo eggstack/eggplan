@@ -30,29 +30,29 @@ no WorkOrder/scheduler state, no storage, and no evidence acquisition:
   guards, and only the first is `[dependencies]`-scoped
   (`scripts/check-codegg-compat-boundary.sh`). Each guard is a named function
   and the header at `:7-29` states all five with their scan scope:
-  - `no_production_repo_dep` (`:32-40`) `awk` — `eggplan-repo` must not appear
+  - `no_production_repo_dep` (`:32-39`) `awk` — `eggplan-repo` must not appear
     under `[dependencies]`; it deliberately allows the `[dev-dependencies]`
     entry at `Cargo.toml:14`.
-  - `no_codegg_dependency` (`:43-46`) `rg` over the whole manifest — any
+  - `no_codegg_dependency` (`:43-45`) `rg` over the whole manifest — any
     `codegg`/`codegg-core` dependency line, in *any* section, fails; it is not
     section-scoped.
-  - `no_client_dependency` (`:49-52`) `rg` over the whole manifest —
+  - `no_client_dependency` (`:49-51`) `rg` over the whole manifest —
     `tokio`/`sqlx`/`reqwest`/`hyper`/`ureq`/`surf`/`isahc`/`async-std`
     dependency lines, also not section-scoped.
-  - `no_owned_identity` (`:56-59`) `rg` over `src/` — a
+  - `no_owned_identity` (`:56-58`) `rg` over `src/` — a
     `pub struct|enum|trait|type` declaration named `WorkOrder`, `Goal`,
     `GoalVerification`, `TodoState`, `WorkPlanCheckpoint`, `ContextEpoch`,
     `AgentRunExecutor`, `JobExecutor`, `WorktreePolicy`, or `SandboxPolicy`. It
     catches *declarations*, not mentions, so a CodeGG type named in a doc
     comment or a private field type is not a failure.
-  - `no_impure_source` (`:64-67`) `rg` over `src/` — no process, **filesystem**,
+  - `no_impure_source` (`:64-66`) `rg` over `src/` — no process, **filesystem**,
     network, or database access in production source. It matches both the
     fully-qualified and the `use`-imported call forms, so `std::fs::read` and a
     bare `fs::read` behind `use std::fs` are both caught, plus `File::open`,
     `File::create`, `std::path`, and `tempfile::`. Filesystem coverage was added
     by corrective C002; before it the alternation covered only process/network/
     database, leaving on-disk I/O in `src/` unenforced.
-- `run_guards` (`:68-96`) applies all five to the real manifest and source tree
+- `run_guards` (`:68-95`) applies all five to the real manifest and source tree
   and exits on the first failure. Deterministic synthetic self-proofs
   (`:101-247`) run the same functions against fixtures in a `mktemp -d`
   directory, so every guard has a negative and a positive case and no tracked
@@ -293,7 +293,7 @@ the mapping auditable.
     process/network/database, so `std::fs`, `File::open`, and `read_to_string`
     in `src/` would have passed CI; `src/` contained none (verified by grep), so
     this was a guard gap, not a live defect. `no_impure_source`
-    (`scripts/check-codegg-compat-boundary.sh:64-67`) now matches the
+    (`scripts/check-codegg-compat-boundary.sh:64-66`) now matches the
     fully-qualified and `use`-imported filesystem forms plus `std::path` and
     `tempfile::`, and a synthetic self-proof asserts each one fails. Closed by
     `plans/closure/codegg-integration/003-c002-closed.md`.

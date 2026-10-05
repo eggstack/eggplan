@@ -29,29 +29,29 @@ failure message names the file and section it scanned. Corrective C002 added the
 filesystem coverage in the fifth guard and the self-proofs; before it the
 messages claimed more than was checked.
 
-- `no_production_repo_dep` (`:32-40`) `awk` state machine tracks the
+- `no_production_repo_dep` (`:32-39`) `awk` state machine tracks the
   `[dependencies]` section of `crates/eggplan-codegg-compat/Cargo.toml` and
   fails if `eggplan-repo =` appears there (dev-dependencies are out of scope for
   that test, which is what keeps the legal `Cargo.toml:14` entry legal).
-- `no_codegg_dependency` (`:43-46`) `rg` fails on `codegg | codegg-core =` at
+- `no_codegg_dependency` (`:43-45`) `rg` fails on `codegg | codegg-core =` at
   line start in the same manifest: the bridge must not depend on CodeGG. Not
   section-scoped, so a dev- or build-dependency declaration would also fail.
-- `no_client_dependency` (`:49-52`) `rg` fails on `tokio | sqlx | reqwest |
+- `no_client_dependency` (`:49-51`) `rg` fails on `tokio | sqlx | reqwest |
   hyper | ureq | surf | isahc | async-std =` at line start in the manifest: no
   async, database, or network client may enter the bridge's dependency graph at
   all (also not section-scoped).
-- `no_owned_identity` (`:56-59`) `rg` fails on `pub (struct | enum | trait |
+- `no_owned_identity` (`:56-58`) `rg` fails on `pub (struct | enum | trait |
   type) (WorkOrder | Goal | GoalVerification | TodoState | WorkPlanCheckpoint |
   ContextEpoch | AgentRunExecutor | JobExecutor | WorktreePolicy |
   SandboxPolicy)` in `src/`: the bridge owns only the WorkPlan assessment
   seam, not scheduler/runtime identity. Declarations only, so comments and
   private positions are not failures.
-- `no_impure_source` (`:64-67`) `rg` fails in `src/` on process, **filesystem**,
+- `no_impure_source` (`:64-66`) `rg` fails in `src/` on process, **filesystem**,
   network, and database access: `std::process | Command::new | tokio:: |
   reqwest:: | hyper:: | sqlx:: | async_std:: | std::net | TcpStream | UdpSocket
   | std::fs | std::path | tempfile::`, the `use`-imported `fs::` call forms,
   and `File::open | create | create_new | open_options`.
-- `run_guards` (`:68-96`) applies all five to the real tree. Self-proofs
+- `run_guards` (`:68-95`) applies all five to the real tree. Self-proofs
   (`:101-247`) run the same functions against `mktemp -d` fixtures with positive
   and negative cases for every guard, and clean up with a targeted
   non-recursive `rm -f`/`rmdir`. No tracked file is written, so the proofs are
@@ -170,7 +170,7 @@ form a control surface, not documentation decoration:
   into a passing result because it appears in the source plan. The full
   evidence vocabulary is pass/fail/timeout/environmental block/skipped/not
   run/unavailable external evidence, recorded truthfully (`003 §7`,
-  `AGENTS.md` hygiene rule, `registry.md:280`).
+  `AGENTS.md` hygiene rule, `registry.md:279`).
 - **Corrective-plan convention.** Later findings never silently rewrite an
   accepted closure except for factual errata; a new corrective plan references
   its predecessor, enumerates every unclosed finding, identifies controlling
@@ -178,12 +178,12 @@ form a control surface, not documentation decoration:
   updates registry/roadmap lineage (`003 §9` `:107`–`:116`). Evidence M002
   C001/C002/C003 is the worked example, including explicit non-blocking
   scoping (`registry.md:105`–`:110`, `:287`–`:288`).
-- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:210`–
+- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:209`–
   `:277` (canonical JSON freeze, provider-identity authority, append-only
   evidence, finalizer-owned subject capture, test-seam containment,
   Markdown-import limits, staged CodeGG adoption, and the frozen
   `capture_git_subject_fingerprint` digest contract at gate 23) plus the
-  hygiene rules at `registry.md:280`–`:288` (register before handoff,
+  hygiene rules at `registry.md:279`–`:288` (register before handoff,
   preserve historical closure/use corrective plans, record exact evidence and
   unrun/blocked checks, sync/deterministic core, no hidden model reasoning in
   persisted schemas, non-blocking hygiene must not serialize independent
@@ -199,14 +199,14 @@ Layout and hygiene, verified by enumeration rather than asserted:
   `NNN-cNNN-short-title.md` / `NNN-cNNN-closed.md`.
 - `implementation/` and `closure/` use the same five subsystem directories
   (`codegg-integration`, `eggstack-integration`, `evidence-closure`,
-  `foundation-core`, `projection-cli`), 19 implementation plans against 18
-  closure records as of the C004 closure (`623dde9`). The one-plan difference is
-  correct, not a gap:
-  CodeGG M003 C002 is registered with status `ready` and
-  has no closure record yet, because
+  `foundation-core`, `projection-cli`), 19 implementation plans against 19
+  closure records as of the C002 closure (`8c4f6e6`). The counts are currently
+  equal because every registered plan is now closed; there is no registered open
+  corrective. A gap would be legitimate and expected in the other direction: a
+  plan with status `ready` has no closure record yet, because
   `plans/003-planning-process.md` §7 requires a closure record to distinguish
-  planned from actually-run commands and must never be written from a plan. Every
-  `closed` row in the registry resolves to an existing closure file, and no
+  planned from actually-run commands and must never be written from a plan.
+  Every `closed` row in the registry resolves to an existing closure file, and no
   closure record is orphaned. Re-derive both counts by enumeration rather than
   trusting this line — they change whenever a plan is registered or closed.
 - The two "historical" qualifications are real and bounded, not

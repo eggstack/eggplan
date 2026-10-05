@@ -1,7 +1,7 @@
 # CodeGG Integration Roadmap
 
-Status: M001-M003 and C001 closed; the roadmap is terminal. C002 is an open
-non-blocking tooling corrective, not a reopened milestone.
+Status: M001-M003 and C001/C002 closed; the roadmap is terminal. C002 was
+non-blocking tooling hardening and did not reopen any milestone.
 
 Long-term references: plans/000-long-term-specification.md section 16.
 
@@ -211,12 +211,12 @@ State as of this roadmap update:
 
 ### C002 — Compatibility boundary-guard completeness
 
-Status: ready; registered at `60a5f92`. Open tooling corrective, non-blocking.
+Status: closed at `8c4f6e6`. Tooling corrective, non-blocking; closed without
+reopening M003 or C001.
 
 Plan: plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md
 
-Closure: not yet written. A closure record is created only from real evidence
-after implementation, per plans/003-planning-process.md §7.
+Closure: plans/closure/codegg-integration/003-c002-closed.md
 
 A code-verified architecture review of the M003 ownership boundary found that
 `scripts/check-codegg-compat-boundary.sh:34` fails on process, network, and
@@ -237,6 +237,30 @@ synthetic self-proofs following the `prove(...)` pattern already established in
 C002 does not reopen M003 or C001, does not change the bridge's dependency set or
 any mapped semantics, and does not gate the terminal CodeGG roadmap or any other
 subsystem.
+
+Resolved as implemented. The script was restructured around five named guard
+functions with a header stating each guard and the scope it scans.
+`no_impure_source` now matches `std::fs`, `std::path`, `tempfile::`, the
+`use`-imported `fs::` call forms, and the `File::` constructors alongside the
+existing process/network/database patterns, so a filesystem use in the bridge
+source fails CI. Both the fully-qualified and the `use`-imported call forms are
+covered. The manifest guards keep their unscoped strictness by deliberate
+decision, and every failure message now names the file and section actually
+scanned. All five guards gained deterministic synthetic self-proofs — 67
+assertions, measured by running an instrumented copy — that use fixtures in a
+`mktemp -d` directory and never write tracked source.
+
+One correction to the description above, which is retained as the record of what
+was found: it states that the manifest guards at `:19` and `:24` have messages
+claiming "production dependencies" while scanning unscoped. On reading the
+original script, only the `:24` message was inaccurate; the `:19` message said
+"compatibility crate", not "production", and matched what it scanned. All five
+messages were rewritten for explicit scope regardless, which is what the plan's
+§3 requires.
+
+`crates/eggplan-codegg-compat` was already pure and is unchanged: `src/lib.rs`
+imports only `std::collections`, and no file under `crates/` was modified. The
+defect was in the enforcement, not the crate.
 
 ## 5. Verification
 

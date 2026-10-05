@@ -134,10 +134,17 @@ Single-plan commands keep their existing paths.
 
 ## No public injection seam
 
-Three `compile_fail` doctests in `crates/eggplan-repo/src/lib.rs` pin this:
-`SnapshotCounters` is not reachable from outside the crate, `SubjectCapture`
-cannot be passed to the snapshot, and `InspectionSnapshot` is not serializable.
-The nine doctests in that module pass.
+`crates/eggplan-repo/src/lib.rs` carries 9 `compile_fail` doctests, 6 of them
+pre-existing from Foundation M003 and 3 added by this milestone:
+
+- `SnapshotCounters` cannot be named from outside the crate;
+- a caller cannot inject a `SubjectCapture` into the snapshot path;
+- `InspectionSnapshot` is not serializable.
+
+The other 6 continue to pin that `SubjectCapture` and `ScriptedSubjectCapture`
+are not public, that no injected closure finalizer is reachable, and that
+`GitSubjectFingerprintV1` exposes no repository ID, path, or manifest bytes. All 9
+doctests pass, which is why `eggplan-repo` reports 9 in its doctest count.
 
 ## Performance characterization
 
@@ -192,18 +199,22 @@ Per-crate test counts at `2c32ffe`: `eggplan-core` 34, `eggplan-repo` 77,
 
 The 3 ignored tests are the 2 characterization harnesses introduced by this
 milestone (`characterization_snapshot_matrix`,
-`characterization_dirty_subject_dominates_and_does_not_scale_with_plans`) plus
-the 1 pre-existing ignored test in `git_subject_digest_golden.rs`. The CI-gated
-`characterization_counter_matrix_runs_in_ci` is *not* ignored: it asserts the
-counter matrix on every run, and only the wall-time replay is opt-in.
+`characterization_dirty_subject_dominates_and_does_not_scale_with_plans`, both in
+`snapshot.rs`) plus the 1 pre-existing ignored test
+`record_golden_dirty_manifest_digests` in `git_subject_digest_golden.rs`. The
+CI-gated `characterization_counter_matrix_runs_in_ci` is *not* ignored: it asserts
+the counter matrix on every run, and only the wall-time replay is opt-in.
 
 `eggplan-repo`'s 77 is 30 lib tests + 9 doctests + 38 integration tests across
 `repository.rs`, `git_subject_fingerprint.rs`, and `git_subject_digest_golden.rs`.
 
-New in this milestone: 30 `eggplan-repo` lib tests (23 snapshot regressions, 1
-CI-gated characterization matrix, 2 ignored evidence harnesses, plus shared
-fixtures) and 5 differential golden tests in
-`crates/eggplan-cli/tests/inspection_snapshot_golden.rs`.
+New in this milestone: 24 `eggplan-repo` lib tests in `snapshot.rs`, of which 22
+are active (including the CI-gated
+`characterization_counter_matrix_runs_in_ci`) and 2 are `#[ignore]`d evidence
+harnesses, plus 5 differential golden tests in
+`crates/eggplan-cli/tests/inspection_snapshot_golden.rs`. `eggplan-repo` has 32
+lib tests in total (24 `snapshot.rs`, 4 `git_subject.rs`, 4 `store.rs`), reported
+as 30 passed and 2 ignored.
 
 ## Golden-output equivalence
 

@@ -154,7 +154,7 @@ because it would couple the shell to repository discovery and its latency.
 | §9 human ergonomics | `render_compact_row` produces fixed-width one-row-per-plan output with explicit truncation and next-cursor notices; color/pager/TUI are absent by design. |
 | §10 machine output | All new output uses the existing `OutputEnvelope` schema v1; `CompactPlanSummaryV1` carries its own `schema_version: 1`. Reason codes come from domain/projection code, never human-string parsing. |
 | §11 bounds and failure | `list_bounds_are_enforced`, `explicit_id_set_is_bounded`, `status_rejects_duplicates_and_unknown_ids_deterministically`, `unknown_completion_shell_is_a_usage_error`. An unknown plan ID fails the command rather than returning a shorter, apparently complete result. |
-| §12 tests | 19 tests in `tests/batch_and_completions.rs`, plus the 7 pre-existing CLI tests and 3 `compile_fail` doctests. Linux and Rust 1.89 verified locally; macOS/Windows require the hosted run recorded below. |
+| §12 tests | 19 tests in `tests/batch_and_completions.rs`, plus the 7 pre-existing CLI tests in `tests/commands.rs` and the 5 differential golden tests in `tests/inspection_snapshot_golden.rs`. The CLI crate has no `compile_fail` doctests of its own; the 9 in `eggplan-repo` belong to the read model and are recorded under M003a. Linux and Rust 1.89 verified locally; macOS/Windows require the hosted run recorded below. |
 | §13 documentation | `docs/cli-reference.md` and `architecture/cli-control-surface.md`. |
 | §15 required verification | Below. |
 | §16 acceptance criteria | 1-8 met; **9 unmet** — see "Hosted qualification". |

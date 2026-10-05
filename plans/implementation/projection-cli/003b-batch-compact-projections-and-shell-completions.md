@@ -1,6 +1,6 @@
 # Projection and CLI M003b — Batch Queries, Compact Projections, and Shell Completions
 
-Status: ready
+Status: closing
 
 Repository baseline: 71904570e908a15c099f9b2804cabfbccf9ae51a
 

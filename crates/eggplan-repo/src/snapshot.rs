@@ -46,6 +46,24 @@ pub enum InspectionSelection {
     Repository { retain: Option<usize> },
     /// One specific Plan.
     One(PlanId),
+    /// Deterministic keyset selection: every Plan strictly greater than
+    /// `after`, retaining at most `retain` of them.
+    ///
+    /// The cursor is applied *before* retention so pagination can walk the
+    /// whole repository while the in-memory projection stays bounded. Every
+    /// Plan is still deep-validated exactly once.
+    After {
+        after: Option<PlanId>,
+        retain: usize,
+    },
+    /// An explicit, bounded set of Plan IDs.
+    ///
+    /// Every repository Plan is still deep-validated exactly once; only the
+    /// requested IDs are retained. This is how a multi-ID batch read avoids
+    /// reintroducing the per-Plan reads the snapshot exists to remove.
+    Subset {
+        ids: std::collections::BTreeSet<PlanId>,
+    },
 }
 
 impl InspectionSelection {
@@ -53,13 +71,22 @@ impl InspectionSelection {
     pub fn retain_limit(&self) -> Option<usize> {
         match self {
             Self::Repository { retain } => *retain,
-            Self::One(_) => None,
+            Self::After { retain, .. } => Some(*retain),
+            Self::One(_) | Self::Subset { .. } => None,
         }
     }
 
     /// Does this selection enumerate the whole repository?
     pub fn is_repository_wide(&self) -> bool {
-        matches!(self, Self::Repository { .. })
+        !matches!(self, Self::One(_))
+    }
+
+    /// The keyset cursor, when this selection is a keyset scan.
+    pub fn after(&self) -> Option<&PlanId> {
+        match self {
+            Self::After { after, .. } => after.as_ref(),
+            _ => None,
+        }
     }
 }
 

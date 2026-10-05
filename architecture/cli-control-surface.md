@@ -76,3 +76,66 @@ observations to trusted proof. Current Git subject unavailability is explicit.
 `RepositoryStore::open_read_only` does not initialize files or recover pending
 closure transactions. The separate normal open path retains repository
 startup recovery semantics for mutation and explicit `check --recover-pending`.
+
+
+## M003b additions
+
+### One declarative command inventory
+
+`crates/eggplan-cli/src/commands.rs` is the single description of what the CLI accepts:
+command and subcommand names, positional shapes, value options, boolean flags,
+subcommand-scoped options, closed value sets, and short help text.
+
+Three things read it, so they cannot drift into independent inventories:
+
+1. the top-level `usage()` line and per-command `--help COMMAND` rendering;
+2. unknown-option and unknown-flag validation in `validate_command_options`;
+3. the four shell completion generators.
+
+Parser *execution* remains handwritten. This is deliberately not a parser migration:
+the milestone needed a single inventory to hang completions and validation from, and
+rewriting the parser would have put stable JSON and error compatibility at risk for no
+user-visible gain. Clap was not adopted; it must not take over error or output authority
+unless exact CLI JSON/error compatibility is proven first.
+
+`eggplan_cli::command_metadata()` exposes a read-only view of the table so a test can
+prove help is *derived* from it, and `metadata_drives_help_validation_and_completions_together`
+proves every declared option is accepted while an undeclared one still fails.
+
+### Compact plan projection
+
+`CompactPlanSummaryV1` in `eggplan-projection` is a new, explicitly versioned projection
+for multi-plan overviews. It never replaces or trims `PlanSummary`, `show`, or `status`:
+those payloads are unchanged. The compact row carries identity, revision, lifecycle,
+item and readiness counts, closure presence, an optional assessment verdict, bounded
+sorted reason codes, and an objective preview with an explicit truncation marker. It
+carries no item descriptions, evidence records, blocker prose, or arbitrary metadata.
+
+`assessment_status: None` means no assessment was computed. That is deliberately distinct
+from an assessment that found nothing, so a caller cannot read absence as success.
+
+### Bounded batch reads
+
+`status` accepts a bounded explicit ID set and `list` adds filtering and keyset
+pagination. Both are bounded at 100, and both go through the M003a repository inspection
+snapshot — including explicit ID sets, which use `InspectionSelection::Subset` and
+`InspectionSelection::After` so a batch never reintroduces per-Plan subject capture.
+
+`--status` accepts only the canonical serialized `PlanStatus` spellings that `list` itself
+emits, so a caller can filter on a value it just read.
+
+Keyset pagination applies the cursor inside the read model, before retention. That is
+what lets a caller page through a repository larger than one page without the projection
+becoming unbounded.
+
+`matched` is explicitly window-scoped: it counts rows matching the filter inside the
+bounded window the call could see, not an unbounded repository-wide total. Reporting an
+unbounded total would require loading every row, which the bounds forbid.
+
+### Provider policy on read commands
+
+`show`, `status`, `list`, `registry render`, and `check` accept an optional
+`--provider-policy FILE`, parsed by the same strict bounded parser as `assess` and
+`close`. Absence still means an empty provider registry, and a read that assessed
+evidence without a policy says so in `warnings`. Provider IDs found in evidence never
+self-enroll, and no repository-global trust store exists.

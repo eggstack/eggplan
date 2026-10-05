@@ -361,7 +361,7 @@ pub fn registry_projection(
             RegistryPlan {
                 plan_id: plan.id,
                 revision: plan.revision,
-                status: plan.status,
+                status: plan.status.clone(),
                 item_count: plan.items.len(),
                 closure_present,
                 readiness_count,
@@ -481,4 +481,142 @@ fn bound_warnings(mut warnings: Vec<String>) -> Vec<String> {
         .into_iter()
         .map(|warning| truncate(&warning, MAX_TEXT_CHARS).0)
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Compact plan overview (M003b)
+// ---------------------------------------------------------------------------
+
+/// Schema version for [`CompactPlanSummaryV1`]. Independent of
+/// [`OUTPUT_SCHEMA_VERSION`], which versions the envelope.
+pub const COMPACT_PLAN_SCHEMA_VERSION: u32 = 1;
+
+/// Maximum objective preview characters in a compact row.
+pub const MAX_COMPACT_OBJECTIVE_CHARS: usize = 120;
+/// Maximum stable reason codes retained in a compact row.
+pub const MAX_COMPACT_REASON_CODES: usize = 8;
+
+/// One row of the compact plan overview.
+///
+/// This is a new, explicitly versioned projection. It exists so multi-plan
+/// repositories can be inspected without paying for full [`PlanSummary`]
+/// objects, and it never replaces or mutates an existing JSON contract.
+///
+/// It carries only high-value bounded fields: identity, revision, lifecycle,
+/// counts, closure presence, an optional assessment verdict, stable reason
+/// codes, and an objective preview with an explicit truncation marker. It never
+/// carries item descriptions, evidence records, blocker prose, or arbitrary
+/// metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompactPlanSummaryV1 {
+    pub schema_version: u32,
+    pub plan_id: PlanId,
+    pub revision: u64,
+    pub status: PlanStatus,
+    pub item_count: usize,
+    pub ready_item_count: usize,
+    pub blocked_item_count: usize,
+    pub has_closure: bool,
+    pub assessment_status: Option<AssessmentStatus>,
+    pub assessment_reason_codes: Vec<String>,
+    pub assessment_reason_codes_truncated: bool,
+    pub objective_preview: String,
+    pub objective_truncated: bool,
+}
+
+/// Build one compact row.
+///
+/// `assessment` is whatever the host chose to compute. `None` means no
+/// assessment was computed, which is not the same as an assessment that found
+/// nothing: the caller must not silently treat the two as equal.
+pub fn compact_plan_summary_v1(
+    plan: &Plan,
+    assessment: Option<&PlanAssessment>,
+) -> CompactPlanSummaryV1 {
+    let (objective_preview, objective_truncated) =
+        truncate(&plan.objective, MAX_COMPACT_OBJECTIVE_CHARS);
+    // Reuse the same derived readiness the detailed projection uses, so a
+    // compact "ready" count never disagrees with `ready`.
+    let readiness: BTreeMap<_, _> = readiness(plan)
+        .into_iter()
+        .map(|item| (item.item_id, item.readiness))
+        .collect();
+    let ready_item_count = plan
+        .items
+        .iter()
+        .filter(|item| readiness.get(&item.id) == Some(&Readiness::Ready))
+        .count();
+    let blocked_item_count = plan
+        .items
+        .iter()
+        .filter(|item| item.status == PlanItemStatus::Blocked)
+        .count();
+
+    let (assessment_status, mut codes) = match assessment {
+        Some(assessment) => {
+            let mut codes: Vec<String> = assessment.reasons.iter().map(reason_code).collect();
+            codes.extend(
+                assessment
+                    .items
+                    .iter()
+                    .flat_map(|item| &item.reasons)
+                    .map(reason_code),
+            );
+            codes.sort();
+            codes.dedup();
+            (Some(assessment.status), codes)
+        }
+        None => (None, Vec::new()),
+    };
+    let codes_truncated = codes.len() > MAX_COMPACT_REASON_CODES;
+    codes.truncate(MAX_COMPACT_REASON_CODES);
+
+    CompactPlanSummaryV1 {
+        schema_version: COMPACT_PLAN_SCHEMA_VERSION,
+        plan_id: plan.id.clone(),
+        revision: plan.revision,
+        status: plan.status.clone(),
+        item_count: plan.items.len(),
+        ready_item_count,
+        blocked_item_count,
+        has_closure: false,
+        assessment_status,
+        assessment_reason_codes: codes,
+        assessment_reason_codes_truncated: codes_truncated,
+        objective_preview,
+        objective_truncated,
+    }
+}
+
+/// Deterministic one-line human rendering of a compact row.
+///
+/// Columns are fixed and aligned so `list` output is greppable and diffable.
+/// Truncation is always visible rather than silently implied.
+pub fn render_compact_row(row: &CompactPlanSummaryV1) -> String {
+    let assessment = match row.assessment_status {
+        Some(status) => format!("{status:?}").to_lowercase(),
+        None => "-".to_string(),
+    };
+    let closure = if row.has_closure { "closed" } else { "-" };
+    let mut line = format!(
+        "{:<28} {:<7} rev {:<4} items {:<4} ready {:<4} blocked {:<4} assess {:<12} closure {:<6}",
+        row.plan_id.as_str(),
+        format!("{:?}", row.status).to_lowercase(),
+        row.revision,
+        row.item_count,
+        row.ready_item_count,
+        row.blocked_item_count,
+        assessment,
+        closure,
+    );
+    if row.assessment_reason_codes_truncated {
+        line.push_str(" reasons+");
+    }
+    line.push(' ');
+    line.push_str(&row.objective_preview);
+    if row.objective_truncated {
+        line.push('…');
+    }
+    line
 }

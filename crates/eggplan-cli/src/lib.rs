@@ -2,6 +2,41 @@
 
 //! Thin command adapter over eggplan-core, eggplan-repo, and bounded DTOs.
 
+mod commands;
+
+/// Read-only view of the declarative command inventory.
+///
+/// Exposed so a test can prove that help and shell completions are generated
+/// from this one table rather than from an independent hand-maintained list.
+/// Read-only by construction: the returned entries are shared references.
+pub fn command_metadata() -> Vec<CommandInfo> {
+    commands::COMMANDS
+        .iter()
+        .map(|spec| CommandInfo {
+            name: spec.name,
+            help: spec.help,
+            subcommands: spec.subcommands.to_vec(),
+            options: spec
+                .options
+                .iter()
+                .chain(spec.sub_options.iter().flat_map(|(_, o)| o.iter()))
+                .map(|option| option.name)
+                .collect(),
+            flags: spec.flags.iter().map(|flag| flag.name).collect(),
+        })
+        .collect()
+}
+
+/// One command's declarative metadata, as seen by the read-only view above.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandInfo {
+    pub name: &'static str,
+    pub help: &'static str,
+    pub subcommands: Vec<&'static str>,
+    pub options: Vec<&'static str>,
+    pub flags: Vec<&'static str>,
+}
+
 use eggplan_core::{
     AssessmentStatus, ClosureCandidate, ClosureId, EvidenceKind, EvidenceObservation,
     EvidenceObservationId, EvidenceProviderId, EvidenceStatus, Plan, PlanAssessment, PlanId,
@@ -10,10 +45,13 @@ use eggplan_core::{
 };
 use eggplan_markdown::{ImportFormat, ImportReport};
 use eggplan_projection::{
-    OutputEnvelope, PlanDetail, PlanSummary, graph_projection, readiness_projection, reason_code,
-    registry_projection, summarize_plan,
+    CompactPlanSummaryV1, OutputEnvelope, PlanDetail, PlanSummary, compact_plan_summary_v1,
+    graph_projection, readiness_projection, reason_code, registry_projection, render_compact_row,
+    summarize_plan,
 };
-use eggplan_repo::{InspectionSelection, PlanStore, RepoError, RepositoryStore};
+use eggplan_repo::{
+    InspectionSelection, LoadedPlanSnapshot, PlanStore, RepoError, RepositoryStore,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -279,7 +317,7 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, CliFailure> {
         let arg = &args[i];
         if arg == "--json" {
             json = true;
-        } else if arg == "--recover-pending" {
+        } else if is_flag(arg) {
             flags.insert(arg.clone());
         } else if arg == "--help" || arg == "-h" {
             flags.insert("--help".into());
@@ -328,18 +366,11 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, CliFailure> {
 }
 
 fn is_value_option(value: &str) -> bool {
-    matches!(
-        value,
-        "--state-root"
-            | "--input"
-            | "--expected-revision"
-            | "--provider-policy"
-            | "--status"
-            | "--blocker"
-            | "--next-action"
-            | "--output"
-            | "--format"
-    )
+    commands::is_value_option(value)
+}
+
+fn is_flag(value: &str) -> bool {
+    commands::is_flag(value)
 }
 
 fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, CliFailure> {
@@ -409,58 +440,7 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
                 format!("{} {:?} revision {}", plan.id, plan.status, plan.revision),
             )
         }
-        "status" => {
-            require_positions(&args, 0, 1)?;
-            let store = read_store(&state_root, &command, args.json)?;
-            let selection = match args.positional.first() {
-                Some(raw) => InspectionSelection::One(plan_id(raw, &command, args.json)?),
-                // Repository-wide status retains 100 projected plans.
-                None => InspectionSelection::Repository { retain: Some(100) },
-            };
-            let snapshot = store
-                .inspection_snapshot(&selection)
-                .map_err(|error| repo_failure(&command, error, args.json))?;
-            let mut warnings = Vec::new();
-            let empty_registry = ProviderRegistry::default();
-            let plans = snapshot
-                .plans()
-                .iter()
-                .map(|loaded| {
-                    let (subject, assessment) = match snapshot.subject() {
-                        Some(subject) => (
-                            Some(subject.clone()),
-                            Some(assess_plan(
-                                loaded.plan(),
-                                subject,
-                                loaded.effective(),
-                                &empty_registry,
-                            )),
-                        ),
-                        None => {
-                            warnings.push("current_subject_unavailable".into());
-                            (None, None)
-                        }
-                    };
-                    Ok(summarize_plan(
-                        loaded.plan(),
-                        subject,
-                        assessment.as_ref(),
-                        loaded.closure().is_some(),
-                    ))
-                })
-                .collect::<Result<Vec<_>, CliFailure>>()?;
-            let data = StatusData {
-                plans,
-                total_plans: snapshot.total_plans(),
-                truncated: snapshot.truncated(),
-            };
-            success(
-                &args,
-                data,
-                warnings,
-                format!("{} plan(s)", snapshot.total_plans()),
-            )
-        }
+        "status" => status_command(&args, &state_root),
         "ready" => {
             require_positions(&args, 1, 1)?;
             let id = plan_id(&args.positional[0], &command, args.json)?;
@@ -491,6 +471,7 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
                 .join("\n");
             success(&args, graph, Vec::new(), human)
         }
+        "list" => list_command(&args, &state_root),
         "check" => check_command(&args, &state_root),
         "activate" => mutate_activate(&args, &state_root),
         "item" => mutate_item(&args, &state_root),
@@ -500,74 +481,60 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
         "closure" => closure_command(&args, &state_root),
         "registry" => registry_command(&args, &state_root),
         "markdown" => markdown_command(&args, &state_root),
-        "help" | "--help" | "-h" => success(&args, json!({"usage": usage()}), Vec::new(), usage()),
+        "completions" => completions_command(&args),
+        "help" | "--help" | "-h" => {
+            // `--help COMMAND` renders that command's own metadata.
+            let detail = args
+                .positional
+                .first()
+                .and_then(|name| commands::command_help(name));
+            let help = detail.clone().unwrap_or_else(usage);
+            success(
+                &args,
+                json!({"usage": usage(), "command": detail}),
+                Vec::new(),
+                help,
+            )
+        }
         _ => Err(failure(&command, "usage", usage(), args.json)),
     }
 }
 
+/// Validate the supplied options and flags against the declarative command
+/// metadata. The metadata is the only command inventory, so help, validation,
+/// and completions cannot drift apart.
 fn validate_command_options(args: &ParsedArgs) -> Result<(), CliFailure> {
-    let mut allowed = BTreeSet::from(["--state-root"]);
-    let mut allowed_flags = BTreeSet::new();
-    match args.command.as_str() {
-        "init" => {}
-        "new" => {
-            allowed.insert("--input");
-        }
-        "show" | "status" | "ready" | "graph" | "registry" | "closure" | "evidence" => {}
-        "check" => {
-            allowed_flags.insert("--recover-pending");
-            allowed.insert("--provider-policy");
-        }
-        "activate" => {
-            allowed.insert("--expected-revision");
-        }
-        "item" => {
-            allowed.extend([
-                "--expected-revision",
-                "--status",
-                "--blocker",
-                "--next-action",
-            ]);
-        }
-        "assess" => {
-            allowed.insert("--provider-policy");
-        }
-        "close" => {
-            allowed.extend(["--expected-revision", "--provider-policy"]);
-        }
-        "markdown" => {
-            let subcommand = args.positional.first().map(String::as_str).unwrap_or("");
-            match subcommand {
-                "render" => {
-                    allowed.insert("--output");
-                }
-                "inspect" | "import" => {
-                    allowed.insert("--format");
-                }
-                _ => {}
-            }
-        }
-        "help" => {
-            allowed_flags.insert("--help");
-        }
-        _ => return Ok(()),
-    }
-    if let Some(option) = args
-        .options
-        .keys()
-        .find(|option| !allowed.contains(option.as_str()))
+    let subcommand = args.positional.first().map(String::as_str);
+    let (options, flags) = commands::options_for(&args.command, subcommand);
+    if let Some(sub) = args.positional.first()
+        && commands::spec(&args.command).is_some_and(|spec| !spec.subcommands.is_empty())
+        && !commands::is_subcommand_of(&args.command, sub)
     {
         return Err(failure(
             &args.command,
             "usage",
-            format!("option {option} is not valid for this command"),
+            format!(
+                "unknown subcommand {sub:?}; expected one of {}",
+                commands::spec(&args.command)
+                    .map(|spec| spec.subcommands.join(", "))
+                    .unwrap_or_default()
+            ),
             args.json,
         ));
+    }
+    // `--state-root` selects the repository and is accepted by every command,
+    // which is why it is carried on every spec as well.
+    if let Some(option) = args
+        .options
+        .keys()
+        .find(|option| !options.iter().any(|allowed| allowed.name == *option))
+    {
+        return Err(unknown_option(args, option));
     }
     if let Some(flag) = args
         .flags
         .iter()
-        .find(|flag| !allowed_flags.contains(flag.as_str()))
+        .find(|flag| !flags.iter().any(|allowed| allowed.name == *flag))
     {
         return Err(failure(
             &args.command,
@@ -577,6 +544,378 @@ fn validate_command_options(args: &ParsedArgs) -> Result<(), CliFailure> {
         ));
     }
     Ok(())
+}
+
+fn unknown_option(args: &ParsedArgs, option: &str) -> CliFailure {
+    let known = commands::options_for(&args.command, args.positional.first().map(String::as_str))
+        .0
+        .iter()
+        .map(|allowed| allowed.name)
+        .collect::<Vec<_>>()
+        .join(", ");
+    failure(
+        &args.command,
+        "usage",
+        format!("option {option} is not valid for this command; accepted: {known}"),
+        args.json,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Batch and compact read commands
+// ---------------------------------------------------------------------------
+
+/// Resolve the read-side provider registry. Absence always means an empty
+/// registry, which is how "no implicit trust" is expressed without a global
+/// trust store.
+fn read_registry(args: &ParsedArgs) -> Result<ProviderRegistry, CliFailure> {
+    match args.options.get("--provider-policy") {
+        Some(path) => Ok(load_policy(path, args.json)?.registry),
+        None => Ok(ProviderRegistry::default()),
+    }
+}
+
+fn assess_read(
+    loaded: &LoadedPlanSnapshot,
+    subject: Option<&SubjectRevision>,
+    registry: &ProviderRegistry,
+) -> Option<PlanAssessment> {
+    subject.map(|subject| assess_plan(loaded.plan(), subject, loaded.effective(), registry))
+}
+
+/// `status [PLAN_ID ...]` — zero IDs is the repository-wide bounded read, one
+/// ID keeps the historical single-plan semantics, and several IDs project the
+/// same stable shape for just the requested set.
+fn status_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
+    let command = &args.command;
+    if args.positional.len() > commands::bounds::MAX_EXPLICIT_PLAN_IDS {
+        return Err(failure(
+            command,
+            "usage",
+            format!(
+                "at most {} explicit plan IDs are accepted, got {}",
+                commands::bounds::MAX_EXPLICIT_PLAN_IDS,
+                args.positional.len()
+            ),
+            args.json,
+        ));
+    }
+    // Duplicates are a caller mistake, not something to silently deduplicate.
+    let mut seen = BTreeSet::new();
+    let mut ids = Vec::new();
+    for raw in &args.positional {
+        let id = plan_id(raw, command, args.json)?;
+        if !seen.insert(id.clone()) {
+            return Err(failure(
+                command,
+                "usage",
+                format!("duplicate plan ID {id}"),
+                args.json,
+            ));
+        }
+        ids.push(id);
+    }
+
+    let store = read_store(root, command, args.json)?;
+    let registry = read_registry(args)?;
+    let selection = match ids.as_slice() {
+        [] => InspectionSelection::Repository { retain: Some(100) },
+        [one] => InspectionSelection::One(one.clone()),
+        many => InspectionSelection::Subset {
+            ids: many.iter().cloned().collect(),
+        },
+    };
+    let snapshot = store
+        .inspection_snapshot(&selection)
+        .map_err(|error| repo_failure(command, error, args.json))?;
+
+    let selected: Vec<&LoadedPlanSnapshot> = match ids.as_slice() {
+        [] => snapshot.plans().iter().collect(),
+        many => {
+            let requested: BTreeSet<_> = many.iter().cloned().collect();
+            let mut selected: Vec<_> = snapshot
+                .plans()
+                .iter()
+                .filter(|loaded| requested.contains(&loaded.plan().id))
+                .collect();
+            // Unknown IDs must fail deterministically rather than vanish.
+            let found: BTreeSet<_> = selected
+                .iter()
+                .map(|loaded| loaded.plan().id.clone())
+                .collect();
+            if let Some(missing) = requested.difference(&found).next() {
+                return Err(failure(
+                    command,
+                    "plan_not_found",
+                    format!("plan {missing} does not exist"),
+                    args.json,
+                ));
+            }
+            selected.sort_by(|a, b| a.plan().id.cmp(&b.plan().id));
+            selected
+        }
+    };
+
+    let mut warnings = Vec::new();
+    let plans: Vec<PlanSummary> = selected
+        .iter()
+        .map(|loaded| {
+            let assessment = assess_read(loaded, snapshot.subject(), &registry);
+            summarize_plan(
+                loaded.plan(),
+                snapshot.subject().cloned(),
+                assessment.as_ref(),
+                loaded.closure().is_some(),
+            )
+        })
+        .collect();
+    if snapshot.subject().is_none() {
+        warnings.push("current_subject_unavailable".into());
+    } else if !ids.is_empty() && !args.options.contains_key("--provider-policy") {
+        // Only worth saying when evidence could have changed the verdict.
+        if selected
+            .iter()
+            .any(|loaded| !loaded.active_observations().is_empty())
+        {
+            warnings.push(
+                "assessment_uses_empty_provider_registry:no provider policy was supplied".into(),
+            );
+        }
+    }
+
+    let total_plans = if ids.is_empty() {
+        snapshot.total_plans()
+    } else {
+        ids.len()
+    };
+    let truncated = if ids.is_empty() {
+        snapshot.truncated()
+    } else {
+        false
+    };
+    let data = StatusData {
+        plans,
+        total_plans,
+        truncated,
+    };
+    success(args, data, warnings, format!("{total_plans} plan(s)"))
+}
+
+/// Machine payload for `list`.
+#[derive(Debug, Serialize, Deserialize)]
+struct ListData {
+    repository_id: String,
+    plans: Vec<CompactPlanSummaryV1>,
+    matched: usize,
+    returned: usize,
+    truncated: bool,
+    /// Strictly-greater keyset cursor for the next call, absent when exhausted.
+    next_after: Option<String>,
+    filter_status: Option<PlanStatus>,
+}
+
+/// `list` — compact, bounded, deterministic overview with keyset pagination.
+fn list_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
+    let command = &args.command;
+    if !args.positional.is_empty() {
+        return Err(failure(
+            command,
+            "usage",
+            "list accepts no positional arguments",
+            args.json,
+        ));
+    }
+    let limit = match args.options.get("--limit") {
+        Some(raw) => {
+            let parsed: usize = raw.parse().map_err(|_| {
+                failure(
+                    command,
+                    "usage",
+                    format!("--limit must be a positive integer, got {raw:?}"),
+                    args.json,
+                )
+            })?;
+            if parsed == 0 || parsed > commands::bounds::MAX_LIMIT {
+                return Err(failure(
+                    command,
+                    "usage",
+                    format!(
+                        "--limit must be between 1 and {}, got {parsed}",
+                        commands::bounds::MAX_LIMIT
+                    ),
+                    args.json,
+                ));
+            }
+            parsed
+        }
+        None => commands::bounds::DEFAULT_LIMIT,
+    };
+    let filter_status = match args.options.get("--status") {
+        Some(raw) => Some(parse_plan_status(raw, command, args.json)?),
+        None => None,
+    };
+    let after = match args.options.get("--after") {
+        Some(raw) => Some(plan_id(raw, command, args.json)?),
+        None => None,
+    };
+
+    let store = read_store(root, command, args.json)?;
+    let registry = read_registry(args)?;
+    // The cursor is applied inside the read model, before retention, so paging
+    // can walk a repository larger than this call's memory bound. One extra row
+    // is retained so `truncated` and the next cursor come from real data.
+    let snapshot = store
+        .inspection_snapshot(&InspectionSelection::After {
+            after: after.clone(),
+            retain: limit + 1,
+        })
+        .map_err(|error| repo_failure(command, error, args.json))?;
+
+    // Filtering and keyset selection run over the retained window in canonical
+    // order. `matched` therefore counts rows this call could see, not an
+    // unbounded repository-wide total; that is the honest bounded answer.
+    let filter = filter_status.clone();
+    let cursor = after;
+    let matched_rows: Vec<&LoadedPlanSnapshot> = snapshot
+        .plans()
+        .iter()
+        .filter(|loaded| {
+            filter
+                .as_ref()
+                .is_none_or(|want| loaded.plan().status == *want)
+        })
+        .filter(|loaded| {
+            cursor
+                .as_ref()
+                .is_none_or(|value| loaded.plan().id > *value)
+        })
+        .collect();
+
+    let matched = matched_rows.len();
+    let selected: Vec<_> = matched_rows.iter().take(limit).copied().collect();
+    // More rows remain when the page is full, or when the snapshot itself
+    // retained more than this call could return.
+    let truncated = matched > selected.len() || snapshot.truncated();
+    let next_after = if truncated {
+        selected.last().map(|loaded| loaded.plan().id.to_string())
+    } else {
+        None
+    };
+
+    let mut warnings = Vec::new();
+    let plans: Vec<CompactPlanSummaryV1> = selected
+        .iter()
+        .map(|loaded| {
+            let assessment = assess_read(loaded, snapshot.subject(), &registry);
+            let mut row = compact_plan_summary_v1(loaded.plan(), assessment.as_ref());
+            row.has_closure = loaded.closure().is_some();
+            row
+        })
+        .collect();
+    if snapshot.subject().is_none() {
+        warnings.push("current_subject_unavailable".into());
+    } else if !args.options.contains_key("--provider-policy")
+        && plans.iter().any(|row| row.assessment_status.is_some())
+    {
+        warnings
+            .push("assessment_uses_empty_provider_registry:no provider policy was supplied".into());
+    }
+
+    let rendered: Vec<String> = plans.iter().map(render_compact_row).collect();
+    let data = ListData {
+        repository_id: snapshot.repository_id().to_string(),
+        plans: plans.clone(),
+        matched,
+        returned: selected.len(),
+        truncated,
+        next_after,
+        filter_status: filter_status.clone(),
+    };
+    let human = if plans.is_empty() {
+        "no plans matched".to_string()
+    } else {
+        let mut lines = rendered;
+        if truncated {
+            lines.push(format!(
+                "truncated: {matched} matched, {} returned; next: --after {}",
+                selected.len(),
+                data.next_after.as_deref().unwrap_or("-")
+            ));
+        }
+        lines.join("\n")
+    };
+    success(args, data, warnings, human)
+}
+
+/// `completions SHELL` — print a static completion script to stdout.
+///
+/// Generated entirely from local command metadata: no shell execution, no
+/// network, no home-directory writes, and no repository scan.
+fn completions_command(args: &ParsedArgs) -> Result<ExecutionResult, CliFailure> {
+    let command = &args.command;
+    if args.positional.len() != 1 {
+        return Err(failure(
+            command,
+            "usage",
+            format!("expected: completions <{}>", commands::SHELLS.join("|")),
+            args.json,
+        ));
+    }
+    let shell = &args.positional[0];
+    let Some(script) = commands::completion_script(shell) else {
+        return Err(failure(
+            command,
+            "usage",
+            format!(
+                "unknown shell {shell}; expected one of {}",
+                commands::SHELLS.join(", ")
+            ),
+            args.json,
+        ));
+    };
+    let data = CompletionsData {
+        shell: shell.clone(),
+        bytes: script.len(),
+        script,
+    };
+    success(args, data, Vec::new(), String::new())
+}
+
+/// Machine payload for `completions`.
+///
+/// The script itself is returned verbatim so a caller can install it without a
+/// second round trip, alongside the byte count it should expect.
+#[derive(Debug, Serialize, Deserialize)]
+struct CompletionsData {
+    shell: String,
+    bytes: usize,
+    script: String,
+}
+
+/// Canonical `PlanStatus` filter values.
+///
+/// These are exactly the spellings `list` emits in its `status` field, so a
+/// caller can filter on a value it just read rather than having to remember a
+/// second vocabulary. Statuses are never matched by prose.
+const PLAN_STATUS_VALUES: &[&str] = &["draft", "active", "blocked", "closed", "cancelled"];
+
+fn parse_plan_status(raw: &str, command: &str, json: bool) -> Result<PlanStatus, CliFailure> {
+    match raw {
+        "draft" => Ok(PlanStatus::Draft),
+        "active" => Ok(PlanStatus::Active),
+        "blocked" => Ok(PlanStatus::Blocked),
+        "closed" => Ok(PlanStatus::Closed),
+        "cancelled" => Ok(PlanStatus::Cancelled),
+        other => Err(failure(
+            command,
+            "usage",
+            format!(
+                "unknown plan status {other:?}; expected one of {}",
+                PLAN_STATUS_VALUES.join(", ")
+            ),
+            json,
+        )),
+    }
 }
 
 fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
@@ -1600,5 +1939,5 @@ fn now_ms() -> Result<u64, String> {
 }
 
 fn usage() -> String {
-    "eggplan [--state-root PATH] [--json] COMMAND\nCommands: init, new --input PLAN.json, show PLAN_ID, status [PLAN_ID], ready PLAN_ID, graph PLAN_ID, check [PLAN_ID] [--recover-pending], activate PLAN_ID --expected-revision N, item update PLAN_ID ITEM_ID --expected-revision N (--status STATUS | --blocker TEXT | --next-action TEXT), evidence list|show|supersessions, assess PLAN_ID --provider-policy FILE, close PLAN_ID --expected-revision N --provider-policy FILE, closure show PLAN_ID, registry render, markdown render PLAN_ID [--output FILE], markdown inspect FILE [--format eggplan|codegg|auto], markdown import FILE --state-root PATH [--format eggplan|codegg|auto]".into()
+    commands::usage()
 }

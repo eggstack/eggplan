@@ -1152,9 +1152,21 @@ impl RepositoryStore {
         // per selected Plan below. Calling `PlanStore::list` here would decode
         // every Plan and discard the result, then decode the retained prefix a
         // second time.
+        let requested: Option<&std::collections::BTreeSet<PlanId>> = match selection {
+            InspectionSelection::Subset { ids } => Some(ids),
+            _ => None,
+        };
         let all_ids = match selection {
             InspectionSelection::One(id) => vec![id.clone()],
-            InspectionSelection::Repository { .. } => self.plan_ids()?,
+            InspectionSelection::Repository { .. }
+            | InspectionSelection::Subset { .. }
+            | InspectionSelection::After { .. } => self.plan_ids()?,
+        };
+        // Keyset selection happens before retention so pagination can walk a
+        // repository larger than the caller's retention bound.
+        let all_ids: Vec<PlanId> = match selection.after() {
+            Some(cursor) => all_ids.into_iter().filter(|id| id > cursor).collect(),
+            None => all_ids,
         };
         debug_assert!(
             crate::snapshot::selection_is_deterministic(&all_ids),
@@ -1174,13 +1186,22 @@ impl RepositoryStore {
             observations_counted += loaded.observations.len();
             supersessions_counted += loaded.supersessions.len();
             closures_counted += usize::from(loaded.closure.is_some());
-            if index < retain_limit {
+            // An explicit subset retains only the requested IDs, no matter how
+            // many plans the repository holds.
+            let retained = requested.is_none_or(|wanted| wanted.contains(id))
+                && (index < retain_limit || requested.is_some());
+            if retained {
                 counters.plans_retained += 1;
                 plans.push(loaded);
             } else {
                 // Validated and counted, then released: `check` keeps full
                 // integrity coverage without an unbounded in-memory projection.
-                debug_assert!(selection.is_repository_wide());
+                debug_assert!(matches!(
+                    selection,
+                    InspectionSelection::Repository { .. }
+                        | InspectionSelection::Subset { .. }
+                        | InspectionSelection::After { .. }
+                ));
             }
         }
 

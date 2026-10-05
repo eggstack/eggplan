@@ -289,6 +289,36 @@ fn help_snapshot_is_stable_and_human_output_needs_no_ansi() {
         .replace("\r\n", "\n");
     let expected = include_str!("fixtures/help.txt").replace("\r\n", "\n");
     assert_eq!(actual, expected);
+    // The frozen fixture is a compatibility artifact, but help must also be
+    // *derived* from the one command metadata table: every command in the
+    // metadata appears in help with its help text, and nothing else does.
+    let metadata = invoke(&["--help", "--json"]);
+    let json = json_ok(&metadata);
+    let usage = json["data"]["usage"].as_str().unwrap();
+    for spec in eggplan_cli::command_metadata() {
+        assert!(
+            usage
+                .lines()
+                .any(|line| line.starts_with(&format!("{} ", spec.name))),
+            "help must list every command in the metadata; missing {}",
+            spec.name
+        );
+        assert!(
+            usage.contains(spec.help),
+            "help must carry the metadata help text for {}",
+            spec.name
+        );
+        // Nothing invented: no help line may name a command the table lacks.
+        for line in usage.lines().skip(1) {
+            let name = line.split_whitespace().next().unwrap_or_default();
+            assert!(
+                eggplan_cli::command_metadata()
+                    .iter()
+                    .any(|spec| spec.name == name),
+                "help line {line:?} names a command absent from the metadata"
+            );
+        }
+    }
     let temp = tempdir().unwrap();
     let human = invoke(&[
         "init",

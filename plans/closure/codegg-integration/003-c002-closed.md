@@ -14,19 +14,16 @@ Reviewed baseline: `2ac47b0`
 
 Implementation commit: `8c4f6e6e586b2704311bda81d7dc402203971e80`
 
-Hosted qualification: **not yet complete at the time of writing.** The
-GitHub Actions run for the closure commit `4344ab7` is
-[37265105852](https://github.com/eggstack/eggplan/actions/runs/37265105852) and
-was still in progress. Per `plans/003-planning-process.md` §7 it is recorded as
-not run rather than assumed green; a following commit records the observed
-result and job identifiers.
-
-Erratum: an earlier revision of this record named run `37269198631`, an
-identifier that does not exist in this repository. It was written before the
-push and was not observed. It has been replaced with the real run id. The run
-for the implementation commit `8c4f6e6` is
-[37264177901](https://github.com/eggstack/eggplan/actions/runs/37264177901)
-(green).
+Hosted qualification: run
+[37265105852](https://github.com/eggstack/eggplan/actions/runs/37265105852) for
+`4344ab7` concluded **failure** — `native (ubuntu-latest)` job
+[111620146353](https://github.com/eggstack/eggplan/actions/runs/37265105852/job/111620146353)
+and `native (macos-latest)` job `111620146410` failed because ripgrep is absent
+from the runner images, while `msrv` `111620146275` and `native (windows-latest)`
+`111620146356` passed. That failure is the evidence for finding
+C-CODEGG-C002-04 and is retained here rather than superseded. The workflow fix
+and the tool precondition were applied afterwards, and the follow-up run is
+recorded in a dated amendment below.
 
 ## Executive finding
 
@@ -42,6 +39,56 @@ was always pure.** `crates/eggplan-codegg-compat/src/lib.rs` imports only
 `std::collections` — no `std::fs`, no `File::`, no process, no network, no
 database. The defect was in the enforcement, not in the crate. This is not a
 bridge correctness defect and no mapping, projection, digest, or ID changed.
+
+## New finding C-CODEGG-C002-04 — ripgrep is absent from the runners, so every `rg` guard was inert in CI
+
+This was not in the plan. It was found by C002's own self-proofs, and it is more
+serious than the filesystem hole C002 was opened to fix.
+
+`.github/workflows/ci.yml` never installed ripgrep, and it is not part of the
+stock `ubuntu-latest` or `macos-latest` GitHub runner images. Every `rg`
+invocation in the boundary guards sits inside an `if` statement, so with `rg`
+absent each call exits 127 *inside a conditional*; the `if` takes the else
+branch and the guard reports success. Direct evidence from the CI run for the
+implementation commit, `native (ubuntu-latest)` job
+[111620146353](https://github.com/eggstack/eggplan/actions/runs/37265105852):
+
+```text
+scripts/check-core-boundary.sh: line 7: rg: command not found
+scripts/check-core-boundary.sh: line 12: rg: command not found
+codegg-compat guard self-proof failed: guard2 rejects dev-dependency codegg
+  (expected fail=1, got fail=0)
+```
+
+Consequences:
+
+- `scripts/check-codegg-compat-boundary.sh` and `scripts/check-core-boundary.sh`
+  had **never enforced anything in CI**. Both printed their success line while
+  scanning nothing. The other three guards use `grep` and `python3`, which are
+  present, and did run for real.
+- The C002 filesystem coverage would itself have been cosmetic had the workflow
+  not been fixed: the guard would have "passed" in CI without ever invoking
+  `rg`.
+
+C002 could not meet its own objective — "the guard actually enforces the
+boundary it documents" — without fixing the environment, so the fix is recorded
+here as a plan amendment rather than treated as scope creep. Two changes:
+
+1. `.github/workflows/ci.yml` installs ripgrep explicitly on Linux and macOS,
+   before the guard steps, with a comment explaining why. This makes both
+   previously-inert guards start working.
+2. `scripts/check-codegg-compat-boundary.sh` now refuses to report a pass when
+   `rg` or `awk` is unavailable. Verified by running the script with ripgrep
+   removed from `PATH`: it exits 1 with
+   `required boundary-guard tool 'rg' is not installed; refusing to report a pass`.
+
+`six compile_fail doctests` and the closure-authority guard were never affected,
+because they use `python3` and `rustdoc` rather than `rg`.
+
+The residual hazard — `scripts/check-core-boundary.sh` still has the same
+silent-no-op exposure and no tool precondition — is out of C002's declared
+scope, which excludes modifying the other four guards. It is recorded below as
+an unresolved finding and needs its own corrective.
 
 ## Recorded decision: C-CODEGG-C002-02
 
@@ -96,8 +143,8 @@ carried the "all three" claim now records the correction inline.
 | 7. Header states all five guards and their scope; every message matches what was scanned | Header at `:7-29` names each guard, its scan scope, and why only guard 1 is section-scoped. `run_guards` (`:68-95`) emits five messages, each naming the file and, for manifest guards, the section. |
 | 8. `architecture/codegg-compat.md` and `architecture/deep-dive-tooling-governance.md` describe the guard accurately | `codegg-compat.md` now describes all five guards, the deliberate asymmetry and why it exists, and the self-proofs. `deep-dive-tooling-governance.md` describes each named function with its new line range, the added filesystem coverage, and the self-proofs. `deep-dive-codegg-compat.md` finding 10 is marked closed and its guard list rewritten. |
 | 9. The `registry.md` citation is unambiguously a CodeGG repository path with attribution preserved | `plans/registry.md` item 7 now reads "in the CodeGG repository `dbowm91/codegg` — not a path in this repository" and drops the false `plans/implementation/` prefix. The `418fdc85656e7e1faa57f71e5e7f10f7f4859c60` attribution and hosted run `36106606574` are intact. |
-| 10. No production Rust source, dependency set, schema, or public API changes | `git status --short crates/eggplan-codegg-compat/` is empty at the implementation commit; `git diff --stat crates/` is empty. Only `scripts/`, `plans/`, and `architecture/` changed. |
-| 11. Native and MSRV qualification pass with all five guards green | See "Verification executed". |
+| 10. No production Rust source, dependency set, schema, or public API changes | `git status --short crates/eggplan-codegg-compat/` is empty at the implementation commit; `git diff --stat crates/` is empty. Only `scripts/`, `plans/`, `architecture/`, and `.github/workflows/ci.yml` changed. |
+| 11. Native and MSRV qualification pass with all five guards green | Locally, every §6 row passes. Hosted: see "New finding C-CODEGG-C002-04" — the first hosted run **failed**, because the runners have no ripgrep, which is what surfaced the finding. The workflow fix and the tool precondition were then applied and the run repeated; the result is recorded in "Hosted qualification" below. |
 
 ## Production evidence
 
@@ -152,13 +199,14 @@ is reported from the plan alone.
 | `git status --short crates/eggplan-codegg-compat/` | empty — bridge crate untouched |
 | `git diff --stat crates/` | empty — no crate changed |
 
-Not run at the time of writing: hosted native (Linux/macOS/Windows) and hosted
-MSRV qualification for the closure commit. Both were in progress as run
-[37265105852](https://github.com/eggstack/eggplan/actions/runs/37265105852) when
-this record was authored, and are recorded as not run rather than assumed
-passing. There is nothing Windows-specific to verify beyond the matrix itself:
-the guard is skipped on Windows runners, which
-`architecture/deep-dive-tooling-governance.md` finding 1 already records.
+Not run at the time of writing: nothing in the §6 list, all of which passed
+locally as tabulated above. Hosted qualification is covered by the runs recorded
+in "Hosted qualification".
+
+Erratum: an earlier revision of this record named run `37269198631`, an
+identifier that does not exist in this repository. It was written before the
+push and was never observed. It has been replaced with the real run id
+`37265105852`.
 
 The script's self-proof cleanup uses a targeted `rm -f` of the two fixture files
 plus `rmdir` of the two directories, not a recursive force removal, so it
@@ -204,7 +252,8 @@ patterns cannot false-positive on the current bridge source, which imports only
 
 | Finding | Severity | Disposition |
 |---|---|---|
-| `tempfile` as a *production* dependency is not rejected by any guard | Low | Open, out of C002 scope. `tempfile` is currently a legal dev-dependency, so it cannot be added to the unscoped guard 3 without failing the tree. Adding it would require a sixth, section-scoped guard. Recorded rather than silently widened into scope. The source-side exposure is closed: `tempfile::` is matched by `no_impure_source`, so an actual use in `src/` fails even if the dependency were promoted. |
+| `scripts/check-core-boundary.sh` still has no tool precondition: with `rg` absent, both its guards silently report success | **Medium** | Open, needs its own corrective. C002 §4 explicitly excludes modifying the other four guards, so this was not changed here. The workflow now installs ripgrep, so the guard is finally active in CI, but the silent-no-op hazard remains if the install is ever dropped. Recommended fix: the same `command -v rg` precondition, plus a synthetic self-proof in the style C002 introduced. |
+| `tempfile` as a *production* dependency is not rejected by any guard | Low | Open, out of C002 scope. `tempfile` is currently a legal dev-dependency, so it cannot be added to the unscoped guard 3 without failing the tree. Adding it would require a sixth, section-scoped guard. The source-side exposure is closed: `tempfile::` is matched by `no_impure_source`, so an actual use in `src/` fails even if the dependency were promoted. |
 | `scripts/check-integrations-boundary.sh` greps `register_trusted|ProviderRegistry` only in `eggwork.rs`/`eggsearch.rs`, never `lib.rs` | Low | Open, unrelated subsystem. Noted during the architecture review; owned by the integrations surface, not by this pass. |
 | Registry row for CodeGG M003 reads `closed` while its closure file is `003-conditionally-closed.md` | Low | Open, explicitly out of C002 scope (§4). Traceability nit previously flagged to the user; still open. |
 

@@ -102,13 +102,13 @@ messages claimed more than was checked.
   plain `pub fn finalize_closure()` are both accepted, so comment-stripping
   and the `_with_` suffix rule are proven, not assumed.
 
-## 2. CI matrix (` .github/workflows/ci.yml`, 41 lines)
+## 2. CI matrix (` .github/workflows/ci.yml`, 51 lines)
 
 Two jobs, both on push and pull-request:
 
 | Job | Runner(s) | Toolchain | Steps |
 |---|---|---|---|
-| `native` | `ubuntu-latest`, `macos-latest`, `windows-latest` (`fail-fast: false`) | stable + `rustfmt, clippy` | `fmt --check` (Linux only), `check --workspace --all-targets --locked`, `clippy --workspace --all-targets --locked -- -D warnings`, `test --workspace --locked`, all 5 boundary scripts (non-Windows only) |
+| `native` | `ubuntu-latest`, `macos-latest`, `windows-latest` (`fail-fast: false`) | stable + `rustfmt, clippy` | `fmt --check` (Linux only), `check --workspace --all-targets --locked`, `clippy --workspace --all-targets --locked -- -D warnings`, `test --workspace --locked`, **ripgrep install** (non-Windows), all 5 boundary scripts (non-Windows only) |
 | `msrv` | `ubuntu-latest` only | pinned `1.89.0` (matches workspace `rust-version = "1.89"`) | `check --workspace --all-targets --locked`, `test --workspace --locked` only |
 
 Consequences, verified from the file: `fmt` runs only on Linux; all boundary
@@ -116,6 +116,23 @@ guards are skipped on Windows (`if: runner.os != 'Windows'`); the MSRV job
 runs no fmt, clippy, or boundary scripts. Workspace (`Cargo.toml`) is
 `resolver = "2"`, `edition = "2024"`, seven members, with `--locked` used by
 every check/clippy/test invocation.
+
+**Ripgrep must be installed explicitly.** It is not in the stock runner images,
+and every guard calls `rg`/`grep` inside an `if`, so a missing `rg` exits 127
+inside a conditional and the guard reports success having scanned nothing. This
+was not hypothetical: `check-core-boundary.sh` and
+`check-codegg-compat-boundary.sh` were both inert in CI until corrective C002
+added the install steps (`ci.yml:28-32`) and a `command -v rg` precondition to
+the codegg guard. Observed directly in run `37265105852`, job `111620146353`:
+
+```text
+scripts/check-core-boundary.sh: line 7: rg: command not found
+scripts/check-core-boundary.sh: line 12: rg: command not found
+```
+
+`check-core-boundary.sh` still lacks the precondition and is the one residual
+gap; see finding 6. The three `grep`/`python3` guards
+(`integrations`, `projection-cli`, `closure-authority`) were never affected.
 
 ## 3. Agent verify order (`AGENTS.md`, `README.md`)
 
@@ -280,6 +297,17 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    `[dependencies]` scope, and guard 2 said "compatibility crate", not
    "production". All five messages now name the file and section scanned, which
    makes the distinction structural rather than a matter of reading closely.
+6. **`check-core-boundary.sh` has no tool precondition (open, medium).** C002
+   discovered that ripgrep is absent from the stock runner images and that this
+   script calls `rg` inside two `if` statements, so both its guards reported
+   success having scanned nothing until `ci.yml` began installing ripgrep. The
+   workflow fix makes the guard active, but the script still has no
+   `command -v rg` guard and no synthetic self-proof, so dropping the install
+   step would silently re-inert it. C002 §4 excludes modifying the other four
+   guards, so this was reported rather than changed. Recommended corrective:
+   add the same precondition `check-codegg-compat-boundary.sh` now uses, plus a
+   self-proof in the C002 style. Until then, this is the one guard whose
+   enforcement depends on a CI step rather than on the script itself.
 
 ## Verification pointers
 

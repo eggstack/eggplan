@@ -4,6 +4,19 @@ set -euo pipefail
 manifest="crates/eggplan-codegg-compat/Cargo.toml"
 source_dir="crates/eggplan-codegg-compat/src"
 
+# Precondition: every guard below runs `rg` inside an `if`. If `rg` is missing,
+# each invocation exits 127 inside a conditional, so the `if` takes the else
+# branch and every guard reports success without scanning anything. This is not
+# hypothetical: ripgrep is not in the stock GitHub runner images, so both
+# `rg`-based guards silently no-opped in CI until this check was added. Fail
+# loudly instead.
+for tool in rg awk; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "required boundary-guard tool '$tool' is not installed; refusing to report a pass" >&2
+        exit 1
+    fi
+done
+
 # ---------------------------------------------------------------------------
 # Compatibility ownership boundary. Five guards, each stated with the exact
 # scope it scans, so a failure message never claims more than was checked.

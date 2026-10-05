@@ -21,6 +21,16 @@ jobs:
       - run: cargo check --workspace --all-targets --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      # The boundary guards use ripgrep. It is not part of the stock runner
+      # images, and every guard invokes `rg` inside an `if`, so a missing `rg`
+      # exits non-zero per-command inside a conditional and every guard then
+      # reports success without having scanned anything. Install it explicitly.
+      - name: Install ripgrep for the boundary guards
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: Install ripgrep for the boundary guards
+        if: runner.os == 'macOS'
+        run: brew install ripgrep
       - run: bash scripts/check-core-boundary.sh
         if: runner.os != 'Windows'
       - run: bash scripts/check-codegg-compat-boundary.sh

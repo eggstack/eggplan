@@ -232,7 +232,30 @@ unchanged and remain deferred.
    outside the REST check-run enum.** They are accepted so a host need not
    special-case them, and both map to non-passing statuses. No live sample of
    either was available.
-4. **Informational — branch protection, required checks, and mergeability are
+4. **Process — the M003b closure commit was not independently buildable.** The
+   closure record was committed with a blanket `git add -A` while unrelated
+   Projection/CLI M003a work was in flight, so commit `1cb3abb` swept in 307
+   lines of half-finished `crates/eggplan-repo/src/snapshot.rs` and the
+   corresponding `store.rs` changes. Hosted run
+   [37352751490](https://github.com/eggstack/eggplan/actions/runs/37352751490)
+   failed on `cargo fmt --check` for exactly that reason (ubuntu `111907407488`,
+   macOS `111907407497`, Windows `111907407766`; MSRV job `111907407055` passed).
+
+   This does not weaken the M003b closure evidence. The implementation commit
+   cited above, `93d65b0`, does not contain any snapshot work and was
+   independently qualified by the all-green hosted run `37351818356` recorded in
+   this document. The defect is confined to the later closure-record commit.
+
+   It is recorded rather than rewritten because force-pushing to repair history
+   would replace a commit that CI has already evaluated and would destroy the
+   evidence of what actually happened. The correct workflow going forward is to
+   stage closure-record changes by explicit path, never `git add -A`, while
+   another milestone is in progress. The complete implementation that `1cb3abb`
+   only partially carried is Projection/CLI M003a at commit `528f75f`, whose own
+   closure record and hosted run are recorded in
+   `plans/closure/projection-cli/003a-closed.md`.
+
+5. **Informational — branch protection, required checks, and mergeability are
    intentionally out of scope.** The adapter does not interpret them. That is
    recorded here so a later milestone does not assume the absence was an
    oversight.

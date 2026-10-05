@@ -316,12 +316,14 @@ closure, and none warrants a corrective plan.
    `2c32ffe` has all four jobs (`msrv` `111959408820`,
    `native (ubuntu-latest)` `111959409113`, `native (windows-latest)`
    `111959409166`, `native (macos-latest)` `111959409236`) unscheduled in
-   `queued`. At the time this record was written it had been queued for roughly
-   8 minutes with none started; prior runs on this repository scheduled and
-   completed within about 3 minutes, so this is a queue delay rather than a
-   failure. No job reported a failing step. This is a GitHub Actions
-   runner-availability condition outside the repository, recorded as blocked
-   rather than substituted. The milestone is not marked closed.
+   `queued`. Observed still unscheduled 13.5 minutes after creation
+   (`20:14:24Z` to `20:27:52Z`) with none started; the two documentation-only
+   pushes that followed queued `37369527303` and `37369775115`, also unscheduled.
+   Prior runs on this repository scheduled and completed within about 3 minutes,
+   so this is a queue delay rather than a failure. No job reported a failing step.
+   This is a GitHub Actions runner-availability condition outside the repository,
+   recorded as blocked rather than substituted. The milestone is not marked
+   closed.
 2. **Informational — `list` reports a window-scoped `matched`.** A caller
    wanting a true repository-wide match count cannot get one without loading
    every row. The field name is not misleading and the doc says so explicitly,

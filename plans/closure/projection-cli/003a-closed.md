@@ -341,12 +341,15 @@ corrective plan is required: no defect was found.
    `native (macos-latest)` never left `queued`. That run was cancelled to release
    queue capacity. The combined commit `2c32ffe` has run
    [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637)
-   queued with all four jobs unscheduled; at the time this record was written it
-   had been queued for roughly 8 minutes with none started. Prior runs on this
-   repository scheduled and completed within about 3 minutes, so this is a queue
-   delay, not a failure. No job reported a failing step. This is a GitHub Actions
-   runner-availability condition outside the repository, recorded as blocked
-   rather than substituted, and the milestone is not marked closed.
+   queued with all four jobs unscheduled; observed still unscheduled 13.5 minutes
+   after creation (`20:14:24Z` to `20:27:52Z`) with none started. The two
+   documentation-only pushes that followed (`559e57b`, `6521613`) queued runs
+   `37369527303` and `37369775115`, which are also unscheduled, so the condition
+   is not specific to one commit. Prior runs on this repository scheduled and
+   completed within about 3 minutes, so this is a queue delay, not a failure. No
+   job reported a failing step. This is a GitHub Actions runner-availability
+   condition outside the repository, recorded as blocked rather than substituted,
+   and the milestone is not marked closed.
 2. **Informational — the characterization harness self-reports timings on one
    machine.** Wall-time figures are indicative only. The gated matrix asserts
    counts; the ignored harness replays the previous shape over the same fixture

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "providers": [
+    {
+      "provider_id": "epp_local_tests",
+      "class": "test_runner",
+      "allowed_kinds": ["test"]
+    }
+  ]
+}

@@ -49,10 +49,14 @@ policy mistake, not a convenience.
 ## Using it
 
 ```sh
-cargo run -p eggplan-cli -- assess ep_example --state-root .eggplan --provider-policy policy.json
-cargo run -p eggplan-cli -- close  ep_example --state-root .eggplan \
-  --expected-revision 7 --provider-policy policy.json
+eggplan assess ep_release --state-root .eggplan --provider-policy examples/policy.json
+eggplan close  ep_release --state-root .eggplan \
+  --expected-revision 3 --provider-policy examples/policy.json
 ```
+
+Both commands need a resolvable Git subject, so make at least one commit before using them
+— otherwise subject capture fails with `subject_unavailable` before the policy is even
+consulted. Malformed policies fail first with their own diagnostics.
 
 The policy is scoped to **one invocation**. It is not persisted as a standing grant, and it
 is not carried forward to later assessments. A closure record stores the policy as

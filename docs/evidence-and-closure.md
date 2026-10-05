@@ -3,6 +3,31 @@
 This is the part of Eggplan that most often surprises people. Evidence is **not** something
 you assert — it is something a trusted provider observed, bound to an exact source state.
 
+## Who writes evidence: not the CLI
+
+The most common surprise is that **the CLI cannot record evidence at all.** The `evidence`
+command is read-only — `list`, `show`, and `supersessions` only:
+
+```sh
+eggplan evidence add ep_release --state-root .eggplan
+# evidence: usage: expected evidence list, show, or supersessions
+```
+
+Recording evidence is a **host responsibility**. A host program:
+
+1. Actually runs the verification (the test command, the linter, the benchmark).
+2. Normalizes the result through `eggplan-integrations`, which produces an immutable
+   `EvidenceObservation` and computes its verification digest.
+3. Appends it to the append-only ledger in `eggplan-repo`.
+
+Until that has happened, `assess` reports `evidence_missing_or_unavailable` and `close`
+reports `closure_not_ready`. Both are correct outcomes, not errors — and neither can be
+worked around from the terminal, by design.
+
+This is why Eggplan's closure claim means something. A plausible-looking JSON blob typed by
+a human cannot close a plan; only a host that actually observed the run can contribute
+evidence.
+
 ## Requirements versus observations
 
 - An **`EvidenceRequirement`** belongs to a plan and describes what evidence a criterion
@@ -72,9 +97,14 @@ Historical observations are never rewritten to make a later assessment pass.
 ## Closing a plan
 
 ```sh
-cargo run -p eggplan-cli -- close ep_example --state-root .eggplan \
+eggplan close ep_example --state-root .eggplan \
   --expected-revision 7 --provider-policy policy.json
 ```
+
+This requires a resolvable Git subject, so the repository needs at least one commit; on an
+unborn branch it fails with `subject_unavailable`. It also requires a host to have already
+written satisfying evidence — otherwise it reports `closure_not_ready`. Both outcomes are
+correct, and neither can be forced from the terminal.
 
 Closure is not a status flag you set. It goes through the repository's **guarded finalizer**,
 which:

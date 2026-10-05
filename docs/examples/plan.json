@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "id": "ep_release",
+  "revision": 0,
+  "objective": "Ship the 1.0 release",
+  "status": "draft",
+  "provenance": {},
+  "items": [
+    {
+      "id": "epi_tests",
+      "position": 0,
+      "dependencies": [],
+      "status": "pending",
+      "description": "Get the test suite green",
+      "criteria": [
+        {
+          "id": "epc_tests",
+          "statement": "The unit test suite passes",
+          "human_judgment_allowed": false,
+          "requirements": [
+            {
+              "description": "cargo test --workspace --locked",
+              "kind": "test",
+              "subject_policy": "exact",
+              "cardinality": "any",
+              "min_count": 1,
+              "allow_human_judgment": false,
+              "expected_verification_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

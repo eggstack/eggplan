@@ -25,8 +25,12 @@ Value-taking flags: `--state-root`, `--input`, `--expected-revision`,
 | `ready PLAN_ID` | Items whose dependencies are satisfied (derived, not authority) |
 | `graph PLAN_ID` | Deterministic dependency graph |
 | `check [PLAN_ID]` | Read-only validation; omit the ID to check all |
-| `evidence list\|show\|supersessions` | Immutable observation and correction lineage |
+| `evidence list\|show\|supersessions` | Immutable observation and correction lineage (read-only) |
 | `closure show PLAN_ID` | Bounded summary of the validated closure record |
+
+`evidence` is **read-only**. The CLI has no command that records an observation, so
+`evidence add` returns a usage error. Writing evidence is a host responsibility — see
+[Evidence and closure](evidence-and-closure.md).
 
 ## Mutating commands
 
@@ -40,6 +44,19 @@ All require `--expected-revision N`.
 | `markdown import FILE --state-root PATH` | Create one Draft plan from Markdown intent |
 
 `item update` takes exactly one of `--status`, `--blocker`, or `--next-action`.
+
+Item status changes are checked against a transition table, so you cannot jump states:
+
+| From | Legal next states |
+|---|---|
+| `pending` | `actionable`, `blocked`, `cancelled` |
+| `actionable` | `in_progress`, `blocked`, `cancelled` |
+| `in_progress` | `actionable`, `blocked`, `completed`, `cancelled` |
+| `blocked` | `pending`, `actionable`, `cancelled` |
+| `completed`, `cancelled` | terminal — no transitions |
+
+An illegal move fails with `invalid_transition`. In particular, `pending → in_progress` is
+not legal; go through `actionable` first.
 
 ## Status vocabularies
 
@@ -63,8 +80,15 @@ Both **require** an explicit provider-policy file. There is no default trusted p
 the CLI never accepts user-authored passing evidence. See
 [Provider policy](provider-policy.md).
 
+Both also require a **resolvable Git subject**. In a repository with no commits — an unborn
+branch — subject capture fails and the command exits nonzero with `subject_unavailable`.
+Make at least one commit first.
+
 `close` delegates entirely to the repository's guarded finalizer, which revalidates the
 current Git subject itself. The CLI cannot assert subject authority at commit time.
+
+Human-readable `assess` output prints the assessment status as a variant name such as
+`EvidenceMissingOrUnavailable`; use `--json` for the stable snake_case codes.
 
 ## Projection and interchange
 

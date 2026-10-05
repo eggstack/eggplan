@@ -9,7 +9,7 @@ closed and M003 is closed with cross-platform qualification, while M002 is
 recorded **conditionally closed** — a historical closure whose platform caveat
 was resolved by M003 (`plans/registry.md:66-68`,
 `plans/subsystems/foundation-core-roadmap.md`); evidence-closure M002 plus its
-C001/C002/C003 are closed (`plans/registry.md:71-74`,
+C001/C002/C003/C004 are closed (`plans/registry.md:71-75`,
 `plans/subsystems/evidence-closure-roadmap.md`); and CodeGG integration M003
 C001, the dirty-subject fingerprint work described in §3a, is closed on the
 Eggplan side at `0dd33b7` (`plans/registry.md:81`). This note reviews the code

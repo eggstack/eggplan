@@ -163,13 +163,13 @@ form a control surface, not documentation decoration:
   semantics, adds regression evidence that would have detected the defect, and
   updates registry/roadmap lineage (`003 §9` `:107`–`:116`). Evidence M002
   C001/C002/C003 is the worked example, including explicit non-blocking
-  scoping (`registry.md:105`–`:110`, `:283`–`:284`).
-- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:205`–
-  `:265` (canonical JSON freeze, provider-identity authority, append-only
+  scoping (`registry.md:105`–`:110`, `:287`–`:288`).
+- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:209`–
+  `:277` (canonical JSON freeze, provider-identity authority, append-only
   evidence, finalizer-owned subject capture, test-seam containment,
   Markdown-import limits, staged CodeGG adoption, and the frozen
   `capture_git_subject_fingerprint` digest contract at gate 23) plus the
-  hygiene rules at `registry.md:275`–`:284` (register before handoff,
+  hygiene rules at `registry.md:279`–`:288` (register before handoff,
   preserve historical closure/use corrective plans, record exact evidence and
   unrun/blocked checks, sync/deterministic core, no hidden model reasoning in
   persisted schemas, non-blocking hygiene must not serialize independent
@@ -185,10 +185,11 @@ Layout and hygiene, verified by enumeration rather than asserted:
   `NNN-cNNN-short-title.md` / `NNN-cNNN-closed.md`.
 - `implementation/` and `closure/` use the same five subsystem directories
   (`codegg-integration`, `eggstack-integration`, `evidence-closure`,
-  `foundation-core`, `projection-cli`), 19 implementation plans against 17
-  closure records as of `60a5f92`. The two-plan difference is correct, not a gap:
-  Evidence M002 C004 and CodeGG M003 C002 are registered with status `ready` and
-  have no closure record yet, because
+  `foundation-core`, `projection-cli`), 19 implementation plans against 18
+  closure records as of the C004 closure (`623dde9`). The one-plan difference is
+  correct, not a gap:
+  CodeGG M003 C002 is registered with status `ready` and
+  has no closure record yet, because
   `plans/003-planning-process.md` §7 requires a closure record to distinguish
   planned from actually-run commands and must never be written from a plan. Every
   `closed` row in the registry resolves to an existing closure file, and no
@@ -241,7 +242,7 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    `crates/eggplan-repo/src/lib.rs` are the one authority check that runs on
    every OS.
 4. **`registry.md` cites a plan path that does not exist.**
-   `registry.md:154` names
+   `registry.md:158` names
    `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
    as the "upstream provenance predecessor", but `plans/implementation/`
    contains only the five subsystem directories; no such file or directory is

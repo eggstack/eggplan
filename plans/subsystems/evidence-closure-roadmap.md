@@ -163,12 +163,11 @@ capability handoffs may execute independently in parallel.
 
 ### M002 C004 — Closed-Plan CAS immutability
 
-Status: ready; registered at `60a5f92`. Open correctness/persistence corrective.
+Status: closed at `623dde9`. Corrective implemented and closed.
 
 Plan: plans/implementation/evidence-closure/002-c004-closed-plan-cas-immutability.md
 
-Closure: not yet written. A closure record is created only from real evidence
-after implementation, per plans/003-planning-process.md §7.
+Closure: plans/closure/evidence-closure/002-c004-closed.md
 
 A code-verified architecture review of M002 found that ordinary
 compare-and-swap accepts a `Closed` → `Closed` rewrite at
@@ -190,8 +189,24 @@ forged, no evidence is fabricated, and the guarded finalizer still owns the only
 legitimate path to `Closed`. C004 restores the invariant that a canonical Closed
 Plan is immutable under ordinary CAS, in any direction.
 
-C004 gates further Evidence/closure work. It does not gate Projection/CLI,
-CodeGG, or Eggstack capability plans, which remain independently closable.
+Resolved as implemented. An unconditional guard at
+`crates/eggplan-repo/src/store.rs:930-932` refuses any CAS against a Closed Plan
+before `atomic_write`, for every target status including `Closed` itself, with
+the typed `RepoError::ClosedPlanImmutable` (CLI code `closed_plan_immutable`).
+`GuardedClosureRequired` is retained for the distinct entry case, and
+`finalize_closure` — which writes through `atomic_write` and never routes through
+`compare_and_swap` — remains the only writer of a Closed Plan. The plan's
+proposed core invariant was wrong: `plan_transition_allowed` deliberately keeps
+the `(Active, Closed)` edge the finalizer performs, so the implemented core test
+pins `Closed` as terminal as a *source* instead. The pre-fix failure was
+observed directly, not inferred, and the new test was confirmed to fail against
+the pre-fix code.
+
+C004 is closed, so it no longer gates Evidence/closure work. No Evidence/closure
+corrective is currently open. It never gated Projection/CLI, CodeGG, or Eggstack
+capability plans, which remain independently closable. Already-poisoned state
+roots still have no repair path; that is out of C004 scope and needs its own
+plan before it can be attempted.
 C001, C002, and C003 closures remain preserved and unqualified.
 
 ### M003 — Policy extensions

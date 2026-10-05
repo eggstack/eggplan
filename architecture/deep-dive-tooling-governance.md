@@ -24,35 +24,35 @@ text/regex guards — not type-system or Cargo-feature enforcement.
 ### `check-codegg-compat-boundary.sh` (mechanism: `awk` + `rg`)
 
 Five guards, only the first of which is section-scoped. Each is a named
-function; the header at `:7-29` states all five with their scan scope, and every
+function; the header at `:20-42` states all five with their scan scope, and every
 failure message names the file and section it scanned. Corrective C002 added the
 filesystem coverage in the fifth guard and the self-proofs; before it the
 messages claimed more than was checked.
 
-- `no_production_repo_dep` (`:32-39`) `awk` state machine tracks the
+- `no_production_repo_dep` (`:45-52`) `awk` state machine tracks the
   `[dependencies]` section of `crates/eggplan-codegg-compat/Cargo.toml` and
   fails if `eggplan-repo =` appears there (dev-dependencies are out of scope for
   that test, which is what keeps the legal `Cargo.toml:14` entry legal).
-- `no_codegg_dependency` (`:43-45`) `rg` fails on `codegg | codegg-core =` at
+- `no_codegg_dependency` (`:56-58`) `rg` fails on `codegg | codegg-core =` at
   line start in the same manifest: the bridge must not depend on CodeGG. Not
   section-scoped, so a dev- or build-dependency declaration would also fail.
-- `no_client_dependency` (`:49-51`) `rg` fails on `tokio | sqlx | reqwest |
+- `no_client_dependency` (`:62-64`) `rg` fails on `tokio | sqlx | reqwest |
   hyper | ureq | surf | isahc | async-std =` at line start in the manifest: no
   async, database, or network client may enter the bridge's dependency graph at
   all (also not section-scoped).
-- `no_owned_identity` (`:56-58`) `rg` fails on `pub (struct | enum | trait |
+- `no_owned_identity` (`:69-71`) `rg` fails on `pub (struct | enum | trait |
   type) (WorkOrder | Goal | GoalVerification | TodoState | WorkPlanCheckpoint |
   ContextEpoch | AgentRunExecutor | JobExecutor | WorktreePolicy |
   SandboxPolicy)` in `src/`: the bridge owns only the WorkPlan assessment
   seam, not scheduler/runtime identity. Declarations only, so comments and
   private positions are not failures.
-- `no_impure_source` (`:64-66`) `rg` fails in `src/` on process, **filesystem**,
+- `no_impure_source` (`:77-79`) `rg` fails in `src/` on process, **filesystem**,
   network, and database access: `std::process | Command::new | tokio:: |
   reqwest:: | hyper:: | sqlx:: | async_std:: | std::net | TcpStream | UdpSocket
   | std::fs | std::path | tempfile::`, the `use`-imported `fs::` call forms,
   and `File::open | create | create_new | open_options`.
-- `run_guards` (`:68-95`) applies all five to the real tree. Self-proofs
-  (`:101-247`) run the same functions against `mktemp -d` fixtures with positive
+- `run_guards` (`:81-109`) applies all five to the real tree. Self-proofs
+  (`:114-260`) run the same functions against `mktemp -d` fixtures with positive
   and negative cases for every guard, and clean up with a targeted
   non-recursive `rm -f`/`rmdir`. No tracked file is written, so the proofs are
   safe to run in CI.
@@ -290,7 +290,7 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    build-dependency on `codegg` or `tokio` failed the guard. That strictness was
    kept deliberately — Option 1 of the C002 decision — and resolved by making
    each message state its actual scan scope in the file header
-   (`:7-29`) and in the failure text, so the file no longer leaves a reader
+   (`:20-42`) and in the failure text, so the file no longer leaves a reader
    guessing which the intent was. One correction to the earlier reading of this
    finding: it claimed *all three* manifest guards said "production
    dependencies". Only guard 3 did. Guard 1's message matched its

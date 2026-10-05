@@ -29,32 +29,32 @@ no WorkOrder/scheduler state, no storage, and no evidence acquisition:
 - The boundary script enforces the dependency and ownership edges with FIVE
   guards, and only the first is `[dependencies]`-scoped
   (`scripts/check-codegg-compat-boundary.sh`). Each guard is a named function
-  and the header at `:7-29` states all five with their scan scope:
-  - `no_production_repo_dep` (`:32-39`) `awk` — `eggplan-repo` must not appear
+  and the header at `:20-42` states all five with their scan scope:
+  - `no_production_repo_dep` (`:45-52`) `awk` — `eggplan-repo` must not appear
     under `[dependencies]`; it deliberately allows the `[dev-dependencies]`
     entry at `Cargo.toml:14`.
-  - `no_codegg_dependency` (`:43-45`) `rg` over the whole manifest — any
+  - `no_codegg_dependency` (`:56-58`) `rg` over the whole manifest — any
     `codegg`/`codegg-core` dependency line, in *any* section, fails; it is not
     section-scoped.
-  - `no_client_dependency` (`:49-51`) `rg` over the whole manifest —
+  - `no_client_dependency` (`:62-64`) `rg` over the whole manifest —
     `tokio`/`sqlx`/`reqwest`/`hyper`/`ureq`/`surf`/`isahc`/`async-std`
     dependency lines, also not section-scoped.
-  - `no_owned_identity` (`:56-58`) `rg` over `src/` — a
+  - `no_owned_identity` (`:69-71`) `rg` over `src/` — a
     `pub struct|enum|trait|type` declaration named `WorkOrder`, `Goal`,
     `GoalVerification`, `TodoState`, `WorkPlanCheckpoint`, `ContextEpoch`,
     `AgentRunExecutor`, `JobExecutor`, `WorktreePolicy`, or `SandboxPolicy`. It
     catches *declarations*, not mentions, so a CodeGG type named in a doc
     comment or a private field type is not a failure.
-  - `no_impure_source` (`:64-66`) `rg` over `src/` — no process, **filesystem**,
+  - `no_impure_source` (`:77-79`) `rg` over `src/` — no process, **filesystem**,
     network, or database access in production source. It matches both the
     fully-qualified and the `use`-imported call forms, so `std::fs::read` and a
     bare `fs::read` behind `use std::fs` are both caught, plus `File::open`,
     `File::create`, `std::path`, and `tempfile::`. Filesystem coverage was added
     by corrective C002; before it the alternation covered only process/network/
     database, leaving on-disk I/O in `src/` unenforced.
-- `run_guards` (`:68-95`) applies all five to the real manifest and source tree
+- `run_guards` (`:81-109`) applies all five to the real manifest and source tree
   and exits on the first failure. Deterministic synthetic self-proofs
-  (`:101-247`) run the same functions against fixtures in a `mktemp -d`
+  (`:114-260`) run the same functions against fixtures in a `mktemp -d`
   directory, so every guard has a negative and a positive case and no tracked
   file is ever modified; cleanup is a targeted non-recursive `rm -f`/`rmdir`.
   Proof coverage: production-vs-dev `eggplan-repo`, `codegg` in both sections,

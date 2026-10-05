@@ -5,6 +5,7 @@
 //! This crate acquires no evidence and grants no provider trust. Hosts own
 //! transports, native clients, authentication, and registry membership.
 
+pub mod eggbench;
 pub mod eggsearch;
 pub mod eggwork;
 

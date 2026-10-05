@@ -1,0 +1,220 @@
+[
+  {
+    "case": "finalized_success_no_comparison",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "manifest_schema_version": 2,
+    "run_id": "8cb4253e-e5f6-4b1e-8c55-e673d973d73a",
+    "manifest_sha256": "74c227f5672b577fb0775531314c183aaaa0985533a05e204caa6fa3ea875fdf",
+    "finalized": true,
+    "execution_status": "completed",
+    "comparison_verdict": null,
+    "legacy_status": null,
+    "subject": {
+      "kind": "external",
+      "target": "api",
+      "revision": null,
+      "digest": null
+    },
+    "artifact_count": 4,
+    "total_retained_bytes": 2420,
+    "artifacts": [
+      {
+        "path": "plan.json",
+        "role": {
+          "kind": "experiment_plan"
+        },
+        "media_type": "application/json",
+        "byte_size": 715,
+        "sha256": "5e3f42e054f2cc5afb0e07ab591afc72e0da8a686fba0dc1ccd44d5d7a4ab9fa"
+      },
+      {
+        "path": "trials/001/result.json",
+        "role": {
+          "kind": "trial_result"
+        },
+        "media_type": "application/json",
+        "byte_size": 48,
+        "sha256": "92f592ab28f48d948d1e84966a1129ae2865dd39000d08dca5fc222880ca5deb"
+      }
+    ],
+    "drivers": [
+      {
+        "name": "http",
+        "version": "0.1.0"
+      },
+      {
+        "name": "lag",
+        "version": null
+      }
+    ]
+  },
+  {
+    "case": "finalized_failed_execution",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "manifest_schema_version": 2,
+    "run_id": "1f0c9d70-0000-4000-8000-000000000002",
+    "manifest_sha256": "a4f646f31cd2a831e2d0be1e8cc205ba9a26d47125943db72d0907b96285510a",
+    "finalized": true,
+    "execution_status": "failed",
+    "comparison_verdict": null,
+    "legacy_status": null,
+    "subject": {
+      "kind": "managed_command",
+      "target": null,
+      "revision": "abc123",
+      "digest": null
+    },
+    "artifact_count": 1,
+    "total_retained_bytes": 48,
+    "artifacts": [
+      {
+        "path": "trials/001/result.json",
+        "role": {
+          "kind": "trial_result"
+        },
+        "media_type": "application/json",
+        "byte_size": 48,
+        "sha256": "92f592ab28f48d948d1e84966a1129ae2865dd39000d08dca5fc222880ca5deb"
+      }
+    ],
+    "drivers": []
+  },
+  {
+    "case": "finalized_cancelled_execution",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "manifest_schema_version": 2,
+    "run_id": "1f0c9d70-0000-4000-8000-000000000003",
+    "manifest_sha256": "bb1e4c2a3d5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+    "finalized": true,
+    "execution_status": "cancelled",
+    "comparison_verdict": null,
+    "legacy_status": null,
+    "subject": {
+      "kind": "label",
+      "target": null,
+      "revision": null,
+      "digest": null
+    },
+    "artifact_count": 0,
+    "total_retained_bytes": 0,
+    "artifacts": [],
+    "drivers": []
+  },
+  {
+    "case": "finalized_invalid_execution",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "manifest_schema_version": 2,
+    "run_id": "1f0c9d70-0000-4000-8000-000000000004",
+    "manifest_sha256": "cc2f5d3b4e60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a0",
+    "finalized": true,
+    "execution_status": "invalid",
+    "comparison_verdict": null,
+    "legacy_status": null,
+    "subject": {
+      "kind": "external",
+      "target": "api",
+      "revision": null,
+      "digest": null
+    },
+    "artifact_count": 0,
+    "total_retained_bytes": 0,
+    "artifacts": [],
+    "drivers": []
+  },
+  {
+    "case": "legacy_v1_ambiguous_inconclusive",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "manifest_schema_version": 1,
+    "run_id": "1f0c9d70-0000-4000-8000-000000000005",
+    "manifest_sha256": "dd3a6e4c5f718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1",
+    "finalized": true,
+    "execution_status": "completed",
+    "comparison_verdict": null,
+    "legacy_status": "inconclusive",
+    "subject": {
+      "kind": "external",
+      "target": "api",
+      "revision": null,
+      "digest": null
+    },
+    "artifact_count": 0,
+    "total_retained_bytes": 0,
+    "artifacts": [],
+    "drivers": []
+  },
+  {
+    "case": "embedded_comparison_pass",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "manifest_schema_version": 2,
+    "run_id": "1f0c9d70-0000-4000-8000-000000000006",
+    "manifest_sha256": "19267f215f8a89b22d9dbd6161d3f30aefa7c52cdf7182dd973e0012ea4d628a",
+    "finalized": true,
+    "execution_status": "completed",
+    "comparison_verdict": "pass",
+    "legacy_status": null,
+    "subject": {
+      "kind": "external",
+      "target": "api",
+      "revision": null,
+      "digest": null
+    },
+    "artifact_count": 1,
+    "total_retained_bytes": 156,
+    "artifacts": [
+      {
+        "path": "environment.json",
+        "role": {
+          "kind": "environment_fingerprint"
+        },
+        "media_type": "application/json",
+        "byte_size": 156,
+        "sha256": "74c227f5672b577fb0775531314c183aaaa0985533a05e204caa6fa3ea875fdf"
+      }
+    ],
+    "drivers": [
+      {
+        "name": "http",
+        "version": "0.1.0"
+      }
+    ]
+  },
+  {
+    "case": "custom_role_label_artifact",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "manifest_schema_version": 2,
+    "run_id": "1f0c9d70-0000-4000-8000-000000000007",
+    "manifest_sha256": "5277856c256ed505c39e6f1a2520dc458a7e20a2789ea6c55afb5a766b0fc088",
+    "finalized": true,
+    "execution_status": "completed",
+    "comparison_verdict": null,
+    "legacy_status": null,
+    "subject": {
+      "kind": "external",
+      "target": "api",
+      "revision": null,
+      "digest": null
+    },
+    "artifact_count": 1,
+    "total_retained_bytes": 10,
+    "artifacts": [
+      {
+        "path": "extra/custom.bin",
+        "role": {
+          "kind": "other",
+          "label": "custom-capture"
+        },
+        "media_type": null,
+        "byte_size": 10,
+        "sha256": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+      }
+    ],
+    "drivers": []
+  }
+]

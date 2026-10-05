@@ -56,7 +56,7 @@ Planning-system bootstrap:
 | Evidence/closure | closed/current | M002 and C001/C002/C003/C004 closed; the C004 durability defect is resolved — ordinary CAS can no longer modify a Closed Plan, so no reachable path desynchronizes it from its ClosureRecord | plans/subsystems/evidence-closure-roadmap.md |
 | Projection/CLI | active/current | M001/M002 closed; M003a inspection/performance and M003b batch/compact/completions are planned and ready | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001-M003 and C001/C002 closed; the roadmap is terminal. C002 closed the boundary guard's filesystem gap: `check-codegg-compat-boundary.sh` now fails on filesystem access, every guard message states its actual scan scope, and all five guards have synthetic self-proofs. The bridge source was already pure; the defect was in the enforcement | plans/subsystems/codegg-integration-roadmap.md |
-| Eggstack integrations | active/current | M001/M002 closed; M003a Eggbench and M003b GitHub CI/forge/artifact adapters are planned and ready | plans/subsystems/eggstack-integration-roadmap.md |
+| Eggstack integrations | active/current | M001/M002 closed; M003a implementation landed and is closing; M003b GitHub CI/forge/artifact adapter is planned and ready | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
 
 ## Registered implementation plans
@@ -84,7 +84,7 @@ Planning-system bootstrap:
 | CodeGG integration | M003 C002 compatibility boundary-guard completeness | closed | plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md | closure plans/closure/codegg-integration/003-c002-closed.md; non-blocking tooling hardening — the bridge source was already pure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
-| Eggstack integrations | M003a Eggbench verified bundle + comparison evidence | ready | plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md | rebaseline/freeze newest compatible dual-green Eggbench SHA before fixture implementation |
+| Eggstack integrations | M003a Eggbench verified bundle + comparison evidence | closing | plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md | implementation landed against Eggbench `30a38251bccb5157beb68202ffe630f6253771e0` (CI `37143714313`, live `37143714261`); hosted qualification pending |
 | Eggstack integrations | M003b GitHub CI/forge + artifact evidence | ready | plans/implementation/eggstack-integration/003b-github-ci-forge-and-artifact-evidence.md | independent of Eggbench fixture gate; attestation verification remains deferred |
 
 ## Corrective history and current maintenance

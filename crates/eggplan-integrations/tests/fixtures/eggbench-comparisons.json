@@ -1,0 +1,329 @@
+[
+  {
+    "case": "v4_pass_performance_and_correctness",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 4,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.4.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "8cb4253e-e5f6-4b1e-8c55-e673d973d73a",
+      "manifest_sha256": "74c227f5672b577fb0775531314c183aaaa0985533a05e204caa6fa3ea875fdf",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000b1",
+      "manifest_sha256": "a4f646f31cd2a831e2d0be1e8cc205ba9a26d47125943db72d0907b96285510a",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "execution_status": "completed",
+    "aggregate_verdict": "pass",
+    "performance_verdict": "pass",
+    "correctness": {
+      "policy_id": "eggbench.security-correctness.v1",
+      "check_count": 3,
+      "aggregate_verdict": "pass"
+    },
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [],
+    "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  {
+    "case": "v4_fail_performance_correctness_pass",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 4,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.4.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f1",
+      "manifest_sha256": "e3434795322ffb2bb66ab0f5cb349f251ebd719e81b5057727986c7024d0de19",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000b1",
+      "manifest_sha256": "a4f646f31cd2a831e2d0be1e8cc205ba9a26d47125943db72d0907b96285510a",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "execution_status": "completed",
+    "aggregate_verdict": "fail",
+    "performance_verdict": "fail",
+    "correctness": {
+      "policy_id": "eggbench.security-correctness.v2",
+      "check_count": 1,
+      "aggregate_verdict": "pass"
+    },
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [
+      "workload_drift",
+      "slow_runner"
+    ],
+    "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  {
+    "case": "v4_inconclusive",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 4,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.4.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f2",
+      "manifest_sha256": "a1e19950ea0da8ca3bd8376af4f1436e8a558868656c608e08e75384365d46d0",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": null,
+    "execution_status": "completed",
+    "aggregate_verdict": "inconclusive",
+    "performance_verdict": "inconclusive",
+    "correctness": null,
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [
+      "statistical_interval_crosses_threshold"
+    ],
+    "receipt_sha256": null
+  },
+  {
+    "case": "v4_invalid",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 4,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.4.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f3",
+      "manifest_sha256": "668c165d7709f31c50066e2e00ba592b71e4d95c85518a7852d1908b6f8662f1",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": null,
+    "execution_status": "completed",
+    "aggregate_verdict": "invalid",
+    "performance_verdict": "invalid",
+    "correctness": {
+      "policy_id": "eggbench.security-correctness.v2",
+      "check_count": 0,
+      "aggregate_verdict": "invalid"
+    },
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [],
+    "receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  {
+    "case": "v4_descriptive_only_critical_mismatch",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 4,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.4.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f4",
+      "manifest_sha256": "29cc33412c7ec5ec5453031aaaf59ac3ddaeec6f3c32305320aecd84aada3f3d",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000b1",
+      "manifest_sha256": "a4f646f31cd2a831e2d0be1e8cc205ba9a26d47125943db72d0907b96285510a",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "execution_status": "completed",
+    "aggregate_verdict": "pass",
+    "performance_verdict": null,
+    "correctness": null,
+    "comparability": {
+      "workload_match": false,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": true
+    },
+    "warning_categories": [
+      "testbed_mismatch"
+    ],
+    "receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  {
+    "case": "v4_no_verdict_completed",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 4,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.4.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f5",
+      "manifest_sha256": "a8b00a984fb81824312e3cf58160a2204c642d250a18ea209c30c2b5328298e9",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": null,
+    "execution_status": "completed",
+    "aggregate_verdict": null,
+    "performance_verdict": null,
+    "correctness": null,
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [],
+    "receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  {
+    "case": "v3_separated_performance_and_correctness",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 3,
+    "policy_id": "eggbench.trial-bootstrap-network-path.v1",
+    "created_by_version": "0.3.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f6",
+      "manifest_sha256": "7f71e100240cfec1f38202cb1cb2e5f90c66cee4f0fda9046dccc01e850a9656",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": null,
+    "execution_status": "completed",
+    "aggregate_verdict": "pass",
+    "performance_verdict": "pass",
+    "correctness": {
+      "policy_id": "eggbench.security-correctness.v1",
+      "check_count": 2,
+      "aggregate_verdict": "pass"
+    },
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [],
+    "receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  {
+    "case": "v2_legacy_metric_only_aggregate",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 2,
+    "policy_id": "eggbench.trial-bootstrap-paired.v1",
+    "created_by_version": "0.2.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f7",
+      "manifest_sha256": "cdf1cb4f4a1ba7d1cf4c9322dcf4cf0498a956aa6d1d84aabf079ec08675e3c7",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000b1",
+      "manifest_sha256": "a4f646f31cd2a831e2d0be1e8cc205ba9a26d47125943db72d0907b96285510a",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "execution_status": "completed",
+    "aggregate_verdict": "pass",
+    "performance_verdict": null,
+    "correctness": null,
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [],
+    "receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  {
+    "case": "v1_legacy_metric_only_aggregate",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 1,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.1.0",
+    "candidate": {
+      "manifest_schema_version": 1,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f8",
+      "manifest_sha256": "e3f210635f05db67bfcbd3dd98528550e41449584877ab43e452762c163cf44d",
+      "subject_revision": null,
+      "subject_digest": null
+    },
+    "baseline": null,
+    "execution_status": "completed",
+    "aggregate_verdict": "pass",
+    "performance_verdict": null,
+    "correctness": null,
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [],
+    "receipt_sha256": null
+  },
+  {
+    "case": "v4_cancelled_execution",
+    "schema_version": 1,
+    "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+    "receipt_schema_version": 4,
+    "policy_id": "eggbench.trial-bootstrap.v1",
+    "created_by_version": "0.4.0",
+    "candidate": {
+      "manifest_schema_version": 2,
+      "run_id": "1f0c9d70-0000-4000-8000-0000000000f9",
+      "manifest_sha256": "712477a7c895a1121a108bc2b9784a72bf48f8abed46beb0d0fef7ee5afb5851",
+      "subject_revision": "abc123",
+      "subject_digest": null
+    },
+    "baseline": null,
+    "execution_status": "cancelled",
+    "aggregate_verdict": "pass",
+    "performance_verdict": "pass",
+    "correctness": null,
+    "comparability": {
+      "workload_match": true,
+      "driver_match": true,
+      "topology_match": true,
+      "critical_mismatch": false
+    },
+    "warning_categories": [],
+    "receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+  }
+]

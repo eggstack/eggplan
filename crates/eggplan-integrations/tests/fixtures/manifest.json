@@ -23,5 +23,54 @@
     "eggwork-snapshots.json",
     "eggwork-artifacts.json",
     "eggsearch-bundles.json"
+  ],
+  "native_fixture_families": [
+    {
+      "family": "eggbench-verified-bundle",
+      "milestone": "eggstack-integration/003a",
+      "fixture": "eggbench-bundles.json",
+      "upstream_repository": "eggstack/eggbench",
+      "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+      "ordinary_ci_run": 37143714313,
+      "live_qualification_run": 37143714261,
+      "dto_schema": 1,
+      "upstream_schemas": {
+        "bundle_manifest": [1, 2]
+      },
+      "cases": [
+        "finalized_success_no_comparison",
+        "finalized_failed_execution",
+        "finalized_cancelled_execution",
+        "finalized_invalid_execution",
+        "legacy_v1_ambiguous_inconclusive",
+        "embedded_comparison_pass",
+        "custom_role_label_artifact"
+      ]
+    },
+    {
+      "family": "eggbench-comparison-receipt",
+      "milestone": "eggstack-integration/003a",
+      "fixture": "eggbench-comparisons.json",
+      "upstream_repository": "eggstack/eggbench",
+      "reviewed_revision": "30a38251bccb5157beb68202ffe630f6253771e0",
+      "ordinary_ci_run": 37143714313,
+      "live_qualification_run": 37143714261,
+      "dto_schema": 1,
+      "upstream_schemas": {
+        "comparison_receipt": [1, 2, 3, 4]
+      },
+      "cases": [
+        "v4_pass_performance_and_correctness",
+        "v4_fail_performance_correctness_pass",
+        "v4_inconclusive",
+        "v4_invalid",
+        "v4_descriptive_only_critical_mismatch",
+        "v4_no_verdict_completed",
+        "v3_separated_performance_and_correctness",
+        "v2_legacy_metric_only_aggregate",
+        "v1_legacy_metric_only_aggregate",
+        "v4_cancelled_execution"
+      ]
+    }
   ]
 }

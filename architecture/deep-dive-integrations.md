@@ -1,9 +1,9 @@
-# Deep dive: `eggplan-integrations` (provider SPI + Eggwork/Eggsearch adapters)
+# Deep dive: `eggplan-integrations` (provider SPI + Eggwork/Eggsearch/Eggbench adapters)
 
 Role within the workspace: pure, synchronous normalization of host-acquired
 facts into Eggplan observations. See [overview](overview.md),
 [provider SPI](provider-spi.md), [Eggwork adapter](eggwork-adapter.md),
-and [Eggsearch adapter](eggsearch-adapter.md).
+[Eggsearch adapter](eggsearch-adapter.md), and [Eggbench adapter](eggbench-adapter.md).
 
 ## 1. Crate role: what it is and must never do
 
@@ -298,3 +298,50 @@ Gaps and risks:
   process deps; no `register_trusted`/`ProviderRegistry` in adapters).
 - `cargo clippy -p eggplan-integrations --all-targets --locked -- -D warnings`
   for the crate-focused lint gate.
+
+## 7. Update — 2026-10-05, Eggbench adapter (Eggstack M003a)
+
+Appended rather than rewritten: sections 1-6 above record the review as it stood
+against the two-adapter crate, and their conclusions are unchanged. What follows
+is the post-M003a delta.
+
+- `src/eggbench.rs` is the third adapter and `src/lib.rs` now exports
+  `eggbench`, `eggsearch`, `eggwork`. Provider `epp_eggbench`, SPI class
+  `Benchmark`, allowed kinds `Artifact` and `Benchmark`. See
+  [Eggbench adapter](eggbench-adapter.md) for the full contract, the dual-green
+  upstream baseline `30a38251…`, and the manifest/receipt compatibility matrix.
+- The plan's suggested free-form provider class `eggbench-verified-evidence-v1`
+  is not expressible in the frozen `ProviderClass` vocabulary that
+  `AdapterDescriptor::provider_descriptor` derives from
+  (`src/lib.rs:104-113`). `Benchmark` is used instead, yielding core class
+  `benchmark`. Documented as a deviation rather than silently substituted.
+- **Section 6 finding on the adapter-file-scoped trust guard is now resolved.**
+  `scripts/check-integrations-boundary.sh` was rewritten into six scope-labelled
+  guards that scan the whole `src` tree rather than a named adapter list, so a
+  registry mutation in `lib.rs` or in any future module fails the build. New
+  coverage the old guard did not have: filesystem access (`std::fs`,
+  `std::path`, `tempfile::`, the `use`-imported `fs::` call forms, `File::`),
+  env-var reads, executable discovery, and credential/secret-store crates.
+  Every guard now states its actual scan scope in its failure message, the
+  script fails loudly when `rg` or `awk` is unavailable rather than silently
+  no-opping, and it carries synthetic self-proofs per guard. A real-tree negative
+  proof confirmed guard 6 fails on an injected `ProviderRegistry` parameter.
+- `tests/fixtures/manifest.json` gains a `native_fixture_families` array with
+  per-family upstream revision, ordinary CI run `37143714313`, live
+  qualification run `37143714261`, and the supported upstream schema ranges.
+  The older `sources.eggbench` `d7d1fd9…` M001 synthetic pin is retained
+  unchanged, so the section 6 finding about its staleness is a recorded
+  historical observation rather than a silent edit; the M003a families are the
+  current closure-grade baseline.
+- Section 6 finding that `native_fixtures` is not exhaustive stands: it names
+  three M001/M002 files and still does not list
+  `verification-digest.json` or the two new Eggbench files. The new families are
+  enumerated separately in `native_fixture_families`, so the authoritative
+  Eggbench provenance is no longer dependent on that incomplete list.
+- Section 6 finding on caller-supplied provider identity stands and still
+  applies to the Eggbench adapter: `epp_eggbench` is adapter-fixed, so payload
+  text cannot select a different provider, but the host registry remains the only
+  authority that makes the label mean anything.
+- The Eggbench adapter emits content-bound artifact references
+  (`eggbench:bundle:<run-id>#<path>` with exact digests), so the Eggsearch
+  undigested-reference gap recorded above is not repeated here.

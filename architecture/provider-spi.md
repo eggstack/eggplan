@@ -56,5 +56,15 @@ execution states, Eggsearch-like local/external trust and gaps, and Eggbench
 comparison/no-comparison verdicts. These are contract fixtures only; no sibling
 crate is imported and no live integration is claimed.
 
+The `native_fixture_families` array additionally records, per family, the exact
+upstream revision, the ordinary hosted CI run, the live external-tool
+qualification run, and the supported upstream schema ranges that the native
+compatibility fixtures were frozen against. The Eggbench families are pinned to
+`30a38251bccb5157beb68202ffe630f6253771e0` (CI `37143714313`, live
+`37143714261`); see [eggbench-adapter](eggbench-adapter.md).
+
 Run `scripts/check-integrations-boundary.sh` to verify there is no sibling,
-transport, async, process, or evidence-acquisition dependency.
+transport, async, credential, process, filesystem, network, or
+trust-enrolment dependency. The guard scans the whole crate source tree rather
+than a named adapter list, so a newly added adapter cannot escape enforcement by
+not being named.

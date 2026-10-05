@@ -1,0 +1,93 @@
+[
+  {
+    "case": "check_success",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "check_run_id": 111899459403,
+    "name": "native (macos-latest)",
+    "app_slug": "github-actions",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at_unix_ms": 1788000035000,
+    "completed_at_unix_ms": 1788000095000
+  },
+  {
+    "case": "check_failure",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "check_run_id": 111899459404,
+    "name": "native (windows-latest)",
+    "app_slug": "github-actions",
+    "status": "completed",
+    "conclusion": "failure",
+    "started_at_unix_ms": null,
+    "completed_at_unix_ms": null
+  },
+  {
+    "case": "check_in_progress",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "check_run_id": 111899459405,
+    "name": "native (ubuntu-latest)",
+    "app_slug": "github-actions",
+    "status": "in_progress",
+    "conclusion": null,
+    "started_at_unix_ms": null,
+    "completed_at_unix_ms": null
+  },
+  {
+    "case": "check_cancelled",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "check_run_id": 111899459406,
+    "name": "native (ubuntu-latest)",
+    "app_slug": "github-actions",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "started_at_unix_ms": null,
+    "completed_at_unix_ms": null
+  },
+  {
+    "case": "check_neutral",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "check_run_id": 111899459407,
+    "name": "legacy-context",
+    "app_slug": "github-actions",
+    "status": "completed",
+    "conclusion": "neutral",
+    "started_at_unix_ms": null,
+    "completed_at_unix_ms": null
+  },
+  {
+    "case": "check_action_required",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "check_run_id": 111899459408,
+    "name": "review-required",
+    "app_slug": null,
+    "status": "completed",
+    "conclusion": "action_required",
+    "started_at_unix_ms": null,
+    "completed_at_unix_ms": null
+  },
+  {
+    "case": "check_pr_merge_sha",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "1111111111111111111111111111111111111111",
+    "check_run_id": 111899459409,
+    "name": "native (ubuntu-latest)",
+    "app_slug": "github-actions",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at_unix_ms": null,
+    "completed_at_unix_ms": null
+  }
+]

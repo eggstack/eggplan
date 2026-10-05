@@ -342,6 +342,22 @@ is the post-M003a delta.
   applies to the Eggbench adapter: `epp_eggbench` is adapter-fixed, so payload
   text cannot select a different provider, but the host registry remains the only
   authority that makes the label mean anything.
+- `src/github.rs` is the fourth adapter and `src/lib.rs` now also exports
+  `github`. Two providers: `epp_github_actions` (`Execution`; `Test`, `Command`,
+  `DelegatedRun`, `Benchmark`; verification binding required) and
+  `epp_github_forge` (`Utility`; `Revision`, `Artifact`;
+  `verification_binding: false`, so an artifact digest can never be replayed as a
+  verification digest). Contract frozen against reviewed REST API version
+  `2022-11-28`. See [GitHub adapter](github-adapter.md).
+- Upstream fact worth recording because the M003b plan had to handle both
+  branches: GitHub **does** supply an artifact content digest
+  (`artifact.digest`, `sha256:<hex>`), but only for artifacts uploaded with
+  `upload-artifact` v4 or newer, and it is `null` for older uploads. The adapter
+  records the digest when present, rejects a malformed one, and records absence
+  explicitly without inferring a value. No payload is ever downloaded.
+- The rewritten boundary guard needs no per-adapter edit: it scans the whole
+  `src` tree, so the GitHub adapter is covered by the same six guards that
+  covered Eggbench.
 - The Eggbench adapter emits content-bound artifact references
   (`eggbench:bundle:<run-id>#<path>` with exact digests), so the Eggsearch
   undigested-reference gap recorded above is not repeated here.

@@ -1,6 +1,6 @@
 # Eggstack Integrations M003b — GitHub CI, Forge, and Artifact Evidence
 
-Status: ready
+Status: closing
 
 Repository baseline: 71904570e908a15c099f9b2804cabfbccf9ae51a
 

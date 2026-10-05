@@ -1,0 +1,62 @@
+[
+  {
+    "case": "artifact_with_digest",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "artifact_id": 5,
+    "name": "eggplan-diagnostics",
+    "run_id": 37350383159,
+    "run_attempt": 1,
+    "head_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "size_in_bytes": 12345,
+    "expired": false,
+    "created_at_unix_ms": 1788000090000,
+    "expires_at_unix_ms": 1790688000000,
+    "digest": "sha256:cfc3236bdad15b5898bca8408945c9e19e1917da8704adc20eaa618444290a8c"
+  },
+  {
+    "case": "artifact_expired",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "artifact_id": 6,
+    "name": "eggplan-diagnostics",
+    "run_id": 37350383159,
+    "run_attempt": 1,
+    "head_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "size_in_bytes": 12345,
+    "expired": true,
+    "created_at_unix_ms": 1788000090000,
+    "expires_at_unix_ms": 1788600000000,
+    "digest": "sha256:cfc3236bdad15b5898bca8408945c9e19e1917da8704adc20eaa618444290a8c"
+  },
+  {
+    "case": "artifact_without_digest",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "artifact_id": 7,
+    "name": "legacy-upload",
+    "run_id": 37350383159,
+    "run_attempt": 2,
+    "head_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "size_in_bytes": 4096,
+    "expired": false,
+    "created_at_unix_ms": 1788000090000,
+    "expires_at_unix_ms": null,
+    "digest": null
+  },
+  {
+    "case": "artifact_pr_merge_sha",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "artifact_id": 8,
+    "name": "pr-artifact",
+    "run_id": 37350383159,
+    "run_attempt": 1,
+    "head_sha": "1111111111111111111111111111111111111111",
+    "size_in_bytes": 4096,
+    "expired": false,
+    "created_at_unix_ms": 1788000090000,
+    "expires_at_unix_ms": null,
+    "digest": null
+  }
+]

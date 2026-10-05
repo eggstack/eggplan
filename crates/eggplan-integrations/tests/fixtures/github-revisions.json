@@ -1,0 +1,16 @@
+[
+  {
+    "case": "exact_commit",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "repository_full_name": "eggstack/eggplan",
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11"
+  },
+  {
+    "case": "exact_commit_pr_merge",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "repository_full_name": "eggstack/eggplan",
+    "commit_sha": "1111111111111111111111111111111111111111"
+  }
+]

@@ -63,6 +63,10 @@ compatibility fixtures were frozen against. The Eggbench families are pinned to
 `30a38251bccb5157beb68202ffe630f6253771e0` (CI `37143714313`, live
 `37143714261`); see [eggbench-adapter](eggbench-adapter.md).
 
+GitHub forge families are recorded the same way and are keyed to reviewed REST
+API version `2022-11-28` with the sampled run and commit recorded per family;
+see [github-adapter](github-adapter.md).
+
 Run `scripts/check-integrations-boundary.sh` to verify there is no sibling,
 transport, async, credential, process, filesystem, network, or
 trust-enrolment dependency. The guard scans the whole crate source tree rather

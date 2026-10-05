@@ -1,0 +1,76 @@
+[
+  {
+    "case": "classic_all_success",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "statuses": [
+      {
+        "status_id": 1,
+        "context": "ci/eggplan",
+        "state": "success"
+      },
+      {
+        "status_id": 2,
+        "context": "eggplan/verify",
+        "state": "success"
+      }
+    ]
+  },
+  {
+    "case": "classic_with_failure",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "statuses": [
+      {
+        "status_id": 1,
+        "context": "ci/eggplan",
+        "state": "success"
+      },
+      {
+        "status_id": 2,
+        "context": "ci/lint",
+        "state": "failure"
+      }
+    ]
+  },
+  {
+    "case": "classic_with_error",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "statuses": [
+      {
+        "status_id": 1,
+        "context": "ci/eggplan",
+        "state": "error"
+      }
+    ]
+  },
+  {
+    "case": "classic_with_pending",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "statuses": [
+      {
+        "status_id": 1,
+        "context": "ci/eggplan",
+        "state": "success"
+      },
+      {
+        "status_id": 2,
+        "context": "ci/release",
+        "state": "pending"
+      }
+    ]
+  },
+  {
+    "case": "classic_empty",
+    "schema_version": 1,
+    "repository_id": 1382494389,
+    "commit_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+    "statuses": []
+  }
+]

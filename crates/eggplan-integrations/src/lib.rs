@@ -8,6 +8,7 @@
 pub mod eggbench;
 pub mod eggsearch;
 pub mod eggwork;
+pub mod github;
 
 use eggplan_core::{
     ArtifactRef, EvidenceKind, EvidenceObservation, EvidenceObservationInput, EvidenceProviderId,

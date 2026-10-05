@@ -35,7 +35,10 @@
       "live_qualification_run": 37143714261,
       "dto_schema": 1,
       "upstream_schemas": {
-        "bundle_manifest": [1, 2]
+        "bundle_manifest": [
+          1,
+          2
+        ]
       },
       "cases": [
         "finalized_success_no_comparison",
@@ -57,7 +60,12 @@
       "live_qualification_run": 37143714261,
       "dto_schema": 1,
       "upstream_schemas": {
-        "comparison_receipt": [1, 2, 3, 4]
+        "comparison_receipt": [
+          1,
+          2,
+          3,
+          4
+        ]
       },
       "cases": [
         "v4_pass_performance_and_correctness",
@@ -71,6 +79,57 @@
         "v1_legacy_metric_only_aggregate",
         "v4_cancelled_execution"
       ]
+    },
+    {
+      "family": "github-actions-run",
+      "milestone": "eggstack-integration/003b",
+      "fixture": "github-runs.json",
+      "upstream_repository": "eggstack/eggplan",
+      "github_api_version": "2022-11-28",
+      "sampled_run_id": 37350383159,
+      "sampled_run_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+      "dto_schema": 1,
+      "cases": 14
+    },
+    {
+      "family": "github-check-run",
+      "milestone": "eggstack-integration/003b",
+      "fixture": "github-check-runs.json",
+      "upstream_repository": "eggstack/eggplan",
+      "github_api_version": "2022-11-28",
+      "sampled_run_id": 37350383159,
+      "sampled_run_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+      "dto_schema": 1,
+      "cases": 7
+    },
+    {
+      "family": "github-commit-status",
+      "milestone": "eggstack-integration/003b",
+      "fixture": "github-commit-statuses.json",
+      "upstream_repository": "eggstack/eggplan",
+      "github_api_version": "2022-11-28",
+      "sampled_run_sha": "674264db7dda3f063cbbedd93f6f4938c1959a11",
+      "dto_schema": 1,
+      "cases": 5
+    },
+    {
+      "family": "github-artifact",
+      "milestone": "eggstack-integration/003b",
+      "fixture": "github-artifacts.json",
+      "upstream_repository": "eggstack/eggplan",
+      "github_api_version": "2022-11-28",
+      "dto_schema": 1,
+      "cases": 4,
+      "note": "GitHub supplies artifact.digest only for upload-artifact v4 or newer; the sampled repository produced no artifacts, so digests are modelled from the documented shape and the null case is covered."
+    },
+    {
+      "family": "github-revision",
+      "milestone": "eggstack-integration/003b",
+      "fixture": "github-revisions.json",
+      "upstream_repository": "eggstack/eggplan",
+      "github_api_version": "2022-11-28",
+      "dto_schema": 1,
+      "cases": 2
     }
   ]
 }

@@ -308,6 +308,203 @@ fn illegal_lifecycle_updates_are_rejected() {
         store.compare_and_swap(&p.id, 0, &completed),
         Err(RepoError::InvalidTransition)
     ));
+    // C004: entering Closed from any non-Closed status keeps reporting the entry
+    // guard, so it is not collapsed into the ClosedPlanImmutable refusal.
+    let mut to_active = p.clone();
+    to_active.revision = 1;
+    to_active.status = PlanStatus::Active;
+    let active = store.compare_and_swap(&p.id, 0, &to_active).unwrap();
+    let mut from_active = active.clone();
+    from_active.revision = active.revision + 1;
+    from_active.status = PlanStatus::Closed;
+    assert!(matches!(
+        store.compare_and_swap(&p.id, active.revision, &from_active),
+        Err(RepoError::GuardedClosureRequired)
+    ));
+    let mut to_blocked = active.clone();
+    to_blocked.revision = active.revision + 1;
+    to_blocked.status = PlanStatus::Blocked;
+    let blocked = store
+        .compare_and_swap(&p.id, active.revision, &to_blocked)
+        .unwrap();
+    let mut from_blocked = blocked.clone();
+    from_blocked.revision = blocked.revision + 1;
+    from_blocked.status = PlanStatus::Closed;
+    assert!(matches!(
+        store.compare_and_swap(&p.id, blocked.revision, &from_blocked),
+        Err(RepoError::GuardedClosureRequired)
+    ));
+}
+
+/// C004 regression for E-M002-C004-01: a canonical `Closed` Plan is immutable
+/// under ordinary compare-and-swap.
+///
+/// Before this guard, a `Closed` → `Closed` rewrite satisfied both CAS guards
+/// (the entry guard requires `current.status != Closed`, and the transition
+/// check short-circuits on equal statuses), wrote the new bytes at
+/// `revision + 1`, and only then failed with `Corrupt` when
+/// `ClosureRecord::validate` stopped matching. Because `RepositoryStore::open`
+/// lists every plan, that single write left the whole state root unopenable.
+#[test]
+fn closed_plan_is_immutable_under_ordinary_compare_and_swap() {
+    let dir = tempdir().unwrap();
+    let _repo = init_git_repo(dir.path());
+    let root = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&root).unwrap();
+    let subject = store.subject_source().capture().unwrap();
+    let binding = VerificationDigest::new(format!("sha256:{}", "d".repeat(64))).unwrap();
+    let mut initial = plan();
+    initial.items[0].criteria.push(AcceptanceCriterion {
+        id: CriterionId::new("epc_immutable").unwrap(),
+        statement: "the immutability regression passed".into(),
+        human_judgment_allowed: false,
+        requirements: vec![EvidenceRequirement {
+            description: "required test".into(),
+            kind: EvidenceKind::Test,
+            provider: None,
+            subject_policy: SubjectPolicy::Exact,
+            cardinality: EvidenceCardinality::Any,
+            min_count: 1,
+            allow_human_judgment: false,
+            expected_verification_digest: Some(binding.clone()),
+        }],
+    });
+    store.create(&initial).unwrap();
+    initial.revision = 1;
+    initial.status = PlanStatus::Active;
+    initial.subject = Some(subject.clone());
+    initial.items[0].status = PlanItemStatus::Actionable;
+    let mut active = store.compare_and_swap(&initial.id, 0, &initial).unwrap();
+    active.revision = 2;
+    active.items[0].status = PlanItemStatus::InProgress;
+    active = store.compare_and_swap(&active.id, 1, &active).unwrap();
+    active.revision = 3;
+    active.items[0].status = PlanItemStatus::Completed;
+    let active = store.compare_and_swap(&active.id, 2, &active).unwrap();
+
+    let observation = EvidenceObservation::finalize(EvidenceObservationInput {
+        id: EvidenceObservationId::new("epe_immutable_pass").unwrap(),
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        kind: EvidenceKind::Test,
+        status: EvidenceStatus::Passed,
+        subject: subject.clone(),
+        observed_at_unix_ms: 20,
+        invocation_ref: Some("test suite".into()),
+        verification_digest: Some(binding),
+        result_metadata: Default::default(),
+        artifacts: vec![],
+    })
+    .unwrap();
+    store.append_observation(&active.id, &observation).unwrap();
+
+    let mut providers = ProviderRegistry::default();
+    providers
+        .register_trusted(
+            ProviderDescriptor::new(
+                EvidenceProviderId::new("epp_test").unwrap(),
+                String::from("host"),
+                [EvidenceKind::Test],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let observations = store.list_observations(&active.id).unwrap();
+    let supersessions = store.list_supersessions(&active.id).unwrap();
+    let effective: Vec<_> = eggplan_core::effective_observations(&observations, &supersessions)
+        .unwrap()
+        .into_iter()
+        .cloned()
+        .collect();
+    let assessment = assess_plan(&active, &subject, &effective, &providers);
+    assert_eq!(assessment.status, AssessmentStatus::Complete);
+    let policy = vec![ProviderPolicyEntry {
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        class: "host".into(),
+        allowed_kinds: [EvidenceKind::Test].into_iter().collect(),
+    }];
+    let candidate = ClosureCandidate::build(
+        &active,
+        subject,
+        assessment,
+        &observations,
+        &supersessions,
+        policy,
+        11,
+    )
+    .unwrap();
+    let (closed, record) = store
+        .finalize_closure(&candidate, ClosureId::new("epcl_immutable").unwrap(), 12)
+        .unwrap();
+    assert_eq!(closed.status, PlanStatus::Closed);
+    record.validate(&closed).unwrap();
+
+    let plan_path = root.join("plans/ep_store/plan.json");
+    let closure_path = root.join("plans/ep_store/closure.json");
+    let stored_plan = fs::read(&plan_path).unwrap();
+    let stored_closure = fs::read(&closure_path).unwrap();
+
+    // The exact rewrite that used to poison the state root.
+    let mut rewrite = closed.clone();
+    rewrite.revision += 1;
+    rewrite.objective = "rewritten after closure".into();
+    assert!(matches!(
+        store.compare_and_swap(&closed.id, closed.revision, &rewrite),
+        Err(RepoError::ClosedPlanImmutable(ref id)) if *id == closed.id
+    ));
+
+    // Every target status, including `Closed` itself, is refused the same way.
+    for target in [
+        PlanStatus::Draft,
+        PlanStatus::Active,
+        PlanStatus::Blocked,
+        PlanStatus::Cancelled,
+        PlanStatus::Closed,
+    ] {
+        let mut moved = closed.clone();
+        moved.revision += 1;
+        moved.status = target.clone();
+        assert!(
+            matches!(
+                store.compare_and_swap(&closed.id, closed.revision, &moved),
+                Err(RepoError::ClosedPlanImmutable(_))
+            ),
+            "Closed -> {target:?} was not refused"
+        );
+    }
+
+    // A same-status edit that moves only an item is refused as well, not just a
+    // plan-status change.
+    let mut item_edit = closed.clone();
+    item_edit.revision += 1;
+    item_edit.items[0].status = PlanItemStatus::Actionable;
+    assert!(matches!(
+        store.compare_and_swap(&closed.id, closed.revision, &item_edit),
+        Err(RepoError::ClosedPlanImmutable(_))
+    ));
+
+    // A stale expected revision still reports Conflict, so the optimistic
+    // concurrency signal is unchanged and is checked before immutability.
+    let stale_expected = closed.revision.checked_sub(1).unwrap();
+    let mut stale_rewrite = closed.clone();
+    stale_rewrite.revision = stale_expected + 1;
+    assert!(matches!(
+        store.compare_and_swap(&closed.id, stale_expected, &stale_rewrite),
+        Err(RepoError::Conflict { .. })
+    ));
+
+    // No refusal wrote anything: plan and closure bytes are identical, and the
+    // Plan still deserializes to the closed candidate.
+    assert_eq!(fs::read(&plan_path).unwrap(), stored_plan);
+    assert_eq!(fs::read(&closure_path).unwrap(), stored_closure);
+    assert_eq!(store.get(&closed.id).unwrap(), closed);
+
+    // The state root still reopens, which is exactly what the defect destroyed.
+    let reopened = RepositoryStore::open(&root).unwrap();
+    assert_eq!(reopened.list().unwrap(), vec![closed.id.clone()]);
+    assert_eq!(reopened.get(&closed.id).unwrap(), closed);
+    reopened
+        .get_observation(&closed.id, observation.id())
+        .unwrap();
 }
 
 #[test]

@@ -127,7 +127,7 @@ There is no `tests/` integration directory — only `tests/fixtures/` plus inlin
 rejection (`src/evidence.rs:476-497`), strict-schema rejection (§3 refs), per-status
 determinism, stale/dirty/untrusted rejection, cardinality and human-judgment policy,
 supersession cycles, and v2-binding enforcement for all five execution kinds on both
-the plan side and the observation side (`src/model.rs:512-559`,
+the plan side and the observation side (`src/model.rs:539-586`,
 `src/evidence.rs:457-472`). The separate `src/assessment.rs:511-653` range covers only
 exact-binding matching and the legacy-unbound rejection path, not the five-kind loop.
 

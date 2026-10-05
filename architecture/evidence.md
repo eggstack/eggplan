@@ -83,7 +83,12 @@ writes the pending closure record, replaces the Plan with its next Closed
 revision, and promotes the record. Repository open discards a pending
 candidate when the source Plan is still current and promotes it when the
 exact target Plan is present. A Closed Plan without a matching record is
-corruption. Ordinary Plan CAS rejects transitions to Closed.
+corruption. Ordinary Plan CAS rejects transitions to Closed, and rejects every
+modification of a Plan that is already Closed with
+`RepoError::ClosedPlanImmutable` before any write. The two rejections stay
+distinct so a caller can tell an illegal entry from an illegal rewrite, and
+neither can leave a Closed Plan desynchronized from its record — the corruption
+case above.
 
 The closure subject capture authority is repository-owned and is not exposed
 as an injection point in the public API. The `SubjectCapture` abstraction,

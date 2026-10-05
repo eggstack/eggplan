@@ -468,6 +468,45 @@ mod tests {
     }
 
     #[test]
+    fn closed_is_terminal_across_the_whole_plan_transition_matrix() {
+        // C004: `Closed` is terminal as a *source* — no pair leaves it, including
+        // `Closed` -> `Closed`. This matrix was already correct and is pinned here
+        // so a later pass cannot weaken it.
+        //
+        // Note the asymmetry, which is deliberate: `(_, Closed)` is *not* all
+        // illegal. `Active -> Closed` is the legitimate lifecycle edge that
+        // `RepositoryStore::finalize_closure` performs, so core must permit it.
+        // Authority is a repository concern, enforced by the
+        // `GuardedClosureRequired` and `ClosedPlanImmutable` guards in
+        // `compare_and_swap`; core states only what is structurally possible,
+        // never who is allowed to do it. That is why the Closed rewrite is
+        // blocked in the repository and not here.
+        const ALL: [PlanStatus; 5] = [
+            PlanStatus::Draft,
+            PlanStatus::Active,
+            PlanStatus::Blocked,
+            PlanStatus::Closed,
+            PlanStatus::Cancelled,
+        ];
+        for from in &ALL {
+            for to in &ALL {
+                if matches!(from, PlanStatus::Closed) {
+                    assert!(
+                        !plan_transition_allowed(from, to),
+                        "Closed is terminal: {from:?} -> {to:?} must not be a legal plan transition"
+                    );
+                }
+            }
+        }
+        // The one legal edge into Closed, asserted so the terminality pin above
+        // cannot be "fixed" by deleting it.
+        assert!(plan_transition_allowed(
+            &PlanStatus::Active,
+            &PlanStatus::Closed
+        ));
+    }
+
+    #[test]
     fn collection_and_unicode_scalar_bounds_are_enforced() {
         let mut p = Plan::new(PlanId::new("ep_bounds").unwrap(), "é", vec![]).unwrap();
         p.objective = "é".repeat(OBJECTIVE_CHARS + 1);

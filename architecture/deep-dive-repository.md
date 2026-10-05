@@ -28,29 +28,31 @@ matching the [repository](repository.md) and
 [evidence](evidence.md) boundaries.
 
 - **`.eggplan` layout.** `open`/`open_with_options`
-  (`crates/eggplan-repo/src/store.rs:574-616`) ensure `root/` + `plans/`,
+  (`crates/eggplan-repo/src/store.rs:576-618`) ensure `root/` + `plans/`,
   create or validate `config.toml` (schema version 1, stable `epr_` identity;
-  validation at `store.rs:1123-1137`), then run pending-closure recovery and a
+  validation at `store.rs:1128-1142`), then run pending-closure recovery and a
   full `list()` validation pass. Per-plan directories hold `plan.json`,
   `evidence/<id>.json`, `supersessions/<id>.json`, `closure.pending.json`,
   and `closure.json`, as documented in [repository](repository.md).
 - **Plan CAS semantics.** `StoredPlan` (`store.rs:46-52`) wraps the plan with
-  `storage_version: 1` and a canonical digest. `create` (`store.rs:851-878`)
-  requires revision 0 + Draft; `compare_and_swap` (`store.rs:909-957`)
+  `storage_version: 1` and a canonical digest. `create` (`store.rs:853-880`)
+  requires revision 0 + Draft; `compare_and_swap` (`store.rs:911-962`)
   requires `next.revision == expected + 1`, checks the persisted revision
   under the lock, and returns typed `Conflict` on staleness. Ordinary CAS can
   never *enter* Closed from a non-Closed plan (`GuardedClosureRequired`,
-  `store.rs:928-932`) — but it can *rewrite* a plan that is already Closed; see
-  finding 6.1, which is a real code defect, not a documentation nuance.
-- **Evidence ledger.** `append_observation` (`store.rs:959-998`) validates,
+  `store.rs:933-937`), and can never modify a plan that is already Closed in any
+  direction, including Closed→Closed (`ClosedPlanImmutable`, `store.rs:930-932`).
+  Both refusals precede `atomic_write` (`store.rs:960`), so a rejected update
+  leaves stored bytes untouched.
+- **Evidence ledger.** `append_observation` (`store.rs:964-1003`) validates,
   then compares canonical bytes for idempotent replay vs
   `ObservationConflict`; `list_observations_unlocked`
-  (`store.rs:1038-1085`) sorts by typed ID, skips `.tmp-*` staging remnants,
+  (`store.rs:1043-1090`) sorts by typed ID, skips `.tmp-*` staging remnants,
   and rejects non-`.json` entries. Limits: 10,000 observations per plan
-  (`store.rs:969,1078` via core bounds), 1 MiB per observation
+  (`store.rs:974,1078` via core bounds), 1 MiB per observation
   (`store.rs:26,1168-1173`), 16 MiB per plan (`store.rs:25,696-700`).
 - **Closure finalizer as subject authority.** `finalize_closure`
-  (`store.rs:358-367`) is the only public finalizer; it builds a
+  (`store.rs:360-369`) is the only public finalizer; it builds a
   `GitSubjectCapture` from `self.subject_source()` and delegates to the
   crate-private hook. It recaptures the Git `SubjectRevision` under the lock,
   never accepting a caller-owned subject. See sections 2–4.
@@ -63,71 +65,72 @@ declares `git_subject` + `store`, and re-exports exactly
 `GitSubjectFingerprintV1`, `GitSubjectOptions`, `GitSubjectSource`,
 `PlanStore`, `RepoError`, `RepositoryStore`, `StoreOptions`.
 
-- **Open paths.** `open_read_only` (`store.rs:172-197`) reads `config.toml`
+- **Open paths.** `open_read_only` (`store.rs:174-199`) reads `config.toml`
   without creating files or recovering pending closures — the inspection
-  path for check commands. `pending_closures` (`store.rs:200-230`) lists
+  path for check commands. `pending_closures` (`store.rs:202-232`) lists
   pending intents sorted, rejecting symlinked entries. `open_with_options`
-  (`store.rs:578-616`) takes a short-lived init lock, then recovers.
-- **Plan CAS.** Above plus `load_unlocked` (`store.rs:677-847`): storage
+  (`store.rs:580-618`) takes a short-lived init lock, then recovers.
+- **Plan CAS.** Above plus `load_unlocked` (`store.rs:679-849`): storage
   version check, domain validation, digest check, directory/object identity
   check, `RecoveryRequired` if `closure.pending.json` exists
-  (`store.rs:737-739`), and — for Closed plans — full closure-record
+  (`store.rs:739-741`), and — for Closed plans — full closure-record
   validation including reproduced source digest, provider-policy rebuild,
   reproducible assessment, evidence digests, and supersession lineage
-  (`store.rs:744-830`). Unknown/corrupt objects fail closed (`Corrupt`,
+  (`store.rs:746-832`). Unknown/corrupt objects fail closed (`Corrupt`,
   `InvalidPlan`).
 - **Evidence append / idempotency.** Byte-identical replay of the same ID
   returns `Ok(())`; same ID with different canonical bytes returns
-  `ObservationConflict` (`store.rs:978-987`). Post-write re-read guards
-  against partial writes (`store.rs:993-996`).
-- **Supersessions.** `append_supersession` (`store.rs:489-520`) validates the
+  `ObservationConflict` (`store.rs:983-992`). Post-write re-read guards
+  against partial writes (`store.rs:998-1001`).
+- **Supersessions.** `append_supersession` (`store.rs:491-522`) validates the
   record, requires both endpoints to exist, rejects writes to Closed plans,
   rejects filename collisions, and re-runs `effective_observations` before
-  persisting. `list_supersessions_unlocked` (`store.rs:530-572`) checks
+  persisting. `list_supersessions_unlocked` (`store.rs:532-574`) checks
   filename/identity agreement and sorts by ID.
-- **`finalize_closure` two-capture protocol** (`store.rs:383-487`): lock →
+- **`finalize_closure` two-capture protocol** (`store.rs:385-489`): lock →
   reload current and require exact source revision + digest → capture S1,
   require equality with candidate subject (`ClosureSubjectStale` on
   mismatch) → reload observations + supersessions, rebuild the provider
   registry from the candidate's bounded snapshot via `register_trusted`
-  (`store.rs:408-415`), recompute `assess_plan` and require Complete +
+  (`store.rs:410-417`), recompute `assess_plan` and require Complete +
   equality → verify satisfying-observation digests, re-derive the expected
   observation set from the assessment criteria and require it to equal
-  `candidate.satisfying_observations` (`store.rs:428-447`), provider-policy
+  `candidate.satisfying_observations` (`store.rs:430-449`), provider-policy
   digest, and supersession lineage → build the Closed plan and `ClosureRecord` →
   refuse if `closure.json`/`closure.pending.json` already exist → capture S2
   immediately before the first closure write, require `S2 == S1 ==
   candidate.subject` (`ClosureSubjectDrift` on drift) → write pending, write
   plan, rename pending to final. Neither stale, drift, nor capture failure
   produces pending/final state or a Closed plan.
-- **Pending recovery.** `recover_pending_closures` (`store.rs:262-344`),
+- **Pending recovery.** `recover_pending_closures` (`store.rs:264-346`),
   run under the lock at open: exact closed target (revision + digest) with a
   valid record promotes pending to final; exact source match discards;
   anything else (including both-files-present) is `Corrupt`. `closure_record`
-  (`store.rs:234-260`) revalidates before returning, with an 8 MiB size cap.
-- **Staging / sync.** `atomic_write` (`store.rs:1204-1226`): stage
+  (`store.rs:236-262`) revalidates before returning, with an 8 MiB size cap.
+- **Staging / sync.** `atomic_write` (`store.rs:1209-1231`): stage
   `.tmp-*` in the destination directory, `sync_all` file bytes, refuse to
   replace symlinks/non-files, `persist` (rename), then sync the parent
   directory on Unix (`DurabilityUnknown` on failure).
-  `abandoned_staging_files` (`store.rs:628-650`) reports `.tmp-*` remnants
+  `abandoned_staging_files` (`store.rs:630-652`) reports `.tmp-*` remnants
   without loading them.
 - **Symlink / path validation.** Every managed root, directory, plan file,
   ledger entry, and lock file goes through `symlink_metadata` +
-  `check_dir`/`ensure_dir` (`store.rs:1181-1202`); symlinks and non-
+  `check_dir`/`ensure_dir` (`store.rs:1186-1207`); symlinks and non-
   directories fail as `UnsafePath`. Plan directory names must parse as
   `PlanId` (restricted alphabet), observation filenames must match
   `<id>.json`.
-- **Error taxonomy.** `RepoError` (`store.rs:54-108`) declares 24 variants and
+- **Error taxonomy.** `RepoError` (`store.rs:54-110`) declares 25 variants and
   constructs all but one: `Domain` (`store.rs:58-59`) is an unused
   `Box<dyn Error + Send + Sync>` catch-all that can never carry a diagnostic.
   Lifecycle triggers: `InvalidUpdate` for identity/revision/digest/assessment
   mismatch and every pre-write refusal, `InvalidTransition` for plan or item
-  status moves the core transition tables forbid (`store.rs:933-948`),
-  `GuardedClosureRequired` for CAS entry into Closed, `Conflict` for a stale
+  status moves the core transition tables forbid (`store.rs:938-953`),
+  `GuardedClosureRequired` for CAS entry into Closed, `ClosedPlanImmutable` for
+  any CAS against an already-Closed plan, `Conflict` for a stale
   expected-revision, `AlreadyExists`/`NotFound` for directory presence,
   `LockTimeout` for `fs2` contention past the deadline
-  (`store.rs:1108-1120`), `DurabilityUnknown` when a rename succeeded but the
-  parent-directory `sync_all` did not (`store.rs:482-485,1221-1224`),
+  (`store.rs:1113-1125`), `DurabilityUnknown` when a rename succeeded but the
+  parent-directory `sync_all` did not (`store.rs:484-487,1221-1224`),
   `UnsafePath` for a symlinked or non-directory managed path, `Corrupt` for
   unknown storage schema, digest mismatch, ID/filename disagreement and
   unreproducible closure chains, `InvalidPlan` for a domain-valid plan that
@@ -173,7 +176,7 @@ unusable exclusion is treated; it never changes manifest bytes, row ordering,
 status bits, index-entry treatment, or bounds.
 
 Managed-root exclusion: `RepositoryStore::subject_source`
-(`store.rs:624-626`) wires `.excluding_path(&self.root)`; `resolve_exclusion`
+(`store.rs:626-628`) wires `.excluding_path(&self.root)`; `resolve_exclusion`
 (`git_subject.rs:239-279`) canonicalizes both roots (handling macOS `/var` →
 `/private/var` aliasing) and `dirty_manifest` drops normalized status paths
 equal to or under the exclusion
@@ -232,8 +235,8 @@ Three layers, matching [repository](repository.md) and
 
 1. **Crate-private seam.** `SubjectCapture` trait + `GitSubjectCapture`
    adapter + `finalize_closure_with_capture` hook are all `pub(crate)`
-   (`store.rs:110-136,373-381`); the `ScriptedSubjectCapture` test double
-   lives inside `store.rs`'s `#[cfg(test)]` module (`store.rs:1255-1275`)
+   (`store.rs:112-138,373-381`); the `ScriptedSubjectCapture` test double
+   lives inside `store.rs`'s `#[cfg(test)]` module (`store.rs:1260-1280`)
    and cannot be named from another crate.
 2. **Compile-fail doctests.** `lib.rs:15-42` assert that naming
    `SubjectCapture` / `ScriptedSubjectCapture` or calling
@@ -251,8 +254,8 @@ Three layers, matching [repository](repository.md) and
 
 ## 5. Test strategy
 
-- **Integration (`crates/eggplan-repo/tests/repository.rs`, 976 lines,
-  22 tests):** CAS/reopen round-trips, read-only-open pending reporting,
+- **Integration (`crates/eggplan-repo/tests/repository.rs`, 1173 lines,
+  23 tests):** CAS/reopen round-trips, read-only-open pending reporting,
   thread *and* multi-process contention (exactly-one-winner via barrier and
   spawned processes), lock timeout + staging reports, stale-revision after
   lock-file loss, symlink rejection (plan dir, plan file, ledger), lifecycle
@@ -262,9 +265,13 @@ Three layers, matching [repository](repository.md) and
   persistence + reopen, non-Git error, submodule manifests, stale-subject
   abort with no partial state, and
   `historical_closure_subject_becomes_stale_after_worktree_change`
-  (`repository.rs:942`) — the read-surface staleness assertion behind finding
-  6.2. The one lifecycle-rejection test (`repository.rs:292-311`) covers only
-  Draft→Closed, which is why 6.1 is untested.
+  (`repository.rs:1139`) — the read-surface staleness assertion behind finding
+  6.2. The lifecycle-rejection test (`repository.rs:292-347`) covers
+  Draft/Active/Blocked→Closed as distinct `GuardedClosureRequired` cases, and
+  `closed_plan_is_immutable_under_ordinary_compare_and_swap`
+  (`repository.rs:349-509`) covers the Closed-rewrite direction that finding 6.1
+  describes, asserting the typed refusal, byte-identical stored Plan and closure
+  record, and a successful reopen.
 - **Fingerprint (`crates/eggplan-repo/tests/git_subject_fingerprint.rs`,
   632 lines, 13 tests, one Unix-gated) plus the frozen digest matrix
   (`tests/git_subject_digest_golden.rs`, 320 lines, 2 tests + 1 `#[ignore]`
@@ -284,7 +291,7 @@ Three layers, matching [repository](repository.md) and
   (`:42-51,266-280`). The submodule fixture is this crate's only process
   execution and it is test-only: it shells out to the `git` CLI with
   `protocol.file.allow=always` and `core.hooksPath=/dev/null` (`:32,154-195`).
-- **Unit-in-crate (`store.rs:1228-1478`, `git_subject.rs:436-549`):**
+- **Unit-in-crate (`store.rs:1233-1483`, `git_subject.rs:436-549`):**
   deterministic S1/S2 regressions via the scripted seam (stable success,
   drift → `ClosureSubjectDrift`, S2 failure → `ClosureSubjectCapture`, all
   asserting no partial closure state), a visibility test pinning the
@@ -302,61 +309,63 @@ entire closure chain rather than trusting `closure.json`; atomic-write and
 symlink discipline are applied uniformly, not just on the plan path; and
 `src/` contains **no** production panic path — every `unwrap`/`expect` in
 `store.rs` and `git_subject.rs` is inside a `#[cfg(test)] mod tests`
-(`store.rs:1228-1478`, `git_subject.rs:435-549`), and the only other
+(`store.rs:1233-1483`, `git_subject.rs:435-549`), and the only other
 `unimplemented!` is inside a `compile_fail` doctest (`lib.rs:23`).
 
 **Gaps / risks / surprises.**
 
-- **6.1 `compare_and_swap` can rewrite an already-Closed plan, and the store
-  then refuses to open (code defect).** The guard at `store.rs:928-932` fires
-  only when `current.status != Closed`; for Closed→Closed the status-equality
-  short-circuit at `store.rs:933` skips `plan_transition_allowed`, and
-  `plan_transition_allowed` has no `Closed` row at all
-  (`crates/eggplan-core/src/model.rs:391-403`). Nothing else blocks it:
-  `load_unlocked` validates the *pre-write* plan (`store.rs:920`) and
-  `Plan::validate` constrains no Closed-plan content or revision
-  (`crates/eggplan-core/src/model.rs:288-347`). So `atomic_write` at
-  `store.rs:955` persists a Closed plan at `revision + 1` that no longer
-  matches `closure.json`, and the trailing re-read at `store.rs:956` then
-  returns `Corrupt` — `ClosureRecord::validate` pins both
-  `final_plan_revision` and `final_plan_digest`
-  (`crates/eggplan-core/src/closure.rs:253-262`, enforced at
-  `store.rs:750-755`). The error is reported *after* the bad bytes land, the
-  plan directory is left permanently unreadable, and because `open` runs
-  `store.list()` over every plan (`store.rs:614`) the whole state root stops
-  opening, with no recovery path (`recover_pending_closures` only handles
-  `closure.pending.json`, `store.rs:262-344`). The resulting state is exactly
-  the one [evidence](evidence.md) calls corruption — "a Closed Plan without a
-  matching record is corruption" (`evidence.md:85-86`) — reachable by an
-  ordinary CAS rather than by tampering. No closure record is forged and
-  no evidence, provider, or closure authority is gained — the record still
-  pins the pre-write plan — so the blast radius is durable availability, not
-  closure bypass. It is reachable from the public `PlanStore::compare_and_swap`
-  with only a legitimately closed plan, and untested:
-  `tests/repository.rs:291-311` asserts only the Draft→Closed direction. What
-  would defend it: make the guard unconditional (`if next.status == Closed`),
-  or refuse any write to a Closed plan at `store.rs:920`.
+- **6.1 `compare_and_swap` can no longer rewrite an already-Closed plan (closed
+  by E-M002-C004-01).** *This was a real code defect: the guard fired only when
+  `current.status != Closed`, so for Closed→Closed the status-equality
+  short-circuit at `store.rs:938` skipped `plan_transition_allowed` (which has
+  no `Closed` row at all, `crates/eggplan-core/src/model.rs:391-403`) and
+  `Plan::validate` constrained nothing Closed-specific
+  (`crates/eggplan-core/src/model.rs:288-347`). `atomic_write` at
+  `store.rs:960` persisted a Closed plan at `revision + 1` that no longer matched
+  `closure.json`, and the trailing re-read at `store.rs:961` returned `Corrupt`
+  only *after* the bad bytes landed — verified against the pre-fix code as
+  `Corrupt { reason: "closure record does not match final plan" }`. Because
+  `open` runs `store.list()` over every plan (`store.rs:616`), the whole state
+  root stopped opening, and `recover_pending_closures` only handles
+  `closure.pending.json` (`store.rs:264-346`), so there was no recovery path.
+  The blast radius was durable availability, not closure bypass: no record is
+  forged, no evidence or trust is gained, and the record still pins the
+  pre-write plan.* Fixed by an unconditional guard at `store.rs:930-932` that
+  refuses **any** CAS against a Closed plan, for every target status including
+  Closed itself, before the entry guard and before `atomic_write`. It raises the
+  typed `RepoError::ClosedPlanImmutable` (CLI code `closed_plan_immutable`), so a
+  rejected update leaves stored bytes unchanged instead of degrading into a late
+  `Corrupt`. `GuardedClosureRequired` is retained for the distinct
+  Draft/Active/Blocked→Closed entry case. `finalize_closure` is unaffected: it
+  writes through `atomic_write` at `store.rs:482` and never routes through
+  `compare_and_swap`, so it remains the only writer of a Closed plan.
+  Regressions: `closed_plan_is_immutable_under_ordinary_compare_and_swap` in
+  `tests/repository.rs` (fails against the pre-fix code),
+  `closed_is_terminal_across_the_whole_plan_transition_matrix` in core pinning
+  `Closed` terminality, and a `closed_plan_immutable` CLI assertion in
+  `close_uses_explicit_policy_and_guarded_repository_protocol`. Closed by
+  `plans/closure/evidence-closure/002-c004-closed.md`.
 - **6.2 Post-S2 window is documented, not closed.** After the S2 recapture any
   further worktree change leaves the finalized record valid; staleness is
   reported by read surfaces. That matches [evidence](evidence.md) but
   reviewers should not mistake two-capture for a worktree lock.
 - **6.3 S1/S2 themselves cannot race, and pending recovery is idempotent.**
-  Both captures run under one `LockGuard` taken at `store.rs:390` and held to
-  `store.rs:486`, and every other mutator (`create` 853, `compare_and_swap`
-  919, `append_observation` 965, `append_supersession` 498,
-  `recover_pending_closures` 263) takes the same `.lock`, so no interleaved
+  Both captures run under one `LockGuard` taken at `store.rs:392` and held to
+  `store.rs:488`, and every other mutator (`create` 855, `compare_and_swap`
+  921, `append_observation` 970, `append_supersession` 500,
+  `recover_pending_closures` 265) takes the same `.lock`, so no interleaved
   finalization or ledger write is possible. The only writers S1/S2 do not
   exclude are non-cooperating actors outside the process, which is finding
-  6.2. The three-write order at `store.rs:479-481` has exactly two reachable
-  crash points — pending+source plan, discarded at `store.rs:327-331`, and
-  pending+Closed plan, promoted at `store.rs:312-326` — so recovery is
+  6.2. The three-write order at `store.rs:481-483` has exactly two reachable
+  crash points — pending+source plan, discarded at `store.rs:329-333`, and
+  pending+Closed plan, promoted at `store.rs:314-328` — so recovery is
   genuinely idempotent for both, and both-files-present fails closed as
-  `Corrupt` (`store.rs:306-311`).
+  `Corrupt` (`store.rs:308-313`).
 - **6.4 Read surfaces take no lock.** `get`/`list`/`list_observations`/
-  `closure_record` (`store.rs:880-882,884-907,1031-1034,234-260`) never
+  `closure_record` (`store.rs:882-884,884-907,1031-1034,234-260`) never
   acquire `.lock`, so a reader can observe the pre-finalize snapshot, and
   `closure_record` racing the rename sees `RecoveryRequired`
-  (`store.rs:737-739`) rather than a half-record. Fail-closed but not
+  (`store.rs:739-741`) rather than a half-record. Fail-closed but not
   snapshot-consistent; callers must tolerate the error.
 - **6.5 Durability claims are platform-limited.** Unix directory `sync_all` is
   best-effort portable; macOS is not `F_FULLFSYNC`; Windows has no portable
@@ -364,18 +373,18 @@ symlink discipline are applied uniformly, not just on the plan path; and
   locking — all disclosed in [repository](repository.md), with M003
   owning native qualification evidence.
 - **6.6 `exists()` follows symlinks at all six decision sites**
-  (`store.rs:470,512,587,681,737,857`). Each mislabels a symlinked path:
+  (`store.rs:472,512,587,681,737,857`). Each mislabels a symlinked path:
   a symlinked `closure.json`/`closure.pending.json` yields `InvalidUpdate`
   (470), a symlinked supersession filename yields `InvalidUpdate` (512), a
   symlinked plan directory yields `AlreadyExists` (857) or `NotFound` when
   dangling (681), and a symlinked pending record yields `RecoveryRequired`
   (737) instead of `UnsafePath`. A symlinked `config.toml` is the one case
-  that still reports `UnsafePath`, either at `store.rs:590` (live target) or
-  from `atomic_write` (`store.rs:1212-1215`) after a dangling link takes the
+  that still reports `UnsafePath`, either at `store.rs:592` (live target) or
+  from `atomic_write` (`store.rs:1217-1220`) after a dangling link takes the
   create branch. Fail-closed in every case, but the diagnostics hide an
   attack-shaped condition. Every other path check uses `symlink_metadata` and
   does report `UnsafePath`.
-- **6.7 Cooperative lock only.** `acquire_lock` (`store.rs:1095-1121`) is
+- **6.7 Cooperative lock only.** `acquire_lock` (`store.rs:1100-1126`) is
   `fs2` advisory locking with a 5 s default timeout (`store.rs:32-38`); a
   holder that bypasses the lock file or a stale NFS lock can break mutual
   exclusion. The contention tests cover cooperating processes only.

@@ -1560,6 +1560,10 @@ fn repo_failure(command: &str, error: RepoError, json: bool) -> CliFailure {
             "guarded_closure_required",
             "Plans may only close through guarded closure".into(),
         ),
+        RepoError::ClosedPlanImmutable(id) => (
+            "closed_plan_immutable",
+            format!("plan {id} is Closed and cannot be modified"),
+        ),
         RepoError::InvalidUpdate => (
             "invalid_update",
             "candidate update violates revision or lifecycle constraints".into(),

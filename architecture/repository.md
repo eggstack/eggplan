@@ -34,7 +34,16 @@ providers. The store accepts at most 10,000 observations per plan, with a
 1 MiB encoded-file limit per observation and a 16 MiB encoded-file limit per
 Plan.
 
-Ordinary CAS cannot transition a Plan to Closed. `finalize_closure` acquires
+Ordinary CAS cannot transition a Plan to Closed, and cannot modify a Plan that
+is already Closed. The first is `RepoError::GuardedClosureRequired`; the second
+is `RepoError::ClosedPlanImmutable`, which is raised for every target status
+including Closed itself, before any write. A canonical Closed Plan is therefore
+immutable under ordinary CAS in both directions: only
+`RepositoryStore::finalize_closure` writes one. The refusal precedes
+`atomic_write`, so a rejected update leaves stored bytes unchanged; it is never
+deferred into a late corruption report on the next read.
+
+`finalize_closure` acquires
 the repository lock, recaptures the Git `SubjectRevision` from the
 repository's configured `GitSubjectSource` under that lock, requires the
 captured subject to equal the candidate's subject, rebuilds trusted provider

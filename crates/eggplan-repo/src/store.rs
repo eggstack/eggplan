@@ -79,6 +79,8 @@ pub enum RepoError {
     InvalidTransition,
     #[error("plans may only enter Closed through guarded closure finalization")]
     GuardedClosureRequired,
+    #[error("plan {0} is already Closed and is immutable under ordinary compare-and-swap")]
+    ClosedPlanImmutable(PlanId),
     #[error("cooperative repository lock timed out")]
     LockTimeout,
     #[error("replacement succeeded but directory durability could not be confirmed: {0}")]
@@ -924,6 +926,9 @@ impl PlanStore for RepositoryStore {
                 expected: expected_revision,
                 current: current.revision,
             });
+        }
+        if current.status == eggplan_core::PlanStatus::Closed {
+            return Err(RepoError::ClosedPlanImmutable(id.clone()));
         }
         if next.status == eggplan_core::PlanStatus::Closed
             && current.status != eggplan_core::PlanStatus::Closed

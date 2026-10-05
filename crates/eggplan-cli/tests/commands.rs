@@ -536,6 +536,30 @@ fn close_uses_explicit_policy_and_guarded_repository_protocol() {
     let read_only = RepositoryStore::open_read_only(&state).unwrap();
     assert_eq!(read_only.get(&plan.id).unwrap().status, PlanStatus::Closed);
     assert!(read_only.closure_record(&plan.id).unwrap().is_some());
+    // C004: a Closed Plan is immutable through the CLI mutation surface, and the
+    // refusal is a stable machine code rather than a late corrupt_state.
+    let mutate_closed = invoke(&[
+        "item",
+        "update",
+        "ep_cli_plan",
+        "epi_cli_step",
+        "--expected-revision",
+        "5",
+        "--next-action",
+        "rewrite after closure",
+        "--state-root",
+        state.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&mutate_closed.stdout).unwrap()["error"]["code"],
+        "closed_plan_immutable"
+    );
+    assert_eq!(
+        read_only.get(&plan.id).unwrap().revision,
+        5,
+        "the refused CLI mutation must not have advanced the revision"
+    );
     commit_file(&git_root, "later.txt", b"new revision");
     let stale_check = invoke(&[
         "check",

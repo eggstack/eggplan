@@ -50,7 +50,9 @@ This roadmap sequences product capability. It does not imply implementation.
     Projection/CLI       CodeGG integration     Eggstack integrations
       M001 CLI/status      M001 golden parity     M001 provider SPI
       M002 Markdown        M002 staged adoption   M002 Eggwork/Eggsearch
-      import/render                               M003 Eggbench/CI/forge
+      import/render                               M003a Eggbench
+      M003a read snapshot                         M003b GitHub CI/forge
+      M003b batch/compact
         |                      |                      |
         +----------------------+----------------------+
                                |
@@ -203,6 +205,17 @@ Markdown with deterministic loss reporting. Imported lifecycle is provenance
 only. Markdown cannot create EvidenceObservation, provider authority,
 SubjectRevision authority, or ClosureRecord state.
 
+### M003 — Ergonomics and performance
+
+Class: capability / performance / compatibility
+
+M003a adds an ephemeral validated repository inspection snapshot so
+repository-wide read commands capture source state once, avoid repeated
+canonical reads, and qualify complexity without introducing a persistent
+cache. M003b adds bounded batch queries, compact machine projections,
+provider-policy-aware read views, and shell completions while preserving
+existing JSON contracts.
+
 ## 6. CodeGG integration
 
 ### M001 — Golden parity and adapter seam
@@ -271,8 +284,12 @@ self-enroll Eggplan provider authority.
 
 ### M003 — Eggbench, CI, and forge adapters
 
-Reference/verify Eggbench .eggb evidence; consume CI and forge results; support
-artifact handles/digests without embedding unbounded payloads.
+M003a normalizes host-verified Eggbench .eggb identity and comparison receipts,
+keeping artifact integrity distinct from benchmark verdicts. M003b normalizes
+host-acquired GitHub Actions/check/status/revision/artifact facts with exact
+tested-SHA and verification binding. Both retain bounded artifact handles/
+digests without embedding payloads, runtime clients, or credentials.
+Attestation verification remains Interoperability M001.
 
 ## 8. Interoperability and distribution
 

@@ -1,13 +1,10 @@
-# Projection and CLI M003a — Repository Inspection Snapshot and Performance Qualification
+# Projection and CLI M003a — Repository Inspection Snapshot and Performance Qualification — Closed
 
-Status: **not closed — hosted qualification blocked**
+Status: **closed**
 
-Implementation landed and every local gate passes. The plan's acceptance
-criterion 10 (native/MSRV hosted CI on the implementation SHA) could not be
-observed because GitHub Actions stopped scheduling runners for this repository
-mid-session. The milestone is therefore held at `closing` in the registry rather
-than marked closed on incomplete evidence. See "Hosted qualification" below for
-the exact run IDs and observed job states.
+Implementation landed, every local gate passes, and hosted native + MSRV
+qualification is green on the implementation commit. All 10 acceptance criteria
+are met. See "Hosted qualification" for the run and job IDs.
 
 Source implementation plan:
 
@@ -25,7 +22,8 @@ Implementation commits:
   `status`/`registry render`/`check` migration, the differential golden test, the
   characterization harnesses, and `architecture/repository-inspection-snapshot.md`.
 - `2c32ffef0dfe0d9931a679723a24cdc17f1fccb6` — Projection/CLI M003b, which builds
-  on this snapshot. Hosted qualification is being sought on this combined commit.
+  on this snapshot. Hosted qualification for both milestones was obtained on this
+  combined commit; see "Hosted qualification".
 
 ## Executive finding
 
@@ -44,9 +42,10 @@ regression dressed up as an optimization. The S1/S2 recapture detects a subject
 that moves under the read and fails closed rather than projecting facts from two
 different worlds.
 
-Nine of ten acceptance criteria are met on local evidence. Criterion 10 is unmet
-only because GitHub Actions stopped scheduling runners for this repository; no job
-reported a failing step.
+All 10 acceptance criteria are met. Hosted qualification initially could not be
+observed because GitHub Actions stopped scheduling runners mid-session; that
+condition cleared and the re-run of the same run ID is green, so criterion 10 is
+now satisfied on hosted evidence rather than substituted local evidence.
 
 ## What landed
 
@@ -130,7 +129,7 @@ Single-plan commands keep their existing paths.
 | §13 required tests | Clean 1/10/100 Plan snapshots, dirty repository snapshots, S1/S2 drift, concurrent writer refusal, bounded lock timeout, closed-plan corruption detection, pending-closure reporting, golden equivalence, no public injection seam, and Rust 1.89 (below). |
 | §14 documentation | `architecture/repository-inspection-snapshot.md`. |
 | §16 required verification | Below. |
-| §17 acceptance criteria | 1-9 met; **10 unmet** — see "Hosted qualification". |
+| §17 acceptance criteria | All 10 met. See "Hosted qualification" for criterion 10. |
 
 ## No public injection seam
 
@@ -173,7 +172,8 @@ not observed below.
 
 ## Exact local verification
 
-All commands ran on Linux at `2c32ffe` and passed:
+All commands below passed on Linux at `2c32ffe`, and were re-run unchanged at
+`bfb019c` (the closure commit) with identical results:
 
 ```text
 cargo fmt --all -- --check
@@ -309,47 +309,53 @@ existing code was replaced.
 
 ## Roadmap disposition
 
-Projection/CLI M003a is **not closed**. It remains at `closing` in the registry
-with implementation complete and one unmet acceptance criterion, and it is not a
-precondition for any other milestone being worked: M003b was planned against it
-explicitly and built on it, and nothing further in the Projection/CLI roadmap
-depends on the hosted run.
-
-Disposition of each acceptance criterion:
+Projection/CLI M003a is **closed**. All 10 acceptance criteria are met.
 
 | Criterion | Disposition |
 |---|---|
-| 1-9 | Met on the evidence recorded above. |
-| 10 (hosted native + MSRV CI) | **Unmet — blocked externally.** See unresolved finding 1. |
+| 1-9 | Met on the local evidence recorded above. |
+| 10 (hosted native + MSRV CI) | Met — run [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637), all four jobs green. |
 
-Re-running qualification on `2c32ffef0dfe0d9931a679723a24cdc17f1fccb6` and
-recording the result is the only work remaining to close this milestone. No
-corrective plan is required: no defect was found.
+The milestone was never a precondition for other work: M003b was planned against
+it explicitly and built on it, and nothing in the Projection/CLI roadmap is
+blocked behind it.
+
+No corrective plan is required. No defect was found in this milestone. The three
+informational findings below are documented limitations, not defects, and none
+blocks closure.
 
 ## Registry updates
 
-- M003a row left at `closing` with this record, explicitly noting the blocked
-  hosted qualification.
+- M003a row set to `closed` with this record and the hosted run ID.
 
 ## Unresolved findings
 
-1. **Blocked — hosted native/MSRV qualification was not observed.** Run
-   [37365396150](https://github.com/eggstack/eggplan/actions/runs/37365396150) on
-   `528f75f` reached `msrv` success (`111949172887`) and
-   `native (windows-latest)` success (`111949173179`), but
-   `native (ubuntu-latest)` was **cancelled** (`111949173133`) and
-   `native (macos-latest)` never left `queued`. That run was cancelled to release
-   queue capacity. The combined commit `2c32ffe` has run
-   [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637)
-   queued with all four jobs unscheduled; observed still unscheduled 13.5 minutes
-   after creation (`20:14:24Z` to `20:27:52Z`) with none started. The two
-   documentation-only pushes that followed (`559e57b`, `6521613`) queued runs
-   `37369527303` and `37369775115`, which are also unscheduled, so the condition
-   is not specific to one commit. Prior runs on this repository scheduled and
-   completed within about 3 minutes, so this is a queue delay, not a failure. No
-   job reported a failing step. This is a GitHub Actions runner-availability
-   condition outside the repository, recorded as blocked rather than substituted,
-   and the milestone is not marked closed.
+1. **Resolved — hosted qualification obtained.** This milestone was first held
+   at `closing` because GitHub Actions stopped scheduling runners. The history is
+   retained rather than rewritten:
+
+   - Run [37365396150](https://github.com/eggstack/eggplan/actions/runs/37365396150)
+     on `528f75f` (the M003a-only implementation) reached `msrv` success
+     (`111949172887`) and `native (windows-latest)` success (`111949173179`), but
+     `native (ubuntu-latest)` was **cancelled** (`111949173133`) and
+     `native (macos-latest)` never left `queued`. That run was cancelled
+     deliberately to release queue capacity.
+   - Run [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637)
+     on `2c32ffe` sat unscheduled for 13.5 minutes on 2026-10-05
+     (`20:14:24Z`–`20:27:52Z`), and four further runs queued behind it
+     (`37369527303`, `37369775115`, `37369882357`, `37369913546`). Those runs
+     later started and did **not** all pass: each ended `conclusion: failure`
+     with its jobs **cancelled** and no failing step recorded, which is an
+     external runner-availability signature, not a test failure.
+   - On 2026-10-06 the same run ID was re-run (attempt 2,
+     `19:14:33Z`–`19:18:44Z`) and is **success**, all four jobs green. See
+     "Hosted qualification".
+
+   No commit was changed between attempts: the code under test is byte-identical
+   across the failing and passing runs, so the earlier cancellations carried no
+   signal about the implementation. The lesson is recorded rather than discarded:
+   a cancelled job is not evidence of a defect, and a run that never started is
+   not evidence of a pass.
 2. **Informational — the characterization harness self-reports timings on one
    machine.** Wall-time figures are indicative only. The gated matrix asserts
    counts; the ignored harness replays the previous shape over the same fixture
@@ -369,11 +375,28 @@ corrective plan is required: no defect was found.
 Projection/CLI M003b consumed this read model as planned: repository-wide batch
 execution uses `After` for keyset pagination and `Subset` for explicit ID sets, so
 neither reintroduces per-Plan subject capture. M003b is implemented at `2c32ffe`
-and shares the same blocked hosted qualification recorded above.
+and is closed on the same hosted run.
 
 ## Hosted qualification
 
-**Not observed.** See unresolved finding 1. No hosted result is claimed for this
-milestone. Re-run qualification on `2c32ffe` when runner capacity is available and
-replace this section with the concrete run and job IDs before marking the
-milestone closed.
+Run [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637) on
+`2c32ffef0dfe0d9931a679723a24cdc17f1fccb6`, attempt 2, `success`
+(`2026-10-06T19:14:33Z` to `19:18:44Z`):
+
+| Job | Job ID | Conclusion |
+|---|---|---|
+| `msrv` (Rust 1.89.0) | `112453998401` | success |
+| `native (ubuntu-latest)` | `112453998731` | success |
+| `native (macos-latest)` | `112453998736` | success |
+| `native (windows-latest)` | `112453998825` | success |
+
+Each native job runs `cargo check --workspace --all-targets --locked`,
+`cargo clippy --workspace --all-targets --locked -- -D warnings`,
+`cargo test --workspace --locked`, and — on Linux and macOS — all five boundary
+guards. `cargo fmt --all -- --check` and the Linux ripgrep install run on the
+Linux job only, matching `.github/workflows/ci.yml` and the `README.md`
+dev-checks block exactly.
+
+This satisfies acceptance criterion 10 with native Ubuntu, macOS, Windows, and
+MSRV coverage. The same run also qualifies Projection/CLI M003b, which builds on
+this snapshot.

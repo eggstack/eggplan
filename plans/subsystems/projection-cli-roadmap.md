@@ -57,7 +57,8 @@ plans/closure/projection-cli/002-closed.md.
 
 ### M003 — Ergonomics and performance
 
-Status: planned / ready.
+Status: closed (M003a and M003b both closed and hosted-qualified on run
+`37368489637`).
 
 Real repository use exposed two separable work lines.
 

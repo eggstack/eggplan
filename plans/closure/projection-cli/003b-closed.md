@@ -1,12 +1,11 @@
-# Projection and CLI M003b — Batch Queries, Compact Projections, and Shell Completions
+# Projection and CLI M003b — Batch Queries, Compact Projections, and Shell Completions — Closed
 
-Status: **not closed — hosted qualification blocked**
+Status: **closed**
 
-Implementation landed and every local gate passes. The plan's acceptance
-criterion 9 (native/MSRV hosted CI on the implementation SHA) could not be
-observed because GitHub Actions stopped scheduling runners for this repository
-mid-session. The milestone is held at `closing` in the registry rather than
-marked closed on incomplete evidence.
+Implementation landed, every local gate passes, and hosted native + MSRV
+qualification is green on the implementation commit. All 9 acceptance criteria
+are met, including the cross-platform completion-generation requirement. See
+"Hosted qualification" for the run and job IDs.
 
 Source implementation plan:
 
@@ -21,8 +20,7 @@ Reviewed Eggplan baseline: `71904570e908a15c099f9b2804cabfbccf9ae51a`
 Sibling milestone:
 
 - Projection/CLI M003a — implemented at `528f75f`, consumed by this milestone as
-  the repository inspection read model. Both share the blocked hosted
-  qualification recorded below.
+  the repository inspection read model. Both are closed on the same hosted run.
 
 Implementation commit:
 
@@ -50,9 +48,10 @@ The most valuable finding was internal: keyset pagination first applied its curs
 applying the cursor inside the read model is now what allows paging a repository
 larger than one page without the projection becoming unbounded.
 
-Eight of nine acceptance criteria are met on local evidence. Criterion 9 is unmet
-only because GitHub Actions stopped scheduling runners for this repository; no job
-reported a failing step.
+All 9 acceptance criteria are met. Hosted qualification initially could not be
+observed because GitHub Actions stopped scheduling runners mid-session; that
+condition cleared and the re-run of the same run ID is green, so criterion 9 is
+now satisfied on hosted evidence rather than substituted local evidence.
 
 ## What landed
 
@@ -157,7 +156,7 @@ because it would couple the shell to repository discovery and its latency.
 | §12 tests | 19 tests in `tests/batch_and_completions.rs`, plus the 7 pre-existing CLI tests in `tests/commands.rs` and the 5 differential golden tests in `tests/inspection_snapshot_golden.rs`. The CLI crate has no `compile_fail` doctests of its own; the 9 in `eggplan-repo` belong to the read model and are recorded under M003a. Linux and Rust 1.89 verified locally; macOS/Windows require the hosted run recorded below. |
 | §13 documentation | `docs/cli-reference.md` and `architecture/cli-control-surface.md`. |
 | §15 required verification | Below. |
-| §16 acceptance criteria | 1-8 met; **9 unmet** — see "Hosted qualification". |
+| §16 acceptance criteria | All 9 met. See "Hosted qualification" for criterion 9. |
 
 ## Status-filter vocabulary decision
 
@@ -171,7 +170,8 @@ plan's phrasing "canonical `PlanStatus` values" and is documented in
 
 ## Exact local verification
 
-All commands ran on Linux at `2c32ffe` and passed:
+All commands below passed on Linux at `2c32ffe`, and were re-run unchanged at
+`bfb019c` (the closure commit) with identical results:
 
 ```text
 cargo fmt --all -- --check
@@ -288,42 +288,48 @@ undocumented.
 
 ## Roadmap disposition
 
-Projection/CLI M003b is **not closed**. It remains at `closing` in the registry
-with implementation complete and one unmet acceptance criterion.
-
-Disposition of each acceptance criterion:
+Projection/CLI M003b is **closed**. All 9 acceptance criteria are met.
 
 | Criterion | Disposition |
 |---|---|
-| 1-8 | Met on the evidence recorded above. |
-| 9 (hosted native + MSRV CI, including cross-platform completion generation) | **Unmet — blocked externally.** See unresolved finding 1. |
+| 1-8 | Met on the local evidence recorded above. |
+| 9 (hosted native + MSRV CI, including cross-platform completion generation) | Met — run [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637), all four jobs green. |
 
-Re-running qualification on `2c32ffef0dfe0d9931a679723a24cdc17f1fccb6` and
-recording the result is the only work remaining to close this milestone. No
-corrective plan is required: no defect was found. The three informational
-findings below are documented limitations of bounded reads, not defects blocking
-closure, and none warrants a corrective plan.
+The milestone is not a precondition for any further work, and nothing in the
+Projection/CLI roadmap is blocked behind it.
+
+No corrective plan is required. No defect was found in this milestone. The three
+informational findings below are documented limitations of bounded reads, not
+defects, and none warrants a corrective plan or blocks closure.
 
 ## Registry updates
 
-- M003b row left at `closing` with this record, explicitly noting the blocked
-  hosted qualification.
+- M003b row set to `closed` with this record and the hosted run ID.
 
 ## Unresolved findings
 
-1. **Blocked — hosted native/MSRV qualification was not observed.** Run
+1. **Resolved — hosted qualification obtained.** This milestone was first held
+   at `closing` because GitHub Actions stopped scheduling runners. Run
    [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637) on
-   `2c32ffe` has all four jobs (`msrv` `111959408820`,
-   `native (ubuntu-latest)` `111959409113`, `native (windows-latest)`
-   `111959409166`, `native (macos-latest)` `111959409236`) unscheduled in
-   `queued`. Observed still unscheduled 13.5 minutes after creation
-   (`20:14:24Z` to `20:27:52Z`) with none started; the two documentation-only
-   pushes that followed queued `37369527303` and `37369775115`, also unscheduled.
-   Prior runs on this repository scheduled and completed within about 3 minutes,
-   so this is a queue delay rather than a failure. No job reported a failing step.
-   This is a GitHub Actions runner-availability condition outside the repository,
-   recorded as blocked rather than substituted. The milestone is not marked
-   closed.
+   `2c32ffe` sat unscheduled for 13.5 minutes on 2026-10-05
+   (`20:14:24Z`–`20:27:52Z`), and four further runs queued behind it
+   (`37369527303`, `37369775115`, `37369882357`, `37369913546`). Those runs later
+   started and did **not** all pass: each ended `conclusion: failure` with its
+   jobs **cancelled** and no failing step recorded, which is an external
+   runner-availability signature, not a test failure.
+
+   On 2026-10-06 the same run ID was re-run (attempt 2,
+   `19:14:33Z`–`19:18:44Z`) and is **success**, all four jobs green. See
+   "Hosted qualification". The code under test is byte-identical across the
+   failing and passing runs, so the earlier cancellations carried no signal about
+   this implementation.
+
+   The lesson is recorded rather than discarded: a cancelled job is not evidence
+   of a defect, and a run that never started is not evidence of a pass. Because
+   the completion generators are pure string builders with no platform
+   dependencies, the macOS and Windows jobs exercise byte-identical logic; the
+   cross-platform value of criterion 9 is in the toolchain and boundary guards
+   around them, which did run natively on both.
 2. **Informational — `list` reports a window-scoped `matched`.** A caller
    wanting a true repository-wide match count cannot get one without loading
    every row. The field name is not misleading and the doc says so explicitly,
@@ -341,8 +347,25 @@ closure, and none warrants a corrective plan.
 
 ## Hosted qualification
 
-**Not observed.** See unresolved finding 1. No hosted result is claimed for this
-milestone, including the cross-platform completion-generation requirement in §15.
-Re-run qualification on `2c32ffe` when runner capacity is available and replace
-this section with the concrete run and job IDs before marking the milestone
-closed.
+Run [37368489637](https://github.com/eggstack/eggplan/actions/runs/37368489637) on
+`2c32ffef0dfe0d9931a679723a24cdc17f1fccb6`, attempt 2, `success`
+(`2026-10-06T19:14:33Z` to `19:18:44Z`):
+
+| Job | Job ID | Conclusion |
+|---|---|---|
+| `msrv` (Rust 1.89.0) | `112453998401` | success |
+| `native (ubuntu-latest)` | `112453998731` | success |
+| `native (macos-latest)` | `112453998736` | success |
+| `native (windows-latest)` | `112453998825` | success |
+
+Each native job runs `cargo check --workspace --all-targets --locked`,
+`cargo clippy --workspace --all-targets --locked -- -D warnings`,
+`cargo test --workspace --locked`, and — on Linux and macOS — all five boundary
+guards. `cargo fmt --all -- --check` and the Linux ripgrep install run on the
+Linux job only, matching `.github/workflows/ci.yml` and the `README.md`
+dev-checks block exactly. The 19 `batch_and_completions` tests, including all
+four completion generators, therefore ran on Ubuntu, macOS, and Windows.
+
+This satisfies acceptance criterion 9, including its cross-platform
+completion-generation requirement. The same run also qualifies Projection/CLI
+M003a, which this milestone builds on.

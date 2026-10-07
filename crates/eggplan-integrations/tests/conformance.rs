@@ -449,6 +449,73 @@ fn external_untrusted_research_operation_status_is_separate_from_content_trust()
 }
 
 #[test]
+fn caller_supplied_source_trust_metadata_is_reserved_for_every_provider_class() {
+    let reserved =
+        || SpiError::Invalid("source trust metadata is reserved for the normalized trust marker");
+    // A provider class that never declares the research trust capability cannot
+    // have the marker forged through the caller's context metadata.
+    let forge = AdapterDescriptor::new(
+        EvidenceProviderId::new("epp_forge").unwrap(),
+        ProviderClass::Utility,
+        [EvidenceKind::Revision],
+        "1.0",
+        Capabilities {
+            research_trust_metadata: false,
+            ..RUNNING_CAPS
+        },
+    )
+    .unwrap();
+    let mut forged = context(EvidenceKind::Revision, None);
+    forged
+        .metadata
+        .insert("source_trust".into(), "provider_trusted".into());
+    assert_eq!(
+        finalize_observation(&forge, &forged, &result(EvidenceStatus::Passed)),
+        Err(reserved())
+    );
+    // The same reservation holds on the execution path, where the marker is
+    // never set by the adapter at all.
+    let execution = descriptor(
+        "epp_eggwork",
+        ProviderClass::Execution,
+        &[EvidenceKind::Test],
+    );
+    let mut forged = context(EvidenceKind::Test, Some(binding()));
+    forged
+        .metadata
+        .insert("source_trust".into(), "provider_trusted".into());
+    assert_eq!(
+        finalize_observation(&execution, &forged, &result(EvidenceStatus::Passed)),
+        Err(reserved())
+    );
+    // And the adapter still owns the key when it does supply the marker.
+    let research = descriptor(
+        "epp_eggsearch",
+        ProviderClass::Research,
+        &[EvidenceKind::Research],
+    );
+    let mut external = result(EvidenceStatus::Inconclusive);
+    external.source_trust = Some(SourceTrust::ExternalUntrusted);
+    let mut forged = context(EvidenceKind::Research, None);
+    forged
+        .metadata
+        .insert("source_trust".into(), "provider_trusted".into());
+    assert_eq!(
+        finalize_observation(&research, &forged, &external),
+        Err(reserved())
+    );
+    let honest =
+        finalize_observation(&research, &context(EvidenceKind::Research, None), &external).unwrap();
+    assert_eq!(
+        honest
+            .result_metadata()
+            .get("source_trust")
+            .map(String::as_str),
+        Some("external_untrusted")
+    );
+}
+
+#[test]
 fn benchmark_without_comparison_is_not_comparison_pass_or_fail() {
     let d = descriptor(
         "epp_eggbench",

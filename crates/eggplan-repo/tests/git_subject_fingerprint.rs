@@ -385,6 +385,76 @@ fn fingerprint_fails_closed_on_configured_bounds() {
     ));
 }
 
+/// Regression for the defect where `max_content_bytes` was charged only after
+/// `fs::read` had already allocated the whole file, so the bound bounded
+/// nothing. An oversized dirty file must still fail closed, while the same
+/// dirty repository inside the bound must keep capturing.
+#[test]
+fn oversized_dirty_file_fails_closed_on_the_content_bound() {
+    let dir = tempdir().unwrap();
+    let _repo = base_repo(dir.path());
+    let bound = GitSubjectOptions {
+        max_content_bytes: 1024,
+        ..GitSubjectOptions::default()
+    };
+
+    fs::write(dir.path().join("small.txt"), b"tiny\n").unwrap();
+    let in_bounds = GitSubjectSource::new(dir.path(), "epr_fingerprint")
+        .with_options(bound.clone())
+        .capture()
+        .unwrap();
+    assert_eq!(in_bounds.state, SubjectState::Dirty);
+    assert!(in_bounds.dirty_digest.is_some());
+
+    fs::remove_file(dir.path().join("small.txt")).unwrap();
+    fs::write(dir.path().join("oversized.bin"), vec![b'x'; 1024 * 1024]).unwrap();
+    assert!(matches!(
+        fingerprint(dir.path(), bound.clone(), None),
+        Err(GitSubjectError::BoundExceeded)
+    ));
+    assert!(matches!(
+        GitSubjectSource::new(dir.path(), "epr_fingerprint")
+            .with_options(bound)
+            .capture(),
+        Err(GitSubjectError::BoundExceeded)
+    ));
+}
+
+/// Regression for the same defect, pinned from the observable side: the bound
+/// is decided from the length `symlink_metadata` already reported, so an
+/// oversized dirty file that cannot be opened for reading at all still reports
+/// `BoundExceeded` instead of the I/O failure its read would produce.
+///
+/// On a runner whose test account can read a mode-`0o000` file (root) the
+/// read succeeds and the post-read accounting reports the same typed error, so
+/// this assertion can never fail spuriously; it only stops discriminating.
+#[cfg(unix)]
+#[test]
+fn oversized_dirty_file_is_rejected_before_its_bytes_are_read() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempdir().unwrap();
+    let _repo = base_repo(dir.path());
+    let oversized = dir.path().join("unreadable.bin");
+    fs::write(&oversized, vec![b'x'; 1024 * 1024]).unwrap();
+    fs::set_permissions(&oversized, fs::Permissions::from_mode(0o000)).unwrap();
+
+    let bound = GitSubjectOptions {
+        max_content_bytes: 1024,
+        ..GitSubjectOptions::default()
+    };
+    assert!(matches!(
+        fingerprint(dir.path(), bound.clone(), None),
+        Err(GitSubjectError::BoundExceeded)
+    ));
+    assert!(matches!(
+        GitSubjectSource::new(dir.path(), "epr_fingerprint")
+            .with_options(bound)
+            .capture(),
+        Err(GitSubjectError::BoundExceeded)
+    ));
+}
+
 #[test]
 fn fingerprint_reports_typed_discovery_failures() {
     let not_git = tempdir().unwrap();

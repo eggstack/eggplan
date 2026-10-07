@@ -1,12 +1,12 @@
 eggplan [--state-root PATH] [--json] COMMAND
 init - create a state root
-new ARG - create a plan from a definition
+new - create a plan from a definition
 list - compact, bounded plan overview
 show ARG - one plan with its items
 status [ARG ...] - plan status summary
 ready ARG - ready-to-execute items
 graph ARG - dependency graph
-check [ARG ...] - read-only integrity and readiness check
+check [ARG] - read-only integrity and readiness check
 activate ARG - activate a draft plan
 item SUBCOMMAND ARG ARG - update a plan item
 evidence SUBCOMMAND ARG - inspect the evidence ledger
@@ -16,4 +16,4 @@ closure SUBCOMMAND ARG - show a closure record
 registry SUBCOMMAND - render the plan registry
 markdown SUBCOMMAND ARG - Markdown interchange
 completions SUBCOMMAND - print a shell completion script to stdout
-help ARG - show usage
+help [ARG] - show usage

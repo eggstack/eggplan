@@ -799,6 +799,48 @@ fn identity_fields_are_validated() {
 }
 
 #[test]
+fn revision_repository_full_name_is_bounded_like_the_run_dto() {
+    let revisions = revision_cases();
+    let base = pick(&revisions, "exact_commit");
+    // The documented 256-character bound applies to every GitHub DTO that
+    // carries a repository full name, not just the run DTO.
+    let at_bound = format!("{}/{}", "a".repeat(127), "b".repeat(128));
+    assert_eq!(at_bound.chars().count(), 256);
+    assert!(
+        github::parse_revision(
+            &serde_json::to_vec(&mutate(base, "repository_full_name", at_bound.into())).unwrap()
+        )
+        .is_ok()
+    );
+    let oversized = format!("{}/{}", "a".repeat(200), "b".repeat(200));
+    assert_eq!(
+        github::parse_revision(
+            &serde_json::to_vec(&mutate(
+                base,
+                "repository_full_name",
+                oversized.clone().into()
+            ))
+            .unwrap()
+        )
+        .unwrap_err(),
+        SpiError::Invalid("malformed, unsafe, or oversized GitHub text field")
+    );
+    // The run DTO rejects the same value, so the bound is not revision-specific.
+    let runs = run_cases();
+    assert!(
+        github::parse_run(
+            &serde_json::to_vec(&mutate(
+                pick(&runs, "successful_workflow"),
+                "repository_full_name",
+                oversized.into()
+            ))
+            .unwrap()
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn workflow_paths_and_navigation_handles_are_confined() {
     let cases = run_cases();
     let base = pick(&cases, "successful_workflow");

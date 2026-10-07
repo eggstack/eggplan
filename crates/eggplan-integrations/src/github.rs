@@ -522,6 +522,7 @@ fn validate_revision(value: &GitHubRevisionV1) -> Result<(), SpiError> {
         return Err(SpiError::Invalid("unknown GitHub revision DTO schema"));
     }
     check_repository_id(value.repository_id)?;
+    check_text(&value.repository_full_name, MAX_REPOSITORY_NAME_CHARS)?;
     check_repository_full_name(&value.repository_full_name)?;
     check_commit_sha(&value.commit_sha)?;
     Ok(())

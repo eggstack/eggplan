@@ -5,7 +5,7 @@ use eggplan_core::{
     AcceptanceCriterion, CriterionId, EvidenceCardinality, EvidenceKind, EvidenceObservation,
     EvidenceObservationId, EvidenceObservationInput, EvidenceProviderId, EvidenceRequirement,
     EvidenceStatus, Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus, SubjectPolicy,
-    VerificationDigest,
+    SubjectRevision, VerificationDigest,
 };
 use eggplan_repo::{PlanStore, RepositoryStore};
 use git2::{Repository, Signature};
@@ -156,6 +156,75 @@ fn seed(root: &Path, count: usize) -> RepositoryStore {
 
 fn state(dir: &TempDir) -> String {
     dir.path().join(".eggplan").to_string_lossy().to_string()
+}
+
+fn warnings_of(envelope: &Value) -> Vec<String> {
+    envelope["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap().to_string())
+        .collect()
+}
+
+/// One active plan carrying an observation bound to a superseded subject, so
+/// `check` has stale evidence with no closure record behind it.
+fn seed_stale_subject(dir: &TempDir) -> String {
+    let store = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    let subject = store.subject_source().capture().unwrap();
+    let superseded = SubjectRevision {
+        revision: "0".repeat(40),
+        ..subject.clone()
+    };
+    let binding = VerificationDigest::new(format!("sha256:{}", "d".repeat(64))).unwrap();
+    let item = PlanItemId::new("epi_stale_000").unwrap();
+    let mut plan = Plan::new(
+        PlanId::new("ep_stale_000").unwrap(),
+        "stale subject plan",
+        vec![PlanItem {
+            id: item.clone(),
+            position: 0,
+            parent: None,
+            dependencies: vec![],
+            status: PlanItemStatus::Pending,
+            description: "stale item".into(),
+            criteria: vec![AcceptanceCriterion {
+                id: CriterionId::new("epc_stale_000").unwrap(),
+                statement: "designated test passed".into(),
+                human_judgment_allowed: false,
+                requirements: vec![EvidenceRequirement {
+                    description: "designated test invocation".into(),
+                    kind: EvidenceKind::Test,
+                    provider: None,
+                    subject_policy: SubjectPolicy::Exact,
+                    cardinality: EvidenceCardinality::Any,
+                    min_count: 1,
+                    allow_human_judgment: false,
+                    expected_verification_digest: Some(binding.clone()),
+                }],
+            }],
+            blocker: None,
+            next_action: None,
+        }],
+    )
+    .unwrap();
+    plan.subject = Some(subject.clone());
+    let observation = EvidenceObservation::finalize(EvidenceObservationInput {
+        id: EvidenceObservationId::new("epe_stale_000_0").unwrap(),
+        provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+        kind: EvidenceKind::Test,
+        status: EvidenceStatus::Passed,
+        subject: superseded,
+        observed_at_unix_ms: 11,
+        invocation_ref: Some("cargo test".into()),
+        verification_digest: Some(binding),
+        result_metadata: Default::default(),
+        artifacts: vec![],
+    })
+    .unwrap();
+    store.create(&plan).unwrap();
+    store.append_observation(&plan.id, &observation).unwrap();
+    plan.id.to_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -608,6 +677,496 @@ fn malformed_provider_policy_preserves_typed_diagnostics() {
         "--json",
     ]));
     assert_eq!(missing["error"]["code"], "input_unavailable");
+}
+
+#[test]
+fn show_and_registry_render_apply_a_supplied_policy_instead_of_discarding_it() {
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    seed(dir.path(), 3);
+    let root = state(&dir);
+
+    // A declared-but-discarded `--provider-policy` reported success even for a
+    // file that does not exist; both reads must now resolve it like `list`.
+    let missing_policy = dir.path().join("absent.json").to_string_lossy().to_string();
+    let missing = json_err(&invoke(&[
+        "show",
+        "ep_batch_000",
+        "--state-root",
+        &root,
+        "--provider-policy",
+        &missing_policy,
+        "--json",
+    ]));
+    assert_eq!(
+        missing["error"]["code"], "input_unavailable",
+        "show must resolve a supplied policy file"
+    );
+    let missing = json_err(&invoke(&[
+        "registry",
+        "render",
+        "--state-root",
+        &root,
+        "--provider-policy",
+        &missing_policy,
+        "--json",
+    ]));
+    assert_eq!(
+        missing["error"]["code"], "input_unavailable",
+        "registry render must resolve a supplied policy file"
+    );
+
+    // The registry warning must describe the invocation that actually happened:
+    // a supplied policy changes the projected assessment and must not be
+    // reported as "no provider policy was supplied".
+    let without = json_ok(&invoke(&[
+        "registry",
+        "render",
+        "--state-root",
+        &root,
+        "--json",
+    ]));
+    let with = json_ok(&invoke(&[
+        "registry",
+        "render",
+        "--state-root",
+        &root,
+        "--provider-policy",
+        &policy_file(&dir),
+        "--json",
+    ]));
+    assert!(warnings_of(&without).contains(
+        &"assessment_uses_empty_provider_registry:no provider policy was supplied".to_string()
+    ));
+    assert!(
+        !warnings_of(&with)
+            .iter()
+            .any(|warning| warning.contains("empty_provider_registry")),
+        "a supplied policy must not also warn about having none: {:?}",
+        warnings_of(&with)
+    );
+
+    // `show` is the same read with the same policy applied.
+    let shown = json_ok(&invoke(&[
+        "show",
+        "ep_batch_000",
+        "--state-root",
+        &root,
+        "--provider-policy",
+        &policy_file(&dir),
+        "--json",
+    ]));
+    assert!(
+        !warnings_of(&shown)
+            .iter()
+            .any(|warning| warning.contains("empty_provider_registry")),
+        "a supplied policy must not also warn about having none"
+    );
+    let shown_without = json_ok(&invoke(&[
+        "show",
+        "ep_batch_000",
+        "--state-root",
+        &root,
+        "--json",
+    ]));
+    assert_eq!(
+        warnings_of(&shown_without),
+        vec!["assessment_uses_empty_provider_registry:no provider policy was supplied".to_string()],
+        "show must warn when it assessed evidence without a policy"
+    );
+}
+
+#[test]
+fn status_warns_about_an_empty_registry_for_the_repository_wide_read() {
+    // The repository-wide read is the one most likely to contain evidence, so it
+    // must not be the one read that suppresses the warning.
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    seed(dir.path(), 3);
+    let root = state(&dir);
+
+    let wide = json_ok(&invoke(&["status", "--state-root", &root, "--json"]));
+    assert!(warnings_of(&wide).contains(
+        &"assessment_uses_empty_provider_registry:no provider policy was supplied".to_string()
+    ));
+
+    let one = json_ok(&invoke(&[
+        "status",
+        "ep_batch_000",
+        "--state-root",
+        &root,
+        "--json",
+    ]));
+    assert_eq!(
+        warnings_of(&one),
+        warnings_of(&wide),
+        "both read paths must agree about the same repository state"
+    );
+
+    let with = json_ok(&invoke(&[
+        "status",
+        "--state-root",
+        &root,
+        "--provider-policy",
+        &policy_file(&dir),
+        "--json",
+    ]));
+    assert!(
+        !warnings_of(&with)
+            .iter()
+            .any(|warning| warning.contains("empty_provider_registry"))
+    );
+}
+
+#[test]
+fn a_filtered_list_window_that_matches_nothing_still_reports_a_usable_cursor() {
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    seed(dir.path(), 12);
+    let root = state(&dir);
+
+    // No plan is `closed`, so the retained window matches nothing at all.
+    let data = json_ok(&invoke(&[
+        "list",
+        "--status",
+        "closed",
+        "--limit",
+        "5",
+        "--state-root",
+        &root,
+        "--json",
+    ]));
+    assert_eq!(data["data"]["matched"], 0);
+    assert_eq!(data["data"]["returned"], 0);
+    assert_eq!(data["data"]["truncated"], true);
+    let cursor = data["data"]["next_after"]
+        .as_str()
+        .expect("a truncated window must hand back a cursor it can advance past");
+    assert!(!cursor.is_empty());
+
+    // Following the cursor must actually advance, or the caller is stranded.
+    let next = json_ok(&invoke(&[
+        "list",
+        "--status",
+        "closed",
+        "--limit",
+        "5",
+        "--state-root",
+        &root,
+        "--after",
+        cursor,
+        "--json",
+    ]));
+    assert_eq!(next["data"]["matched"], 0);
+    assert!(
+        next["data"]["next_after"].as_str() != Some(cursor),
+        "paging must advance past the previous cursor"
+    );
+
+    // Paging with a filter still reaches every matching row, never skipping one.
+    let mut cursor: Option<String> = None;
+    let mut seen: Vec<String> = Vec::new();
+    loop {
+        let mut args = vec![
+            "list",
+            "--status",
+            "draft",
+            "--limit",
+            "2",
+            "--state-root",
+            &root,
+            "--json",
+        ];
+        if let Some(value) = &cursor {
+            args.push("--after");
+            args.push(value);
+        }
+        let page = json_ok(&invoke(&args));
+        for row in page["data"]["plans"].as_array().unwrap() {
+            seen.push(row["plan_id"].as_str().unwrap().to_string());
+        }
+        if page["data"]["truncated"] != true {
+            break;
+        }
+        cursor = Some(
+            page["data"]["next_after"]
+                .as_str()
+                .expect("truncated pages must carry a cursor")
+                .to_string(),
+        );
+    }
+    let mut expected = seen.clone();
+    expected.sort();
+    expected.dedup();
+    assert_eq!(seen, expected, "paging must not duplicate or omit a row");
+}
+
+#[test]
+fn item_update_accepts_exactly_the_status_spellings_the_metadata_declares() {
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    seed(dir.path(), 1);
+    let root = state(&dir);
+
+    let help = invoke(&["help", "item", "--json"]);
+    let advertised = json_ok(&help)["data"]["command"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let values = advertised
+        .rsplit_once('[')
+        .and_then(|(_, tail)| tail.split_once(']'))
+        .map(|(values, _)| values.to_string())
+        .expect("`item` help must advertise the closed `--status` value set");
+    assert_eq!(
+        values, "pending|actionable|in_progress|blocked|completed|cancelled",
+        "help must advertise exactly the values the parser accepts"
+    );
+
+    // Every advertised spelling must parse, and the PascalCase spellings the
+    // metadata used to advertise must be rejected rather than suggested.
+    let accepted = json_ok(&invoke(&[
+        "item",
+        "update",
+        "ep_batch_000",
+        "epi_batch_000",
+        "--status",
+        "blocked",
+        "--expected-revision",
+        "1",
+        "--state-root",
+        &root,
+        "--json",
+    ]));
+    assert_eq!(accepted["data"]["revision"], 2);
+    let shown = json_ok(&invoke(&[
+        "show",
+        "ep_batch_000",
+        "--state-root",
+        &root,
+        "--json",
+    ]));
+    let item = &shown["data"]["items"][0];
+    assert_eq!(item["item_id"], "epi_batch_000");
+    assert_eq!(item["status"], "blocked");
+
+    let rejected = json_err(&invoke(&[
+        "item",
+        "update",
+        "ep_batch_000",
+        "epi_batch_000",
+        "--status",
+        "Blocked",
+        "--expected-revision",
+        "2",
+        "--state-root",
+        &root,
+        "--json",
+    ]));
+    assert_eq!(rejected["error"]["code"], "invalid_status");
+}
+
+#[test]
+fn help_flag_is_rendered_for_every_command() {
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    let root = state(&dir);
+
+    for command in [
+        "init",
+        "new",
+        "list",
+        "show",
+        "status",
+        "ready",
+        "graph",
+        "check",
+        "activate",
+        "item",
+        "evidence",
+        "assess",
+        "close",
+        "closure",
+        "registry",
+        "markdown",
+        "completions",
+    ] {
+        let output = invoke(&[command, "--help", "--state-root", &root, "--json"]);
+        assert!(
+            output.status.success(),
+            "`{command} --help` must render help, got {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let data = json_ok(&output);
+        let rendered = data["data"]["command"].as_str().unwrap();
+        assert!(
+            rendered.starts_with(&format!("eggplan {command} ")),
+            "`{command} --help` must render that command's own metadata: {rendered}"
+        );
+
+        // `help COMMAND` and `COMMAND --help` are the same read.
+        let via_help = json_ok(&invoke(&["help", command, "--json"]));
+        assert_eq!(via_help["data"]["command"], data["data"]["command"]);
+    }
+
+    // A bare `help --help` names no command, so it renders the full usage
+    // rather than inventing one.
+    let bare = json_ok(&invoke(&["help", "--help", "--json"]));
+    assert_eq!(bare["data"]["command"], Value::Null);
+    assert!(bare["data"]["usage"].as_str().unwrap().contains("COMMAND"));
+}
+
+#[test]
+fn generated_help_does_not_advertise_positional_shapes_the_cli_rejects() {
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    seed(dir.path(), 1);
+    let root = state(&dir);
+
+    // `new` accepts no positional, `check` accepts at most one.
+    assert!(
+        json_err(&invoke(&[
+            "new",
+            "ep_batch_000",
+            "--state-root",
+            &root,
+            "--json"
+        ]))["error"]["code"]
+            .eq("usage")
+    );
+    assert!(
+        json_err(&invoke(&[
+            "check",
+            "ep_batch_000",
+            "ep_batch_001",
+            "--state-root",
+            &root,
+            "--json"
+        ]))["error"]["code"]
+            .eq("usage")
+    );
+
+    let usage = json_ok(&invoke(&["help", "--json"]))["data"]["usage"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        usage.contains("new - create a plan from a definition"),
+        "`new` must be documented as taking no positional: {usage}"
+    );
+    assert!(
+        usage.contains("check [ARG] - read-only integrity and readiness check"),
+        "`check` must be documented as taking at most one positional: {usage}"
+    );
+}
+
+#[test]
+fn check_reports_stale_only_for_a_stale_closure_record() {
+    // Evidence bound to a superseded subject is an assessment classification
+    // (`invalid_or_stale`); `stale` is reserved for a closure record whose
+    // subject no longer matches. All four reads must agree about one state.
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    let root = state(&dir);
+    let plan_id = seed_stale_subject(&dir);
+    // A trusted provider is required to reach the stale branch at all, so all
+    // four reads are given the same policy.
+    let policy = policy_file(&dir);
+
+    let checked = json_ok(&invoke(&[
+        "check",
+        &plan_id,
+        "--state-root",
+        &root,
+        "--provider-policy",
+        &policy,
+        "--json",
+    ]));
+    let plan = &checked["data"]["plans"][0];
+    assert_eq!(
+        plan["state"], "invalid_or_stale",
+        "evidence on a superseded subject is not a stale closure record"
+    );
+    assert_eq!(plan["assessment_status"], "invalid_or_stale");
+    let codes: Vec<&str> = plan["reason_codes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap())
+        .collect();
+    assert!(
+        codes.contains(&"stale_subject"),
+        "the reason code still carries the detail: {codes:?}"
+    );
+
+    for command in [
+        vec![
+            "list",
+            "--state-root",
+            &root,
+            "--limit",
+            "100",
+            "--provider-policy",
+            &policy,
+            "--json",
+        ],
+        vec![
+            "show",
+            &plan_id,
+            "--state-root",
+            &root,
+            "--provider-policy",
+            &policy,
+            "--json",
+        ],
+    ] {
+        let data = json_ok(&invoke(&command));
+        let status = if command[0] == "list" {
+            data["data"]["plans"][0]["assessment_status"].clone()
+        } else {
+            data["data"]["plan"]["assessment_status"].clone()
+        };
+        assert_eq!(status, "invalid_or_stale");
+    }
+    let status = json_ok(&invoke(&[
+        "status",
+        &plan_id,
+        "--state-root",
+        &root,
+        "--provider-policy",
+        &policy,
+        "--json",
+    ]));
+    assert_eq!(
+        status["data"]["plans"][0]["assessment_status"],
+        "invalid_or_stale"
+    );
+}
+
+#[test]
+fn non_utf8_arguments_produce_a_diagnostic_envelope_not_a_panic() {
+    // `--state-root` is user-supplied, so an undecodable argument is reachable
+    // input rather than an impossible one.
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let output = Command::new(bin())
+            .arg("show")
+            .arg(std::ffi::OsStr::from_bytes(b"ep_\xff\xfe"))
+            .arg("--json")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "stable error exit code");
+        assert!(
+            !String::from_utf8_lossy(&output.stderr).contains("panicked"),
+            "must not panic: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(value["ok"], false);
+        assert_eq!(value["schema_version"], 1);
+        assert_eq!(value["error"]["code"], "invalid_argument");
+    }
 }
 
 #[test]

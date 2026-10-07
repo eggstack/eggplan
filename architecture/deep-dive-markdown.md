@@ -75,8 +75,11 @@ Render is deterministic: `plan.validate()` first (`src/lib.rs:121-122`), pre-ren
 estimate (`src/lib.rs:123`, `820-862`), stable pretty JSON field order, items sorted by
 `(position, id)` (`src/lib.rs:161-162`; a total order, because `plan.validate()` rejects duplicate
 item IDs at `eggplan-core/src/model.rs:324-326`), dependencies sorted (`src/lib.rs:174-178`),
-`markdown_text` escaping (`src/lib.rs:1011-1018`: `&`/`<`/`>` escaped, `\r` stripped,
-`\n` → `<br>`), no timestamps/randomness, trailing byte-cap check (`src/lib.rs:204-208`).
+`markdown_text` escaping (`src/lib.rs:1021-1029`: `&`/`<`/`>` escaped, `\r` stripped,
+`\n` → `<br>`, then a leading fence run neutralized by `escape_leading_fence`
+(`src/lib.rs:1031-1041`) so a description carrying a ``` `eggplan-plan-json` fence or the
+native marker cannot restate interchange structure on re-import), no
+timestamps/randomness, trailing byte-cap check (`src/lib.rs:204-208`).
 The render output is a pure function of `(plan, has_closure)`: `src/lib.rs` contains no clock,
 random source, `HashMap`, environment read, or locale-sensitive sort, and imports only
 `BTreeMap`/`BTreeSet` for ordered collection (`src/lib.rs:11`). The size pre-check deliberately
@@ -103,12 +106,17 @@ Work packages come from `## … Ordered work packages` / `Work packages`
 `src/lib.rs:899`; a shorter multi-byte label can therefore be rejected) and capped at
 `bounds::MAX_ITEMS` = 512 packages (`src/lib.rs:407-411`, re-checked at `src/lib.rs:445-449`).
 IDs are
-`epi_md_<24 hex>` over `identity + NUL + normalized heading` (`src/lib.rs:459-463`,
-`normalize_heading` at `src/lib.rs:963-969`); plan ID is `ep_md_<24 hex>` over the
+`epi_md_<24 hex>` over `identity + NUL + normalized label + NUL + normalized heading`
+(`src/lib.rs:461-467`,
+`normalize_heading` at `src/lib.rs:963-969`, `normalize_label` shared with the heading
+and dependency readers so all three backtick-normalize identically); plan ID is
+`ep_md_<24 hex>` over the
 caller-provided source name or else the document digest (`src/lib.rs:439-443`,
 `short_hash`/`sha256` at `src/lib.rs:971-976`). Duplicate labels are rejected
-(`src/lib.rs:456-458`); generated hash collisions are hard errors (`src/lib.rs:464-466`,
-acceptance-item collision at `src/lib.rs:593-597`).
+(`src/lib.rs:459-461`); generated hash collisions are hard errors (`src/lib.rs:468-470`,
+acceptance-item collision at `src/lib.rs:593-597`). Mixing the label in is what keeps
+two differently-labeled packages whose titles normalize identically (case/whitespace
+variants) from colliding, since duplicate labels are already rejected.
 
 Acceptance sections match `## N. Acceptance criteria` **and any heading whose normalized name ends
 in ` acceptance criteria`** (`src/lib.rs:919-922`), so CodeGG's `## 8. Binary acceptance criteria`
@@ -224,25 +232,32 @@ unrepresentable; and no production panic path reachable from hostile input (see 
 
 Gaps/risks (all verified against source, not speculation):
 
-1. **Native `ImportReport` never populates `generated_ids` or `dropped_fields`.**
-   `report_base` starts both empty (`src/lib.rs:878-880`) and the native path
-   (`src/lib.rs:291-325`) pushes only preserved/warning/lossy entries — unlike CodeGG
-   (`src/lib.rs:643-708`). The ignored human section is therefore unnamed. The
+1. **Native `ImportReport` never populates `generated_ids`.** `report_base` starts it
+   empty (`src/lib.rs:878-880`) and the native path (`src/lib.rs:291-325`) pushes only
+   preserved/dropped/warning/lossy entries — unlike CodeGG (`src/lib.rs:643-708`).
+   `dropped_fields` is now populated for the one dimension the payload can actually
+   carry and discard: non-`markdown_source_*` `plan.provenance`, reported as
+   `source_plan_provenance` (`src/lib.rs:305`). The ignored human section is therefore
+   still unnamed. The
    observations/policy/subject/closure dimensions cannot be named at all: the payload has no
    such fields and `deny_unknown_fields` (`src/lib.rs:63`) makes an attempt a hard error, so the
    report has nothing to record even though [markdown-interchange](markdown-interchange.md)
-   promises dropped fields are named. If unsure whether this is intentional, say so — but as
-   implemented the asymmetry is real.
+   promises dropped fields are named. The human section remains the real residual gap:
+   the payload has no field for it and `deny_unknown_fields` makes recording it a hard
+   error, so it can be neither carried nor reported. If unsure whether that is intentional,
+   say so — but as implemented the asymmetry is real.
 2. **CodeGG `Status:`/baseline parse position is narrower than the doc table implies.**
    The interchange doc lists them as imported metadata; the code only reads them
    before the first `##` (`src/lib.rs:386-404`) — the same lines later in the file
    become section body text (CodeGG path) or acceptance-statement text. Metadata
    placed after a heading is silently kept as prose rather than rejected or recorded.
-3. **ID-collision handling is fail-closed with no recovery hint.** Distinct headings
-   that normalize identically (case/whitespace, `src/lib.rs:963-969`) collide to a
-   hard `generated work-package ID collision` error (`src/lib.rs:464-466`); same for
-   the acceptance-intent item (`src/lib.rs:593-597`). There is no disambiguation
-   (e.g. label mix-in) and the error names no colliding headings. Plan-level IDs
+3. **ID-collision handling is fail-closed with no recovery hint.** A genuine hash
+   collision between two work packages is a hard `generated work-package ID
+   collision` error (`src/lib.rs:468-470`); same for the acceptance-intent item
+   (`src/lib.rs:593-597`). The error names no colliding headings. Distinct packages
+   whose *titles* normalize identically (case/whitespace, `src/lib.rs:963-969`) no
+   longer collide, because the normalized label is mixed into the ID
+   (`src/lib.rs:461-467`) and duplicate labels are rejected before that. Plan-level IDs
    additionally depend on caller-provided `source_name`, so two unrelated documents
    imported under the same name share IDs — collision rejection then lives outside
    this crate (CLI/repo layer, `crates/eggplan-repo/src/store.rs:857-862`). On the native

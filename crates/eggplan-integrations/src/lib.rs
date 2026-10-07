@@ -330,21 +330,26 @@ pub fn finalize_observation(
         return Err(SpiError::VerificationBindingNotSupported);
     }
     let mut metadata = context.metadata.clone();
-    if let Some(trust) = result.source_trust
-        && metadata
-            .insert(
-                "source_trust".into(),
-                match trust {
-                    SourceTrust::ProviderTrusted => "provider_trusted",
-                    SourceTrust::ExternalUntrusted => "external_untrusted",
-                }
-                .into(),
-            )
-            .is_some()
-    {
+    // `source_trust` is reserved for the adapter-declared marker in every
+    // provider class, not only when the adapter supplied one. Checking the
+    // marker first (rather than the key left behind by an insert) keeps the key
+    // reserved even where the marker is `None`, so a caller cannot stamp a
+    // trust value into the digest-bound metadata past the class gate and the
+    // `research_trust_metadata` capability above.
+    if metadata.contains_key("source_trust") {
         return Err(SpiError::Invalid(
             "source trust metadata is reserved for the normalized trust marker",
         ));
+    }
+    if let Some(trust) = result.source_trust {
+        metadata.insert(
+            "source_trust".into(),
+            match trust {
+                SourceTrust::ProviderTrusted => "provider_trusted",
+                SourceTrust::ExternalUntrusted => "external_untrusted",
+            }
+            .into(),
+        );
     }
     for (key, value) in &result.result_metadata {
         if metadata.insert(key.clone(), value.clone()).is_some() {

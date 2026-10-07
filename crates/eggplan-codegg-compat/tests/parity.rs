@@ -946,3 +946,81 @@ fn plan_status_mapping_keeps_completed_outside_closed_and_preserves_terminal_int
         }
     }
 }
+
+#[test]
+fn criterion_identity_is_namespaced_by_item_not_by_acceptance_position() {
+    // Regression: criterion IDs were `epc_<index within one item>`, so the first
+    // acceptance of every item collapsed onto `epc_0000` and
+    // `CriterionAssessment.criterion_id` became ambiguous plan-wide.
+    let mut fixture = load(TRAJECTORY);
+    assert!(fixture.snapshot.items.len() >= 2);
+    for item in &mut fixture.snapshot.items {
+        assert!(!item.acceptance.is_empty());
+        let second = item.acceptance[0].clone();
+        item.acceptance.push(second);
+    }
+    let expected_criteria = fixture
+        .snapshot
+        .items
+        .iter()
+        .map(|item| item.acceptance.len())
+        .sum::<usize>();
+    let criterion_ids = |plan: &eggplan_core::Plan| -> Vec<String> {
+        plan.items
+            .iter()
+            .flat_map(|item| {
+                item.criteria
+                    .iter()
+                    .map(|criterion| criterion.id.to_string())
+            })
+            .collect()
+    };
+    let mapped = normalize_fixture(
+        &fixture,
+        subject(),
+        &mut Resolver {
+            status: EvidenceStatus::Passed,
+        },
+    )
+    .unwrap();
+    mapped.plan.validate().unwrap();
+
+    let ids = criterion_ids(&mapped.plan);
+    assert_eq!(ids.len(), expected_criteria);
+    assert_eq!(
+        ids.iter().collect::<BTreeSet<_>>().len(),
+        ids.len(),
+        "criterion IDs are not globally unique: {ids:?}"
+    );
+    for (index, item) in mapped.plan.items.iter().enumerate() {
+        let later = mapped.plan.items[index + 1..]
+            .iter()
+            .flat_map(|other| other.criteria.iter().map(|criterion| criterion.id.clone()))
+            .collect::<BTreeSet<_>>();
+        assert!(
+            item.criteria
+                .iter()
+                .all(|criterion| !later.contains(&criterion.id)),
+            "item {} shares criterion identities with a later item: {ids:?}",
+            item.id
+        );
+    }
+
+    // Identity is deterministic: identical snapshot input, identical criterion IDs.
+    let repeated = normalize_fixture(
+        &fixture,
+        subject(),
+        &mut Resolver {
+            status: EvidenceStatus::Passed,
+        },
+    )
+    .unwrap();
+    assert_eq!(criterion_ids(&repeated.plan), ids);
+
+    // The colliding identity is gone, and the plan is still persistable.
+    assert!(!ids.iter().any(|id| id.ends_with("0000")));
+    let directory = tempdir().unwrap();
+    let store = RepositoryStore::open(directory.path().join(".eggplan")).unwrap();
+    let stored = create_snapshot(&store, &mapped).unwrap();
+    assert_eq!(criterion_ids(&stored), ids);
+}

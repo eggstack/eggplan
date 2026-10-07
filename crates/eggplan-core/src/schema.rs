@@ -16,6 +16,11 @@ pub fn digest_json<T: Serialize>(value: &T) -> Result<String, serde_json::Error>
     Ok(format!("sha256:{digest:x}"))
 }
 
+/// Maximum serialized size of the whole verification envelope, checked while
+/// the payload is walked so a payload that cannot fit is rejected without being
+/// materialized.
+const VERIFICATION_MAX_BYTES: usize = 65_536;
+
 /// Build the shared, domain-separated verification identity used by evidence
 /// providers. Payload values must be canonicalizable JSON and are bounded to
 /// keep host supplied execution descriptions finite.
@@ -31,7 +36,15 @@ pub fn verification_digest(
     {
         return Err("invalid verification namespace or schema version".into());
     }
-    fn validate(value: &serde_json::Value, depth: usize, nodes: &mut usize) -> Result<(), String> {
+    /// Structural bounds plus a lower bound on the serialized byte length of the
+    /// payload alone. Escaping never shrinks a string (each input byte
+    /// contributes at least one output byte), so the estimate can only be too
+    /// small, never too large.
+    fn validate(
+        value: &serde_json::Value,
+        depth: usize,
+        nodes: &mut usize,
+    ) -> Result<usize, String> {
         *nodes += 1;
         if depth > 32 || *nodes > 4_096 {
             return Err("verification specification structure exceeds bound".into());
@@ -42,32 +55,42 @@ pub fn verification_digest(
             {
                 Err("verification string contains NUL or exceeds bound".into())
             }
+            serde_json::Value::String(text) => Ok(text.len() + 2),
             serde_json::Value::Array(values) => {
                 if values.len() > 512 {
                     return Err("verification array exceeds bound".into());
                 }
+                let mut bytes = values.len() + 2;
                 for value in values {
-                    validate(value, depth + 1, nodes)?;
+                    bytes = bytes.saturating_add(validate(value, depth + 1, nodes)?);
                 }
-                Ok(())
+                Ok(bytes)
             }
             serde_json::Value::Object(values) => {
                 if values.len() > 512 {
                     return Err("verification object exceeds bound".into());
                 }
+                let mut bytes = values.len() + 2;
                 for (key, value) in values {
                     if key.is_empty() || key.len() > crate::bounds::ID_CHARS || key.contains('\0') {
                         return Err("invalid verification key".into());
                     }
-                    validate(value, depth + 1, nodes)?;
+                    bytes = bytes.saturating_add(key.len() + 3);
+                    bytes = bytes.saturating_add(validate(value, depth + 1, nodes)?);
                 }
-                Ok(())
+                Ok(bytes)
             }
-            _ => Ok(()),
+            // Any other scalar serializes to at least one byte.
+            _ => Ok(1),
         }
     }
     let mut nodes = 0;
-    validate(payload, 0, &mut nodes)?;
+    let payload_bytes = validate(payload, 0, &mut nodes)?;
+    // The envelope is strictly larger than its payload, so a payload that alone
+    // exceeds the bound can never fit; reject before building the buffer.
+    if payload_bytes > VERIFICATION_MAX_BYTES {
+        return Err("verification specification exceeds byte bound".into());
+    }
     #[derive(Serialize)]
     struct Envelope<'a> {
         domain: &'static str,
@@ -82,7 +105,7 @@ pub fn verification_digest(
         canonical_payload: payload,
     })
     .map_err(|error| error.to_string())?;
-    if bytes.len() > 65_536 {
+    if bytes.len() > VERIFICATION_MAX_BYTES {
         return Err("verification specification exceeds byte bound".into());
     }
     let digest = Sha256::digest(bytes);
@@ -211,5 +234,34 @@ mod tests {
             serde_json::from_slice(&canonical_json(&base).unwrap()).unwrap();
         value["subject"] = serde_json::json!({"subject_kind":"git","repository_id":"epr_test","revision":"abc","state":"clean","future":true});
         assert!(parse_plan(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn verification_payload_byte_bound_is_consulted_before_serialization() {
+        let mut oversized = serde_json::Map::new();
+        for index in 0..512 {
+            oversized.insert(format!("k{index}"), serde_json::json!("x".repeat(4_000)));
+        }
+        // Structurally legal: 513 nodes, 512 entries, 4,000-character strings.
+        assert_eq!(
+            verification_digest("eggplan-test", 1, &serde_json::Value::Object(oversized))
+                .unwrap_err(),
+            "verification specification exceeds byte bound"
+        );
+
+        // A payload whose serialized envelope still fits is unaffected.
+        let mut largest_fitting = serde_json::Map::new();
+        for index in 0..16 {
+            largest_fitting.insert(format!("k{index}"), serde_json::json!("x".repeat(4_000)));
+        }
+        assert!(
+            verification_digest(
+                "eggplan-test",
+                1,
+                &serde_json::Value::Object(largest_fitting)
+            )
+            .is_ok()
+        );
+        assert!(verification_digest("eggplan-test", 1, &serde_json::json!({"a":1})).is_ok());
     }
 }

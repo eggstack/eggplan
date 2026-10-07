@@ -760,6 +760,7 @@ pub fn normalize_snapshot<R: EvidenceResolver>(
 
     let mut observations = Vec::new();
     let mut observation_ids = BTreeSet::new();
+    let mut criterion_ids = BTreeSet::new();
     let mut items = Vec::with_capacity(snapshot.items.len());
     for item in &snapshot.items {
         let mut requirements = Vec::new();
@@ -797,15 +798,23 @@ pub fn normalize_snapshot<R: EvidenceResolver>(
         if item.acceptance.len() > 1 && !item.evidence.is_empty() {
             losses.insert(Loss::AcceptanceEvidenceAssignmentIsItemScoped);
         }
+        let criterion_item_id = mapped_ids[&item.item_id].to_string();
         let criteria = item
             .acceptance
             .iter()
             .enumerate()
             .map(|(index, acceptance)| {
                 let human = acceptance.disposition == AcceptanceDisposition::RequiresUserJudgment;
+                let id = eggplan_core::CriterionId::new(format!(
+                    "epc_{}",
+                    hash_id("criterion", &format!("{criterion_item_id}\0{index}"))?
+                ))
+                .map_err(|error| error.to_string())?;
+                if !criterion_ids.insert(id.clone()) {
+                    return Err("deterministic criterion ID collision".into());
+                }
                 Ok(AcceptanceCriterion {
-                    id: eggplan_core::CriterionId::new(format!("epc_{index:04x}"))
-                        .map_err(|error| error.to_string())?,
+                    id,
                     statement: acceptance.description.clone(),
                     human_judgment_allowed: human,
                     requirements: if human {

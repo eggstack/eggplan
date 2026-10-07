@@ -293,6 +293,28 @@ pub fn run(args: impl IntoIterator<Item = String>) -> i32 {
     }
 }
 
+/// Report a non-UTF-8 process argument through the normal failure path.
+///
+/// The binary's argv comes from the OS, so an undecodable argument is host
+/// input rather than a programming error: it must produce the same typed
+/// diagnostic and the same stable error exit code as any other failure,
+/// including the JSON envelope `--json` promises.
+pub fn report_invalid_argument(index: usize) -> i32 {
+    let command = "usage";
+    let code = "invalid_argument";
+    let message = format!("argument {} is not valid UTF-8", index + 1);
+    if std::env::args_os().any(|argument| argument == "--json") {
+        let envelope: OutputEnvelope<Value> = OutputEnvelope::failure(command, code, message);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&envelope).unwrap_or_else(|_| "{}".into())
+        );
+    } else {
+        eprintln!("{command}: {code}: {message}");
+    }
+    2
+}
+
 pub fn execute(args: &[String]) -> Result<ExecutionResult, CliFailure> {
     let parsed = parse_args(args)?;
     let state_root = parsed
@@ -375,6 +397,11 @@ fn is_flag(value: &str) -> bool {
 
 fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, CliFailure> {
     let command = args.command.clone();
+    // `--help COMMAND` is valid for every command, so it is answered before the
+    // command's own flag table is consulted.
+    if args.flags.contains("--help") {
+        return help_result(&args);
+    }
     validate_command_options(&args)?;
     match command.as_str() {
         "init" => {
@@ -420,12 +447,19 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
         "show" => {
             require_positions(&args, 1, 1)?;
             let id = plan_id(&args.positional[0], &command, args.json)?;
+            // `show` declares `--provider-policy`, so a supplied policy is
+            // parsed and applied here instead of being silently discarded.
+            let policy = args
+                .options
+                .get("--provider-policy")
+                .map(|path| load_policy(path, args.json))
+                .transpose()?;
             let store = read_store(&state_root, &command, args.json)?;
             let plan = store
                 .get(&id)
                 .map_err(|error| repo_failure(&command, error, args.json))?;
-            let (subject, assessment, closure) =
-                summary_context(&store, &plan, None, &command, args.json)?;
+            let (subject, assessment, closure, has_evidence) =
+                summary_context(&store, &plan, policy.as_ref(), &command, args.json)?;
             let summary = summarize_plan(&plan, subject, assessment.as_ref(), closure);
             let ready = readiness_projection(&plan);
             let items = ready.items;
@@ -433,10 +467,15 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
                 plan: summary,
                 items,
             };
+            let mut warnings = Vec::new();
+            // Only worth saying when evidence could have changed the verdict.
+            if policy.is_none() && has_evidence {
+                warnings.push(empty_registry_warning());
+            }
             success(
                 &args,
                 data,
-                Vec::new(),
+                warnings,
                 format!("{} {:?} revision {}", plan.id, plan.status, plan.revision),
             )
         }
@@ -482,22 +521,27 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
         "registry" => registry_command(&args, &state_root),
         "markdown" => markdown_command(&args, &state_root),
         "completions" => completions_command(&args),
-        "help" | "--help" | "-h" => {
-            // `--help COMMAND` renders that command's own metadata.
-            let detail = args
-                .positional
-                .first()
-                .and_then(|name| commands::command_help(name));
-            let help = detail.clone().unwrap_or_else(usage);
-            success(
-                &args,
-                json!({"usage": usage(), "command": detail}),
-                Vec::new(),
-                help,
-            )
-        }
+        "help" | "--help" | "-h" => help_result(&args),
         _ => Err(failure(&command, "usage", usage(), args.json)),
     }
+}
+
+/// `help COMMAND` and `--help COMMAND` render that command's own metadata; a
+/// bare `help` renders the full usage.
+fn help_result(args: &ParsedArgs) -> Result<ExecutionResult, CliFailure> {
+    let requested = args
+        .positional
+        .first()
+        .map(String::as_str)
+        .or_else(|| (args.command != "help").then_some(args.command.as_str()));
+    let detail = requested.and_then(commands::command_help);
+    let help = detail.clone().unwrap_or_else(usage);
+    success(
+        args,
+        json!({"usage": usage(), "command": detail}),
+        Vec::new(),
+        help,
+    )
 }
 
 /// Validate the supplied options and flags against the declarative command
@@ -573,6 +617,14 @@ fn read_registry(args: &ParsedArgs) -> Result<ProviderRegistry, CliFailure> {
         Some(path) => Ok(load_policy(path, args.json)?.registry),
         None => Ok(ProviderRegistry::default()),
     }
+}
+
+/// The one warning every read that assessed evidence without a policy carries.
+///
+/// Absence of a policy means an empty registry, so legitimate observations read
+/// as untrusted; the read must say so rather than imply it was assessed.
+fn empty_registry_warning() -> String {
+    "assessment_uses_empty_provider_registry:no provider policy was supplied".into()
 }
 
 fn assess_read(
@@ -671,15 +723,15 @@ fn status_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, Cli
         .collect();
     if snapshot.subject().is_none() {
         warnings.push("current_subject_unavailable".into());
-    } else if !ids.is_empty() && !args.options.contains_key("--provider-policy") {
-        // Only worth saying when evidence could have changed the verdict.
+    } else if !args.options.contains_key("--provider-policy") {
+        // Only worth saying when evidence could have changed the verdict. This
+        // applies to the repository-wide read exactly as it does to an explicit
+        // ID set, so both read paths agree about the same repository state.
         if selected
             .iter()
             .any(|loaded| !loaded.active_observations().is_empty())
         {
-            warnings.push(
-                "assessment_uses_empty_provider_registry:no provider policy was supplied".into(),
-            );
+            warnings.push(empty_registry_warning());
         }
     }
 
@@ -796,10 +848,21 @@ fn list_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFa
     // More rows remain when the page is full, or when the snapshot itself
     // retained more than this call could return.
     let truncated = matched > selected.len() || snapshot.truncated();
-    let next_after = if truncated {
+    // The cursor is a keyset position over every row, not only the rows that
+    // matched the filter, so it may only advance past rows this call actually
+    // decided about. While matching rows remain inside the window the cursor
+    // stays on the last returned row; once every matching row in the window has
+    // been handed out it may advance to the last retained row even when that row
+    // did not match, which is what keeps a fully filtered-out window pageable.
+    let next_after = if !truncated {
+        None
+    } else if matched > selected.len() {
         selected.last().map(|loaded| loaded.plan().id.to_string())
     } else {
-        None
+        snapshot
+            .plans()
+            .last()
+            .map(|loaded| loaded.plan().id.to_string())
     };
 
     let mut warnings = Vec::new();
@@ -817,8 +880,7 @@ fn list_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFa
     } else if !args.options.contains_key("--provider-policy")
         && plans.iter().any(|row| row.assessment_status.is_some())
     {
-        warnings
-            .push("assessment_uses_empty_provider_registry:no provider policy was supplied".into());
+        warnings.push(empty_registry_warning());
     }
 
     let rendered: Vec<String> = plans.iter().map(render_compact_row).collect();
@@ -828,20 +890,22 @@ fn list_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFa
         matched,
         returned: selected.len(),
         truncated,
-        next_after,
+        next_after: next_after.clone(),
         filter_status: filter_status.clone(),
     };
-    let human = if plans.is_empty() {
+    // Truncation is part of the answer even when no row matched the filter;
+    // hiding it would strand a caller on a window it cannot advance past.
+    let mut lines = rendered;
+    if truncated {
+        lines.push(format!(
+            "truncated: {matched} matched, {} returned; next: --after {}",
+            selected.len(),
+            data.next_after.as_deref().unwrap_or("-")
+        ));
+    }
+    let human = if plans.is_empty() && !truncated {
         "no plans matched".to_string()
     } else {
-        let mut lines = rendered;
-        if truncated {
-            lines.push(format!(
-                "truncated: {matched} matched, {} returned; next: --after {}",
-                selected.len(),
-                data.next_after.as_deref().unwrap_or("-")
-            ));
-        }
         lines.join("\n")
     };
     success(args, data, warnings, human)
@@ -994,9 +1058,13 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
             }
             codes.sort();
             codes.dedup();
-            let has_stale_subject =
-                stale_closure || codes.iter().any(|code| code == "stale_subject");
-            let state = if has_stale_subject {
+            // `stale` is reserved for a stored closure record whose subject no
+            // longer matches the current one. Evidence bound to a superseded
+            // subject is an assessment classification (`invalid_or_stale`), which
+            // keeps `check` in agreement with `status`/`list`/`show` for one
+            // identical plan and evidence state; the `stale_subject` reason code
+            // still carries the detail.
+            let state = if stale_closure {
                 "stale"
             } else {
                 assessment_state(assessment.status, loaded.active_observations())
@@ -1407,7 +1475,7 @@ fn assess_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, Cli
     let plan = store
         .get(&id)
         .map_err(|error| repo_failure("assess", error, args.json))?;
-    let (assessment, _) = compute_assessment(&store, &plan, &policy, "assess", args.json)?;
+    let (assessment, _, _, _) = compute_assessment(&store, &plan, &policy, "assess", args.json)?;
     let data = assessment_data(&assessment);
     success(args, data, Vec::new(), format!("{:?}", assessment.status))
 }
@@ -1430,13 +1498,10 @@ fn close_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
             args.json,
         ));
     }
-    let (assessment, subject) = compute_assessment(&store, &plan, &policy, "close", args.json)?;
-    let observations = store
-        .list_observations(&id)
-        .map_err(|error| repo_failure("close", error, args.json))?;
-    let supersessions = store
-        .list_supersessions(&id)
-        .map_err(|error| repo_failure("close", error, args.json))?;
+    let (assessment, subject, observations, supersessions) =
+        compute_assessment(&store, &plan, &policy, "close", args.json)?;
+    // One clock read so the candidate and the finalized record cannot disagree.
+    let now = now_ms().map_err(|message| failure("close", "clock_error", message, args.json))?;
     let candidate = ClosureCandidate::build(
         &plan,
         subject,
@@ -1444,15 +1509,11 @@ fn close_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
         &observations,
         &supersessions,
         policy.entries,
-        now_ms().map_err(|message| failure("close", "clock_error", message, args.json))?,
+        now,
     )
     .map_err(|message| failure("close", "closure_not_ready", message, args.json))?;
     let (_, record) = store
-        .finalize_closure(
-            &candidate,
-            ClosureId::generate(),
-            now_ms().map_err(|message| failure("close", "clock_error", message, args.json))?,
-        )
+        .finalize_closure(&candidate, ClosureId::generate(), now)
         .map_err(|error| repo_failure("close", error, args.json))?;
     let summary = closure_summary(&record);
     let data = ClosureCreatedData {
@@ -1511,6 +1572,13 @@ fn registry_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, C
         ));
     }
     require_positions(args, 1, 1)?;
+    // `registry` declares `--provider-policy`, so a supplied policy is parsed and
+    // applied to the projected assessments instead of being silently discarded.
+    let policy = args
+        .options
+        .get("--provider-policy")
+        .map(|path| load_policy(path, args.json))
+        .transpose()?;
     let store = read_store(root, "registry render", args.json)?;
     // `registry render` projects every plan, so retention is unbounded by
     // design; this matches the pre-snapshot behavior exactly.
@@ -1520,6 +1588,9 @@ fn registry_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, C
     let mut plans = Vec::with_capacity(snapshot.plans().len());
     let mut warnings = Vec::new();
     let empty_registry = ProviderRegistry::default();
+    let registry = policy
+        .as_ref()
+        .map_or(&empty_registry, |policy| &policy.registry);
     let has_plans = !snapshot.plans().is_empty();
     for loaded in snapshot.plans() {
         let closure = loaded.closure().is_some();
@@ -1528,7 +1599,7 @@ fn registry_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, C
                 loaded.plan(),
                 subject,
                 loaded.effective(),
-                &empty_registry,
+                registry,
             )),
             None => {
                 warnings.push(format!("current_subject_unavailable:{}", loaded.plan().id));
@@ -1542,27 +1613,33 @@ fn registry_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, C
         "{} plan(s) in {}",
         projection.plan_count, projection.repository_id
     );
-    if has_plans {
-        warnings
-            .push("assessment_uses_empty_provider_registry:no provider policy was supplied".into());
+    if has_plans && policy.is_none() {
+        warnings.push(empty_registry_warning());
     }
     success(args, projection, warnings, human)
 }
 
+/// Everything one plan read needs: its current subject, its assessment, whether
+/// a closure record exists, and whether any stored evidence could have changed
+/// the verdict (so the caller can decide whether to warn about no policy).
 fn summary_context(
     store: &RepositoryStore,
     plan: &Plan,
     policy: Option<&LoadedPolicy>,
     command: &str,
     json: bool,
-) -> Result<(Option<SubjectRevision>, Option<PlanAssessment>, bool), CliFailure> {
+) -> Result<(Option<SubjectRevision>, Option<PlanAssessment>, bool, bool), CliFailure> {
     let closure = store
         .closure_record(&plan.id)
         .map_err(|error| repo_failure(command, error, json))?
         .is_some();
     let current_subject = store.subject_source().capture().ok();
+    let mut has_evidence = false;
     let assessment = if let Some(policy) = policy.filter(|_| current_subject.is_some()) {
-        Some(compute_assessment(store, plan, policy, command, json)?.0)
+        let (assessment, _, observations, _) =
+            compute_assessment(store, plan, policy, command, json)?;
+        has_evidence = !observations.is_empty();
+        Some(assessment)
     } else if let Some(subject) = &current_subject {
         let observations = store
             .list_observations(&plan.id)
@@ -1570,6 +1647,7 @@ fn summary_context(
         let supersessions = store
             .list_supersessions(&plan.id)
             .map_err(|error| repo_failure(command, error, json))?;
+        has_evidence = !observations.is_empty();
         let effective = effective_observations(&observations, &supersessions)
             .map_err(|message| failure(command, "corrupt_evidence", message, json))?;
         Some(assess_plan(
@@ -1581,16 +1659,27 @@ fn summary_context(
     } else {
         None
     };
-    Ok((current_subject, assessment, closure))
+    Ok((current_subject, assessment, closure, has_evidence))
 }
 
+/// Assess one plan against a loaded policy and return the ledger rows it read
+/// alongside the assessment, so a caller that needs the same rows again — the
+/// guarded closure path — does not pay for a second full ledger read.
 fn compute_assessment(
     store: &RepositoryStore,
     plan: &Plan,
     policy: &LoadedPolicy,
     command: &str,
     json: bool,
-) -> Result<(PlanAssessment, SubjectRevision), CliFailure> {
+) -> Result<
+    (
+        PlanAssessment,
+        SubjectRevision,
+        Vec<EvidenceObservation>,
+        Vec<eggplan_core::EvidenceSupersessionRecord>,
+    ),
+    CliFailure,
+> {
     let subject = store
         .subject_source()
         .capture()
@@ -1611,6 +1700,8 @@ fn compute_assessment(
             &policy.registry,
         ),
         subject,
+        observations,
+        supersessions,
     ))
 }
 

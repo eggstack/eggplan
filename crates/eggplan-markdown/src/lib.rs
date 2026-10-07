@@ -300,6 +300,9 @@ fn import_native(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
         "acceptance_criteria_and_evidence_requirements".into(),
         "blocker_and_next_action".into(),
     ];
+    // The native payload carries no provenance field and rejects unknown fields,
+    // so source provenance is always dropped and reported here.
+    report.dropped_fields.push("source_plan_provenance".into());
     report
         .warning_codes
         .push("source_lifecycle_not_authoritative".into());
@@ -452,13 +455,15 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
     let mut used = BTreeSet::new();
     for (label, package_title, body) in packages_raw {
         let normalized = normalize_heading(&package_title);
-        let key = label.to_ascii_lowercase();
+        let key = normalize_label(&label);
         if keys.contains_key(&key) {
             return Err(MarkdownError("duplicate work-package label".into()));
         }
+        // The label is part of the normalized heading, so distinct packages keep
+        // distinct IDs even when their titles normalize identically.
         let id = PlanItemId::new(format!(
             "epi_md_{}",
-            short_hash(&format!("{identity}\0{normalized}"))
+            short_hash(&format!("{identity}\0{key}\0{normalized}"))
         ))
         .map_err(|e| MarkdownError(e.to_string()))?;
         if !used.insert(id.clone()) {
@@ -479,7 +484,7 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
                     return Err(MarkdownError("malformed dependency reference list".into()));
                 }
                 for target in references {
-                    dependencies.push(target.trim_matches('`').to_ascii_lowercase());
+                    dependencies.push(normalize_label(target));
                 }
             } else if !line.trim().is_empty() {
                 content.push(line.clone());
@@ -541,13 +546,11 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
     for (index, statement) in statements.into_iter().enumerate() {
         let (target, statement) = if let Some(scoped) = statement.strip_prefix("Work package ") {
             if let Some((label, statement)) = scoped.split_once(':') {
-                let target = keys
-                    .get(&label.trim().to_ascii_lowercase())
-                    .ok_or_else(|| {
-                        MarkdownError(format!(
-                            "malformed acceptance work-package reference `{label}`"
-                        ))
-                    })?;
+                let target = keys.get(&normalize_label(label)).ok_or_else(|| {
+                    MarkdownError(format!(
+                        "malformed acceptance work-package reference `{label}`"
+                    ))
+                })?;
                 (Some(target.clone()), statement.trim().to_string())
             } else {
                 (None, statement)
@@ -968,6 +971,13 @@ fn normalize_heading(value: &str) -> String {
         .to_ascii_lowercase()
 }
 
+/// Work-package labels are matched case-insensitively and may be backticked, so
+/// every reader (heading, dependency reference, acceptance reference) normalizes
+/// them identically instead of one of them reading `` `a` `` as `a`.
+fn normalize_label(value: &str) -> String {
+    value.trim().trim_matches('`').to_ascii_lowercase()
+}
+
 fn short_hash(value: &str) -> String {
     sha256(value.as_bytes())[..24].to_string()
 }
@@ -1009,12 +1019,32 @@ fn item_status(status: PlanItemStatus) -> &'static str {
     }
 }
 fn markdown_text(value: &str) -> String {
-    value
+    let text = value
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('\r', "")
-        .replace('\n', "<br>")
+        .replace('\n', "<br>");
+    escape_leading_fence(&text)
+}
+
+/// `markdown_text` never emits a newline, so only a leading fence run can be
+/// re-read as interchange structure when rendered output is imported again: a
+/// bare ```eggplan-plan-json restates the payload fence, and any leading
+/// three-plus run would open a phantom fence over the rest of the document.
+/// Escaping the first character neutralizes the run and leaves ordinary text,
+/// including inline code such as `` `cargo test` ``, byte-identical.
+fn escape_leading_fence(text: &str) -> String {
+    let Some(marker) = text.chars().next() else {
+        return text.to_string();
+    };
+    if marker != '`' && marker != '~' {
+        return text.to_string();
+    }
+    if text.chars().take_while(|ch| *ch == marker).count() < 3 {
+        return text.to_string();
+    }
+    format!("\\{text}")
 }
 
 #[cfg(test)]
@@ -1229,6 +1259,86 @@ mod tests {
             "First package is valid."
         );
         assert_eq!(imported.plan.items[2].criteria.len(), 1);
+    }
+
+    #[test]
+    fn backticked_work_package_labels_match_across_headings_dependencies_and_acceptance() {
+        let source = "# Example\n## 1. Objective\n\nDo it.\n## 2. Ordered work packages\n### Work package `A` — First\nDo first.\n### Work package `B` — Second\nDependencies: `A`\nDo second.\n## 3. Acceptance criteria\n- Work package `A`: First package is valid.\n- Work package B: Second package is valid.\n";
+        let imported = import(source.as_bytes(), ImportFormat::Codegg, Some("x.md")).unwrap();
+        assert_eq!(imported.plan.items[0].criteria.len(), 1);
+        assert_eq!(
+            imported.plan.items[1].dependencies,
+            vec![imported.plan.items[0].id.clone()]
+        );
+        assert_eq!(imported.plan.items[1].criteria.len(), 1);
+        assert_eq!(
+            imported.plan.items[1].criteria[0].statement,
+            "Second package is valid."
+        );
+    }
+
+    #[test]
+    fn distinct_labels_with_equal_normalized_titles_get_distinct_item_ids() {
+        let source = "# Example\n## 1. Objective\n\nDo it.\n## 2. Ordered work packages\n### Work package A — Review Plan\nDo first.\n### Work package B — review   plan\nDo second.\n";
+        let imported = import(source.as_bytes(), ImportFormat::Codegg, Some("x.md")).unwrap();
+        assert_eq!(imported.plan.items.len(), 2);
+        assert_ne!(imported.plan.items[0].id, imported.plan.items[1].id);
+        assert_eq!(imported.plan.items[0].description, "Do first.");
+        assert_eq!(imported.plan.items[1].description, "Do second.");
+        let again = import(source.as_bytes(), ImportFormat::Codegg, Some("x.md")).unwrap();
+        assert_eq!(imported.plan, again.plan);
+    }
+
+    #[test]
+    fn rendered_payload_fence_and_native_marker_text_reimport() {
+        let mut plan = draft();
+        plan.objective =
+            "Intent naming ```eggplan-plan-json and <!-- eggplan-markdown:v2 -->".into();
+        plan.items[0].description = format!("```{NATIVE_FENCE}");
+        plan.items[0].next_action = Some("<!-- eggplan-markdown:v2 -->".into());
+        plan.validate().unwrap();
+        let text = render(&plan, false).unwrap();
+        let fence = format!("```{NATIVE_FENCE}");
+        assert_eq!(
+            text.lines().filter(|line| line.trim() == fence).count(),
+            1,
+            "the human section must not restate the payload fence"
+        );
+        assert_eq!(
+            text.lines()
+                .filter(|line| line.trim().starts_with("<!-- eggplan-markdown:"))
+                .collect::<Vec<_>>(),
+            vec![NATIVE_MARKER],
+            "the human section must not restate a native marker"
+        );
+        let imported = import(text.as_bytes(), ImportFormat::Auto, None).unwrap();
+        assert_eq!(imported.plan.objective, plan.objective);
+        assert_eq!(imported.plan.items, plan.items);
+    }
+
+    #[test]
+    fn render_leaves_ordinary_inline_code_untouched() {
+        let mut plan = draft();
+        plan.items[0].description = "Run `cargo test` before review.".into();
+        let text = render(&plan, false).unwrap();
+        assert!(text.contains("Run `cargo test` before review."));
+    }
+
+    #[test]
+    fn native_roundtrip_reports_dropped_source_provenance() {
+        let mut plan = draft();
+        plan.provenance
+            .insert("reviewer".into(), "unrecorded".into());
+        plan.validate().unwrap();
+        let text = render(&plan, false).unwrap();
+        let imported = import(text.as_bytes(), ImportFormat::Auto, None).unwrap();
+        assert!(!imported.plan.provenance.contains_key("reviewer"));
+        assert!(
+            imported
+                .report
+                .dropped_fields
+                .contains(&"source_plan_provenance".into())
+        );
     }
 
     #[test]

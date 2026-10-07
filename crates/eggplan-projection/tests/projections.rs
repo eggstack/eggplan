@@ -1,7 +1,7 @@
 use eggplan_core::{Plan, PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus};
 use eggplan_projection::{
-    MAX_PROJECTED_ITEMS, MAX_PROJECTED_PLANS, MAX_TEXT_CHARS, OutputEnvelope, graph_projection,
-    readiness_projection, reason_code, registry_projection, summarize_plan,
+    MAX_PROJECTED_ITEMS, MAX_PROJECTED_PLANS, MAX_TEXT_CHARS, MAX_WARNINGS, OutputEnvelope,
+    graph_projection, readiness_projection, reason_code, registry_projection, summarize_plan,
 };
 use serde_json::{Value, json};
 
@@ -124,13 +124,18 @@ fn output_envelope_is_versioned_and_warnings_are_bounded() {
         json!({}),
         vec!["w".repeat(MAX_TEXT_CHARS + 20); 40],
     );
-    assert_eq!(bounded.warnings.len(), 32);
+    assert_eq!(bounded.warnings.len(), MAX_WARNINGS);
+    // Without the marker a consumer cannot tell "no warnings" from "dropped".
+    assert!(bounded.warnings_truncated);
     assert!(
         bounded
             .warnings
             .iter()
             .all(|warning| warning.chars().count() == MAX_TEXT_CHARS)
     );
+    let complete = OutputEnvelope::<Value>::success("status", json!({}), Vec::new());
+    assert!(!complete.warnings_truncated);
+    assert!(!OutputEnvelope::<Value>::failure("status", "usage", "nope").warnings_truncated);
 }
 
 #[test]

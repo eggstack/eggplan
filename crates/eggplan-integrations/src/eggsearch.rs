@@ -9,6 +9,7 @@ use crate::{
 };
 use eggplan_core::{
     ArtifactRef, EvidenceKind, EvidenceObservation, EvidenceProviderId, EvidenceStatus,
+    bounds::MAX_OBSERVATION_METADATA,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -366,18 +367,37 @@ pub fn normalize(
             .count()
             .to_string(),
     );
-    let mut counts = BTreeMap::<&'static str, usize>::new();
-    for gap in &bundle.gaps {
-        *counts.entry(gap_code(gap.kind)).or_default() += 1;
-    }
-    for (code, count) in counts {
-        metadata.insert(format!("gap_{code}"), count.to_string());
-    }
     let truncated = bundle.limits.sources_truncated
         || bundle.limits.fetched_items_truncated
         || bundle.limits.total_chars_exceeded
         || bundle.fetched_items.iter().any(|f| f.truncated);
     metadata.insert("bundle_truncated".into(), truncated.to_string());
+    // Every fixed key of this adapter is inserted above this point. The only
+    // variable-width keys left are the per-kind `gap_{code}` keys, and they
+    // share core's `MAX_OBSERVATION_METADATA` cap with the SPI-owned
+    // `source_trust` marker plus whatever context metadata the caller supplied.
+    // Emit per-kind keys only while headroom lasts, in `BTreeMap` code order,
+    // and reserve one slot for `gap_other_count` so an omitted kind is
+    // accounted for instead of silently dropped. `gap_count` always keeps the
+    // total, so a bundle naming more gap kinds than there are slots normalizes
+    // rather than being rejected outright.
+    let mut counts = BTreeMap::<&'static str, usize>::new();
+    for gap in &bundle.gaps {
+        *counts.entry(gap_code(gap.kind)).or_default() += 1;
+    }
+    let fixed = metadata.len() + context.metadata.len() + 1; // + `source_trust`
+    let budget = MAX_OBSERVATION_METADATA.saturating_sub(fixed);
+    let mut emitted = counts.len().min(budget);
+    if emitted < counts.len() && budget > 0 {
+        emitted -= 1; // hold back the aggregate slot
+    }
+    for (code, count) in counts.iter().take(emitted) {
+        metadata.insert(format!("gap_{code}"), count.to_string());
+    }
+    let omitted: usize = counts.iter().skip(emitted).map(|(_, count)| count).sum();
+    if omitted > 0 && budget > 0 {
+        metadata.insert("gap_other_count".into(), omitted.to_string());
+    }
     // Eggsearch trust labels describe content provenance, never host provider
     // authority. The observation status describes bundle production only.
     let status = if bundle.sources.is_empty() {
@@ -454,9 +474,11 @@ fn validate(bundle: &Bundle) -> Result<(), SpiError> {
                 .fetch_id
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
-            || f.line_start
-                .zip(f.line_end)
-                .is_some_and(|(a, b)| a == 0 || b < a)
+            || f.line_start == Some(0)
+            || matches!(
+                (f.line_start, f.line_end),
+                (Some(start), Some(end)) if end < start
+            )
     }) {
         return Err(SpiError::Invalid("invalid Eggsearch fetched item"));
     }
@@ -570,6 +592,57 @@ mod tests {
         let fetched = serde_json::json!({"fetch_id":"fetch_a","source_id":"src_a","url":"https://secret.invalid/path","fetched":true,"truncated":truncated,"trust":"external_untrusted","text":"private fetched body","line_start":1,"line_end":2});
         serde_json::to_vec(&serde_json::json!({"bundle_id":"bundle_abcd","goal":"private query","created_at":"2026-09-24T00:00:00Z","sources":vec![source;sources],"fetched_items":if sources==0 {vec![]} else {vec![fetched]},"gaps":gaps,"limits":{"max_sources":50,"max_fetched_items":20,"max_total_chars":10000,"sources_truncated":false,"fetched_items_truncated":false,"total_chars_exceeded":truncated},"trust_summary":{"external_untrusted_count":1,"local_trusted_count":0}})).unwrap()
     }
+    /// Every gap kind the adapter vocabulary admits, in its serde spelling.
+    const ALL_GAP_KINDS: [&str; 26] = [
+        "no_primary_source_found",
+        "provider_degraded",
+        "native_repo_filter_not_enforced",
+        "security_applicability_unknown",
+        "fetch_failed",
+        "source_unfetched",
+        "all_results_external_untrusted",
+        "local_checkout_dirty",
+        "local_remote_mismatch",
+        "local_generated_or_vendor_only",
+        "local_untracked_file",
+        "local_source_unfetched",
+        "native_advisory_unavailable",
+        "symbol_hint_no_native_provider",
+        "issue_search_no_native_provider",
+        "release_search_no_native_provider",
+        "freshness_not_enforced",
+        "package_resolution_failed",
+        "no_fixed_version_found",
+        "no_counterpoint_found",
+        "no_benchmarks_found",
+        "missing_tests",
+        "missing_examples",
+        "missing_manifest",
+        "missing_changelog",
+        "missing_security_policy",
+    ];
+    fn gap_json(kind: &str) -> serde_json::Value {
+        serde_json::json!({"kind":kind})
+    }
+    /// Sum of every per-kind gap key, so no gap is ever silently dropped.
+    fn gap_kind_total(metadata: &BTreeMap<String, String>) -> usize {
+        metadata
+            .iter()
+            .filter(|(key, _)| key.starts_with("gap_") && key.as_str() != "gap_count")
+            .map(|(_, value)| value.parse::<usize>().unwrap())
+            .sum()
+    }
+    fn line_range_bundle(line_start: Option<u32>, line_end: Option<u32>) -> Vec<u8> {
+        let mut fetched = serde_json::json!({"fetch_id":"fetch_a","source_id":"src_a","fetched":true,"truncated":false,"trust":"external_untrusted"});
+        if let Some(line_start) = line_start {
+            fetched["line_start"] = line_start.into();
+        }
+        if let Some(line_end) = line_end {
+            fetched["line_end"] = line_end.into();
+        }
+        let source = serde_json::json!({"source_id":"src_a","provider_id":"web","trust":"external_untrusted"});
+        serde_json::to_vec(&serde_json::json!({"bundle_id":"bundle_abcd","created_at":"2026-09-24T00:00:00Z","sources":[source],"fetched_items":[fetched],"gaps":[],"limits":{"sources_truncated":false,"fetched_items_truncated":false,"total_chars_exceeded":false}})).unwrap()
+    }
     #[test]
     fn provenance_is_kept_without_copying_content_or_promoting_trust() {
         let parsed = parse_bundle(&bundle("local_trusted", false, vec![], 1)).unwrap();
@@ -638,6 +711,114 @@ mod tests {
             .is_err()
         );
         assert!(parse_bundle(&vec![b' '; MAX_BUNDLE_BYTES + 1]).is_err());
+    }
+
+    #[test]
+    fn every_distinct_gap_kind_normalizes_within_the_observation_metadata_cap() {
+        // All 26 gap kinds the adapter vocabulary admits, cycled up to the
+        // adapter's own `MAX_GAPS`. A bundle like this used to fail the whole
+        // observation with "metadata entry limit exceeded".
+        let gaps: Vec<serde_json::Value> = (0..MAX_GAPS)
+            .map(|index| serde_json::json!({"kind": ALL_GAP_KINDS[index % ALL_GAP_KINDS.len()]}))
+            .collect();
+        let parsed = parse_bundle(&bundle("external_untrusted", false, gaps, 1)).unwrap();
+        let observation = normalize(&parsed, &context()).unwrap();
+        let metadata = observation.result_metadata();
+        assert!(
+            metadata.len() <= MAX_OBSERVATION_METADATA,
+            "metadata stays inside the core cap: {:?}",
+            metadata.len()
+        );
+        assert_eq!(metadata.get("gap_count").map(String::as_str), Some("128"));
+        // The omission is reported rather than silent, and no gap count is lost.
+        assert!(metadata.contains_key("gap_other_count"));
+        assert_eq!(gap_kind_total(metadata), MAX_GAPS);
+        assert_eq!(observation.status(), EvidenceStatus::Inconclusive);
+        let again = normalize(&parsed, &context()).unwrap();
+        assert_eq!(observation.content_digest(), again.content_digest());
+    }
+
+    #[test]
+    fn gap_keys_use_the_available_headroom_and_account_for_the_rest() {
+        let kinds = [
+            "fetch_failed",
+            "missing_changelog",
+            "missing_tests",
+            "provider_degraded",
+            "source_unfetched",
+        ];
+        let gaps = |selected: &[&str]| -> Vec<serde_json::Value> {
+            selected.iter().map(|kind| gap_json(kind)).collect()
+        };
+        let exact = normalize(
+            &parse_bundle(&bundle("external_untrusted", false, gaps(&kinds[..4]), 1)).unwrap(),
+            &context(),
+        )
+        .unwrap();
+        // Headroom is spent on per-kind keys when the kinds fit.
+        assert!(!exact.result_metadata().contains_key("gap_other_count"));
+        for kind in &kinds[..4] {
+            assert_eq!(
+                exact
+                    .result_metadata()
+                    .get(&format!("gap_{kind}"))
+                    .map(String::as_str),
+                Some("1")
+            );
+        }
+        // One distinct kind past the headroom still normalizes, and says so.
+        let over = normalize(
+            &parse_bundle(&bundle("external_untrusted", false, gaps(&kinds), 1)).unwrap(),
+            &context(),
+        )
+        .unwrap();
+        assert_eq!(
+            over.result_metadata().get("gap_count").map(String::as_str),
+            Some("5")
+        );
+        assert_eq!(
+            over.result_metadata()
+                .get("gap_other_count")
+                .map(String::as_str),
+            Some("2")
+        );
+        assert_eq!(gap_kind_total(over.result_metadata()), 5);
+        // Caller context metadata shares the cap, so less room is left for
+        // per-kind keys; the bundle must still normalize.
+        let mut crowded = context();
+        crowded
+            .metadata
+            .insert("run_label".into(), "nightly".into());
+        crowded
+            .metadata
+            .insert("host_region".into(), "eu-west".into());
+        let tighter = normalize(
+            &parse_bundle(&bundle("external_untrusted", false, gaps(&kinds[..3]), 1)).unwrap(),
+            &crowded,
+        )
+        .unwrap();
+        assert_eq!(tighter.status(), EvidenceStatus::Inconclusive);
+        assert_eq!(gap_kind_total(tighter.result_metadata()), 3);
+    }
+
+    #[test]
+    fn one_sided_line_ranges_are_validated() {
+        // A present `line_start` is checked on its own: line 0 does not exist.
+        // A present pair is ordered. Both are checked independently, so a
+        // one-sided range is no longer skipped by the absent bound.
+        for bad in [(Some(0), None), (Some(0), Some(2)), (Some(10), Some(5))] {
+            assert!(
+                parse_bundle(&line_range_bundle(bad.0, bad.1)).is_err(),
+                "line range {bad:?} must be rejected"
+            );
+        }
+        for good in [(None, None), (Some(5), None), (Some(1), Some(2))] {
+            let parsed = parse_bundle(&line_range_bundle(good.0, good.1)).unwrap();
+            assert_eq!(
+                normalize(&parsed, &context()).unwrap().status(),
+                EvidenceStatus::Passed
+            );
+        }
     }
 
     #[test]

@@ -24,6 +24,9 @@ pub struct OutputEnvelope<T> {
     pub data: Option<T>,
     pub error: Option<Diagnostic>,
     pub warnings: Vec<String>,
+    /// True when `warnings` was cut down to [`MAX_WARNINGS`]. Without it a
+    /// machine consumer cannot tell "no warnings" from "warnings dropped".
+    pub warnings_truncated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +38,7 @@ pub struct Diagnostic {
 
 impl<T> OutputEnvelope<T> {
     pub fn success(command: impl Into<String>, data: T, warnings: Vec<String>) -> Self {
+        let warnings_truncated = warnings.len() > MAX_WARNINGS;
         Self {
             schema_version: OUTPUT_SCHEMA_VERSION,
             command: command.into(),
@@ -42,6 +46,7 @@ impl<T> OutputEnvelope<T> {
             data: Some(data),
             error: None,
             warnings: bound_warnings(warnings),
+            warnings_truncated,
         }
     }
 
@@ -60,6 +65,7 @@ impl<T> OutputEnvelope<T> {
                 message: truncate(&message.into(), MAX_TEXT_CHARS).0,
             }),
             warnings: Vec::new(),
+            warnings_truncated: false,
         }
     }
 }

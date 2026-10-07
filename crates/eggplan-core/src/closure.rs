@@ -27,6 +27,16 @@ pub struct EvidenceSupersessionRecord {
 }
 
 impl EvidenceSupersessionRecord {
+    /// Same rule as every other bounded text field in the crate (see
+    /// `model::text` / `evidence::validate_text`): reject empty, NUL, and
+    /// over-bound Unicode scalar counts, so a NUL can never be frozen into a
+    /// digest-covered persisted record.
+    fn valid_reason(reason: &str) -> bool {
+        !reason.is_empty()
+            && !reason.contains('\0')
+            && reason.chars().count() <= crate::bounds::SUPERSESSION_REASON_CHARS
+    }
+
     pub fn new(
         id: EvidenceSupersessionId,
         plan_id: PlanId,
@@ -35,7 +45,7 @@ impl EvidenceSupersessionRecord {
         reason: String,
         recorded_at_unix_ms: u64,
     ) -> Result<Self, String> {
-        if superseded == replacement || reason.is_empty() || reason.chars().count() > 2000 {
+        if superseded == replacement || !Self::valid_reason(&reason) {
             return Err("invalid supersession link or reason".into());
         }
         let mut result = Self {
@@ -64,8 +74,7 @@ impl EvidenceSupersessionRecord {
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != 1
             || self.superseded == self.replacement
-            || self.reason.is_empty()
-            || self.reason.chars().count() > 2000
+            || !Self::valid_reason(&self.reason)
         {
             return Err("invalid supersession record".into());
         }
@@ -224,7 +233,7 @@ impl ClosureRecord {
         finalized_at_unix_ms: u64,
     ) -> Result<Self, String> {
         if final_plan.id != candidate.plan_id
-            || final_plan.revision != candidate.source_revision + 1
+            || Some(final_plan.revision) != candidate.source_revision.checked_add(1)
             || final_plan.status != crate::PlanStatus::Closed
         {
             return Err("invalid closure target plan".into());
@@ -256,7 +265,7 @@ impl ClosureRecord {
             || self.final_plan_revision != final_plan.revision
             || self.final_plan_digest != digest_json(final_plan).map_err(|e| e.to_string())?
             || final_plan.status != crate::PlanStatus::Closed
-            || self.final_plan_revision != self.candidate.source_revision + 1
+            || Some(self.final_plan_revision) != self.candidate.source_revision.checked_add(1)
         {
             return Err("closure record does not match final plan".into());
         }
@@ -340,5 +349,275 @@ mod tests {
                 .unwrap()
                 .contains(&&old)
         );
+    }
+
+    fn subject() -> SubjectRevision {
+        SubjectRevision {
+            subject_kind: "git".into(),
+            repository_id: "epr_test".into(),
+            revision: "abc".into(),
+            state: SubjectState::Clean,
+            dirty_digest: None,
+        }
+    }
+
+    /// An Active plan with one completed item whose single Test requirement is
+    /// satisfiable, i.e. a plan that can actually reach a Complete assessment.
+    fn closable_plan() -> Plan {
+        Plan {
+            schema_version: crate::SCHEMA_VERSION,
+            id: PlanId::new("ep_closure").unwrap(),
+            revision: 0,
+            objective: "close".into(),
+            status: crate::PlanStatus::Active,
+            provenance: BTreeMap::new(),
+            items: vec![crate::PlanItem {
+                id: crate::PlanItemId::new("epi_closure").unwrap(),
+                position: 0,
+                parent: None,
+                dependencies: vec![],
+                status: crate::PlanItemStatus::Completed,
+                description: "finish".into(),
+                criteria: vec![crate::AcceptanceCriterion {
+                    id: crate::CriterionId::new("epc_closure").unwrap(),
+                    statement: "verified".into(),
+                    human_judgment_allowed: false,
+                    requirements: vec![crate::EvidenceRequirement {
+                        description: "run the test".into(),
+                        kind: crate::EvidenceKind::Test,
+                        provider: None,
+                        subject_policy: crate::SubjectPolicy::Exact,
+                        cardinality: crate::EvidenceCardinality::Any,
+                        min_count: 1,
+                        allow_human_judgment: false,
+                        expected_verification_digest: Some(
+                            crate::VerificationDigest::new(format!("sha256:{}", "a".repeat(64)))
+                                .unwrap(),
+                        ),
+                    }],
+                }],
+                blocker: None,
+                next_action: None,
+            }],
+            subject: None,
+        }
+    }
+
+    fn passing_observation(id: &str, subject: &SubjectRevision) -> EvidenceObservation {
+        EvidenceObservation::finalize(EvidenceObservationInput {
+            id: EvidenceObservationId::new(format!("epe_{id}")).unwrap(),
+            provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+            kind: crate::EvidenceKind::Test,
+            status: EvidenceStatus::Passed,
+            subject: subject.clone(),
+            observed_at_unix_ms: 1,
+            invocation_ref: None,
+            verification_digest: Some(
+                crate::VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).unwrap(),
+            ),
+            result_metadata: BTreeMap::new(),
+            artifacts: vec![],
+        })
+        .unwrap()
+    }
+
+    fn complete_assessment(
+        plan: &Plan,
+        subject: &SubjectRevision,
+    ) -> (crate::PlanAssessment, EvidenceObservation) {
+        let observation = passing_observation("closure_pass", subject);
+        let mut providers = crate::ProviderRegistry::default();
+        providers
+            .register_trusted(
+                crate::ProviderDescriptor::new(
+                    EvidenceProviderId::new("epp_test").unwrap(),
+                    "host",
+                    [crate::EvidenceKind::Test],
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let assessment = crate::assess_plan(
+            plan,
+            subject,
+            std::slice::from_ref(&observation),
+            &providers,
+        );
+        assert_eq!(assessment.status, crate::AssessmentStatus::Complete);
+        (assessment, observation)
+    }
+
+    fn candidate(plan: &Plan) -> ClosureCandidate {
+        let subject = subject();
+        let (assessment, observation) = complete_assessment(plan, &subject);
+        ClosureCandidate::build(
+            plan,
+            subject,
+            assessment,
+            std::slice::from_ref(&observation),
+            &[],
+            vec![ProviderPolicyEntry {
+                provider_id: EvidenceProviderId::new("epp_test").unwrap(),
+                class: "host".into(),
+                allowed_kinds: BTreeSet::new(),
+            }],
+            1,
+        )
+        .unwrap()
+    }
+
+    fn inject_unknown_field(value: &mut serde_json::Value, path: &[&str]) {
+        let mut cursor = value;
+        for segment in path {
+            cursor = match cursor {
+                serde_json::Value::Array(values) => segment
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|index| values.get_mut(index))
+                    .unwrap_or_else(|| panic!("missing index {segment} in path {path:?}")),
+                other => other
+                    .get_mut(*segment)
+                    .unwrap_or_else(|| panic!("missing {segment} in path {path:?}")),
+            };
+        }
+        cursor
+            .as_object_mut()
+            .expect("injection target must be an object")
+            .insert("future".into(), serde_json::json!(true));
+    }
+
+    #[test]
+    fn supersession_reason_rejects_nul_and_over_bound_text() {
+        let old = observation("reason_old");
+        let replacement = observation("reason_replacement");
+        let link = |reason: String| {
+            EvidenceSupersessionRecord::new(
+                EvidenceSupersessionId::new("eps_reason").unwrap(),
+                PlanId::new("ep_plan").unwrap(),
+                old.id().clone(),
+                replacement.id().clone(),
+                reason,
+                2,
+            )
+        };
+        assert!(link("bad\0reason".into()).is_err());
+        assert!(link("x".repeat(crate::bounds::SUPERSESSION_REASON_CHARS + 1)).is_err());
+
+        let accepted = link("correction".into()).unwrap();
+        assert!(accepted.validate().is_ok());
+        let at_bound = link("x".repeat(crate::bounds::SUPERSESSION_REASON_CHARS)).unwrap();
+        assert!(at_bound.validate().is_ok());
+        // A NUL smuggled into an already-built record must not survive validate.
+        let mut tampered = accepted.clone();
+        tampered.reason = "bad\0reason".into();
+        assert!(tampered.validate().is_err());
+        let mut over_bound = at_bound;
+        over_bound.reason = "x".repeat(crate::bounds::SUPERSESSION_REASON_CHARS + 1);
+        assert!(over_bound.validate().is_err());
+    }
+
+    #[test]
+    fn closure_source_revision_increment_is_guarded_against_overflow() {
+        let mut maximal = closable_plan();
+        maximal.revision = u64::MAX;
+        maximal.validate().expect("revision itself stays unbounded");
+        let subject = subject();
+        let (assessment, observation) = complete_assessment(&maximal, &subject);
+        let candidate = ClosureCandidate::build(
+            &maximal,
+            subject,
+            assessment,
+            std::slice::from_ref(&observation),
+            &[],
+            vec![],
+            1,
+        )
+        .unwrap();
+        let mut closed = maximal.clone();
+        closed.status = crate::PlanStatus::Closed;
+
+        // No `u64::MAX + 1` panic: the target simply cannot be a next revision.
+        assert_eq!(
+            ClosureRecord::finalize(
+                ClosureId::new("epcl_overflow").unwrap(),
+                candidate.clone(),
+                &closed,
+                2
+            )
+            .unwrap_err(),
+            "invalid closure target plan"
+        );
+        // Every earlier validate arm passes here, so the increment guard is the
+        // one that must reject instead of overflowing.
+        let forged = ClosureRecord {
+            schema_version: 1,
+            id: ClosureId::new("epcl_overflow").unwrap(),
+            candidate,
+            final_plan_revision: u64::MAX,
+            final_plan_digest: crate::digest_json(&closed).unwrap(),
+            finalized_at_unix_ms: 2,
+            content_digest: String::new(),
+        };
+        assert_eq!(
+            forged.validate(&closed).unwrap_err(),
+            "closure record does not match final plan"
+        );
+    }
+
+    #[test]
+    fn closure_shapes_reject_unknown_assessment_fields() {
+        let plan = closable_plan();
+        let mut closed = plan.clone();
+        closed.revision = 1;
+        closed.status = crate::PlanStatus::Closed;
+        let record = ClosureRecord::finalize(
+            ClosureId::new("epcl_unknown").unwrap(),
+            candidate(&plan),
+            &closed,
+            2,
+        )
+        .unwrap();
+        let value = serde_json::to_value(&record).unwrap();
+        // The record validates against the same bytes it serializes to.
+        assert!(record.validate(&closed).is_ok());
+        assert!(serde_json::from_value::<ClosureRecord>(value.clone()).is_ok());
+
+        for path in [
+            vec!["candidate", "assessment"],
+            vec!["candidate", "assessment", "items", "0"],
+            vec!["candidate", "assessment", "items", "0", "criteria", "0"],
+            vec![
+                "candidate",
+                "assessment",
+                "items",
+                "0",
+                "criteria",
+                "0",
+                "requirements",
+                "0",
+            ],
+        ] {
+            let mut tampered = value.clone();
+            inject_unknown_field(&mut tampered, &path);
+            // Unknown fields are not an extension point: the assessment structs
+            // are persisted inside a closure record, so an injected key must
+            // fail closed even though the record digest covers known fields only.
+            assert!(
+                serde_json::from_value::<ClosureRecord>(tampered.clone()).is_err(),
+                "ClosureRecord accepted an injected field at {path:?}"
+            );
+            assert!(
+                serde_json::from_value::<ClosureCandidate>(tampered["candidate"].clone()).is_err(),
+                "ClosureCandidate accepted an injected field at {path:?}"
+            );
+            if path == ["candidate", "assessment"] {
+                assert!(
+                    serde_json::from_value::<crate::PlanAssessment>(
+                        tampered["candidate"]["assessment"].clone()
+                    )
+                    .is_err()
+                );
+            }
+        }
     }
 }

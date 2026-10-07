@@ -587,6 +587,14 @@ impl RepositoryStore {
         Ok(records)
     }
 
+    /// Open (and initialize, if needed) a repository for mutation.
+    ///
+    /// Opening recovers pending closures and rejects unsafe or unreadable Plan
+    /// directories, but it deliberately does not deep-load every Plan: the
+    /// operation a caller is about to run loads and validates the Plan it
+    /// touches, and repository-wide inspection validates the Plans it reports
+    /// on. An eager whole-repository scan here would only make every mutating
+    /// command pay for Plans it does not use.
     pub fn open(root: impl AsRef<Path>) -> Result<Self, RepoError> {
         Self::open_with_options(root, StoreOptions::default())
     }
@@ -627,7 +635,6 @@ impl RepositoryStore {
             repository_id: config.repository_id,
         };
         store.recover_pending_closures()?;
-        store.list()?;
         Ok(store)
     }
 
@@ -1031,8 +1038,7 @@ impl PlanStore for RepositoryStore {
         self.load_unlocked(plan_id)?;
         let dir = self.evidence_dir(plan_id);
         ensure_dir(&dir)?;
-        if self.list_observations(plan_id)?.len() >= eggplan_core::bounds::MAX_OBSERVATIONS_PER_PLAN
-        {
+        if self.count_observations(plan_id)? >= eggplan_core::bounds::MAX_OBSERVATIONS_PER_PLAN {
             return Err(RepoError::ObservationLimit);
         }
         let path = self.observation_path(plan_id, observation.id());
@@ -1286,6 +1292,48 @@ impl RepositoryStore {
         }
         observations.sort_by(|a, b| a.id().cmp(b.id()));
         Ok(observations)
+    }
+
+    /// Ledger size for a bound check, without decoding or validating any
+    /// observation file.
+    ///
+    /// The append guard only needs a count, and re-listing the ledger to take
+    /// one made ingest quadratic in ledger size. This counts exactly the
+    /// directory entries `list_observations_counted` would decode, applying
+    /// the same directory, entry-name, and file-type rules, so the count can
+    /// never disagree with the real listing about what the ledger holds.
+    fn count_observations(&self, plan_id: &PlanId) -> Result<usize, RepoError> {
+        let dir = self.evidence_dir(plan_id);
+        match fs::symlink_metadata(&dir) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(error) => return Err(RepoError::Io(error)),
+            Ok(meta) if meta.file_type().is_symlink() || !meta.is_dir() => {
+                return Err(RepoError::UnsafePath(dir));
+            }
+            Ok(_) => {}
+        }
+        let mut count = 0usize;
+        for entry in fs::read_dir(&dir)? {
+            let entry = entry?;
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| RepoError::Config("non-Unicode observation filename".into()))?;
+            if name.starts_with(".tmp-") {
+                continue;
+            }
+            if !name.ends_with(".json") {
+                return Err(RepoError::Config(format!(
+                    "unexpected evidence ledger entry {name}"
+                )));
+            }
+            let file_type = entry.file_type()?;
+            if file_type.is_symlink() || !file_type.is_file() {
+                return Err(RepoError::UnsafePath(entry.path()));
+            }
+            count += 1;
+        }
+        Ok(count)
     }
 }
 

@@ -4,6 +4,14 @@ use crate::{
     PlanItem, PlanItemId, PlanItemStatus, PlanStatus, ProviderRegistry, SubjectRevision,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+/// Observations grouped by evidence kind, built once per `assess_plan` call so a
+/// requirement scans only its own kind instead of the whole observation slice.
+/// Groups are filled in ID-sorted order, so the per-requirement visit order is
+/// the same order the full-slice filter produced. `BTreeMap` keeps the grouping
+/// deterministic and iteration-order independent.
+type ObservationsByKind<'a> = BTreeMap<EvidenceKind, Vec<&'a EvidenceObservation>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -46,6 +54,7 @@ pub enum AssessmentReason {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RequirementAssessment {
     pub status: AssessmentStatus,
     pub requirement_kind: EvidenceKind,
@@ -54,6 +63,7 @@ pub struct RequirementAssessment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CriterionAssessment {
     pub criterion_id: crate::CriterionId,
     pub status: AssessmentStatus,
@@ -62,6 +72,7 @@ pub struct CriterionAssessment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ItemAssessment {
     pub item_id: PlanItemId,
     pub status: AssessmentStatus,
@@ -70,6 +81,7 @@ pub struct ItemAssessment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PlanAssessment {
     pub plan_id: PlanId,
     pub plan_revision: u64,
@@ -106,8 +118,15 @@ pub fn assess_plan(
     }
 
     let mut items = Vec::with_capacity(plan.items.len());
+    let mut by_kind: ObservationsByKind<'_> = BTreeMap::new();
+    for observation in &sorted {
+        by_kind
+            .entry(observation.kind())
+            .or_default()
+            .push(observation);
+    }
     for item in &plan.items {
-        items.push(assess_item(item, current_subject, &sorted, providers));
+        items.push(assess_item(item, current_subject, &by_kind, providers));
     }
     let mut candidates: Vec<AssessmentStatus> = items.iter().map(|item| item.status).collect();
     if !plan_valid {
@@ -156,7 +175,7 @@ pub fn assess_plan(
 fn assess_item(
     item: &PlanItem,
     current: &SubjectRevision,
-    observations: &[EvidenceObservation],
+    by_kind: &ObservationsByKind<'_>,
     providers: &ProviderRegistry,
 ) -> ItemAssessment {
     let mut criteria = Vec::with_capacity(item.criteria.len());
@@ -186,7 +205,7 @@ fn assess_item(
                     requirement,
                     criterion.human_judgment_allowed,
                     current,
-                    observations,
+                    by_kind,
                     providers,
                 ));
             }
@@ -236,7 +255,7 @@ fn assess_requirement(
     requirement: &EvidenceRequirement,
     criterion_allows_human: bool,
     current: &SubjectRevision,
-    observations: &[EvidenceObservation],
+    by_kind: &ObservationsByKind<'_>,
     providers: &ProviderRegistry,
 ) -> RequirementAssessment {
     let mut reasons = Vec::new();
@@ -252,10 +271,10 @@ fn assess_requirement(
     }
     let mut eligible = Vec::new();
     let mut invalid = false;
-    for observation in observations
-        .iter()
-        .filter(|observation| observation.kind() == requirement.kind)
-    {
+    let same_kind = by_kind
+        .get(&requirement.kind)
+        .map_or(&[][..], Vec::as_slice);
+    for &observation in same_kind {
         let Some(provider) = providers.get(observation.provider_id()) else {
             reasons.push(AssessmentReason::UntrustedProvider(
                 observation.provider_id().clone(),
@@ -296,6 +315,7 @@ fn assess_requirement(
         }
         if observation.subject() != current {
             reasons.push(AssessmentReason::StaleSubject(observation.id().clone()));
+            invalid = true;
             continue;
         }
         if let Some(expected) = &requirement.expected_verification_digest {
@@ -363,13 +383,11 @@ fn assess_requirement(
         )
     }) {
         EvidenceMissingOrUnavailable
-    } else if !reasons.is_empty()
-        && reasons
-            .iter()
-            .any(|reason| matches!(reason, AssessmentReason::StaleSubject(_)))
-    {
-        InvalidOrStale
     } else {
+        // Nothing fatal and no eligible status above: either no eligible
+        // observation at all, or eligible ones that do not meet `min_count`.
+        // Stale and other invalid observations are already caught by the
+        // `invalid` flag above, which keeps invalid/stale ranked first.
         EvidenceMissingOrUnavailable
     };
 
@@ -763,6 +781,192 @@ mod tests {
         assert_eq!(
             assess_plan(&p, &current, &[forged], &trusted).status,
             AssessmentStatus::InvalidOrStale
+        );
+    }
+
+    #[test]
+    fn stale_evidence_outranks_missing_or_unavailable_evidence() {
+        let current = subject(SubjectState::Clean, "current");
+        let p = plan(
+            PlanItemStatus::Completed,
+            vec![requirement(EvidenceKind::Test, EvidenceCardinality::Any, 2)],
+            false,
+        );
+        let providers = registry("host", "host", &[EvidenceKind::Test]);
+        let stale = observation(
+            "stale",
+            EvidenceKind::Test,
+            EvidenceStatus::Passed,
+            subject(SubjectState::Clean, "previous"),
+            "host",
+        );
+        for (id, status) in [
+            ("not_run", EvidenceStatus::NotRun),
+            ("skipped", EvidenceStatus::Skipped),
+            ("unavailable", EvidenceStatus::Unavailable),
+        ] {
+            let pending = observation(id, EvidenceKind::Test, status, current.clone(), "host");
+            // Control: the eligible non-passing observation alone is missing evidence.
+            assert_eq!(
+                assess_plan(&p, &current, std::slice::from_ref(&pending), &providers).status,
+                AssessmentStatus::EvidenceMissingOrUnavailable
+            );
+            // Mixed with a stale observation the documented precedence puts
+            // invalid/stale first, and `highest()` must agree at plan level.
+            let mixed = assess_plan(&p, &current, &[pending, stale.clone()], &providers);
+            assert_eq!(
+                mixed.items[0].criteria[0].requirements[0].status,
+                AssessmentStatus::InvalidOrStale
+            );
+            assert_eq!(mixed.status, AssessmentStatus::InvalidOrStale);
+            assert_eq!(
+                highest(vec![
+                    AssessmentStatus::EvidenceMissingOrUnavailable,
+                    AssessmentStatus::InvalidOrStale
+                ]),
+                AssessmentStatus::InvalidOrStale
+            );
+        }
+    }
+
+    #[test]
+    fn large_plan_assessment_scans_observations_by_kind() {
+        const ITEMS: usize = 20;
+        const CRITERIA: usize = 64;
+        const REQUIREMENTS: usize = 20;
+        const TOTAL: usize = ITEMS * CRITERIA * REQUIREMENTS;
+        let current = subject(SubjectState::Clean, "large");
+        let bound = crate::VerificationDigest::new(format!("sha256:{}", "a".repeat(64))).unwrap();
+        let plan = Plan {
+            schema_version: crate::SCHEMA_VERSION,
+            id: PlanId::new("ep_bulk").unwrap(),
+            revision: 0,
+            objective: "bulk".into(),
+            status: PlanStatus::Active,
+            provenance: BTreeMap::new(),
+            items: (0..ITEMS)
+                .map(|item| PlanItem {
+                    id: PlanItemId::new(format!("epi_bulk_{item}")).unwrap(),
+                    position: item as u32,
+                    parent: None,
+                    dependencies: vec![],
+                    status: PlanItemStatus::Completed,
+                    description: "bulk item".into(),
+                    criteria: (0..CRITERIA)
+                        .map(|criterion| AcceptanceCriterion {
+                            id: CriterionId::new(format!("epc_bulk_{item}_{criterion}")).unwrap(),
+                            statement: "bulk criterion".into(),
+                            human_judgment_allowed: false,
+                            requirements: (0..REQUIREMENTS)
+                                .map(|requirement| EvidenceRequirement {
+                                    description: format!(
+                                        "check {}",
+                                        item * CRITERIA * REQUIREMENTS
+                                            + criterion * REQUIREMENTS
+                                            + requirement
+                                    ),
+                                    kind: if requirement % 2 == 0 {
+                                        EvidenceKind::Test
+                                    } else {
+                                        EvidenceKind::Command
+                                    },
+                                    provider: None,
+                                    subject_policy: crate::SubjectPolicy::Exact,
+                                    cardinality: EvidenceCardinality::Any,
+                                    min_count: 1,
+                                    allow_human_judgment: false,
+                                    expected_verification_digest: Some(bound.clone()),
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                    blocker: None,
+                    next_action: None,
+                })
+                .collect(),
+            subject: None,
+        };
+        plan.validate().unwrap();
+        let providers = registry(
+            "host",
+            "host",
+            &[
+                EvidenceKind::Test,
+                EvidenceKind::Command,
+                EvidenceKind::Revision,
+            ],
+        );
+        let mut observations = vec![
+            observation(
+                "test_pass",
+                EvidenceKind::Test,
+                EvidenceStatus::Passed,
+                current.clone(),
+                "host",
+            ),
+            observation(
+                "command_pending",
+                EvidenceKind::Command,
+                EvidenceStatus::NotRun,
+                current.clone(),
+                "host",
+            ),
+        ];
+        for index in 0..(crate::bounds::MAX_OBSERVATIONS_PER_PLAN - 2) {
+            observations.push(
+                EvidenceObservation::finalize(EvidenceObservationInput {
+                    id: EvidenceObservationId::new(format!("epe_bulk_{index}")).unwrap(),
+                    provider_id: EvidenceProviderId::new("epp_host").unwrap(),
+                    kind: EvidenceKind::Revision,
+                    status: EvidenceStatus::Passed,
+                    subject: current.clone(),
+                    observed_at_unix_ms: 1,
+                    invocation_ref: None,
+                    verification_digest: None,
+                    result_metadata: BTreeMap::new(),
+                    artifacts: vec![],
+                })
+                .unwrap(),
+            );
+        }
+
+        let started = std::time::Instant::now();
+        let result = assess_plan(&plan, &current, &observations, &providers);
+        let elapsed = started.elapsed();
+
+        assert_eq!(
+            result.status,
+            AssessmentStatus::EvidenceMissingOrUnavailable
+        );
+        let mut complete = 0usize;
+        let mut missing = 0usize;
+        for item in &result.items {
+            assert_eq!(item.criteria.len(), CRITERIA);
+            for criterion in &item.criteria {
+                assert_eq!(criterion.requirements.len(), REQUIREMENTS);
+                for requirement in &criterion.requirements {
+                    match requirement.status {
+                        AssessmentStatus::Complete => {
+                            complete += 1;
+                            assert_eq!(
+                                requirement.satisfying_observation_ids,
+                                vec![EvidenceObservationId::new("epe_test_pass").unwrap()]
+                            );
+                        }
+                        AssessmentStatus::EvidenceMissingOrUnavailable => missing += 1,
+                        other => panic!("unexpected requirement status {other:?}"),
+                    }
+                }
+            }
+        }
+        assert_eq!(complete, TOTAL / 2);
+        assert_eq!(missing, TOTAL / 2);
+        // Deliberately generous: a per-requirement full-slice scan of this plan
+        // takes minutes, while the per-kind index stays far below this bound.
+        assert!(
+            elapsed < std::time::Duration::from_secs(20),
+            "assessment of {TOTAL} requirements against {} observations took {elapsed:?}",
+            observations.len()
         );
     }
 

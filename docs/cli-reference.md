@@ -220,7 +220,9 @@ the finalization-time diagnostics `closure_subject_changed`,
 ## JSON envelope
 
 `--json` output is a stable envelope with schema version 1, stable command/status/reason
-codes, explicit truncation counts, and bounded warnings.
+codes, explicit truncation counts, and bounded warnings. `warnings` is capped; when that
+cap drops anything, `warnings_truncated` is `true`, so an empty `warnings` array always
+means "no warnings" rather than "warnings not shown".
 
 Failures write diagnostics to stderr in human mode, and a JSON error envelope to stdout
 with a nonzero exit code in machine mode.

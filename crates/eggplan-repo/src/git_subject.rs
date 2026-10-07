@@ -300,6 +300,17 @@ impl Budget<'_> {
             Ok(())
         }
     }
+    /// Non-mutating counterpart of `add_bytes`, used to reject a known length
+    /// before the read that would allocate it. The accounted total is still
+    /// advanced by `add_bytes` against the bytes actually read, so a file that
+    /// changes between the stat and the read is charged its real size.
+    fn check_bytes(&self, amount: u64) -> Result<(), GitSubjectError> {
+        if self.bytes.saturating_add(amount) > self.options.max_content_bytes {
+            Err(GitSubjectError::BoundExceeded)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 fn dirty_manifest(
@@ -356,6 +367,9 @@ fn dirty_manifest(
                 field(&mut row, target.as_bytes());
             }
             Ok(meta) if meta.is_file() => {
+                // Reject an oversized worktree file from the length already
+                // stat'd, before the read that would allocate it.
+                budget.check_bytes(meta.len())?;
                 let content = fs::read(&work_path)?;
                 budget.add_bytes(content.len())?;
                 field(&mut row, b"file");

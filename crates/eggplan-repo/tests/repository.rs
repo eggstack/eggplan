@@ -4,7 +4,7 @@ use eggplan_core::{
     EvidenceObservationInput, EvidenceProviderId, EvidenceRequirement, EvidenceStatus, Plan,
     PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus, ProviderDescriptor,
     ProviderPolicyEntry, ProviderRegistry, SubjectPolicy, SubjectRevision, SubjectState,
-    VerificationDigest, assess_plan,
+    VerificationDigest, assess_plan, bounds::MAX_OBSERVATIONS_PER_PLAN,
 };
 use eggplan_repo::{
     GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore, StoreOptions,
@@ -556,6 +556,56 @@ fn observation_ledger_is_append_only_idempotent_and_reopens() {
     ));
 }
 
+/// Regression for the append guard that counted the ledger by decoding it.
+/// The guard only needs a count, so it now counts the ledger directory exactly
+/// as the real listing would, which must keep the bound, the staging-file
+/// handling, and the stored bytes unchanged.
+#[test]
+fn append_observation_counts_the_ledger_directory_without_decoding_it() {
+    let dir = tempdir().unwrap();
+    let state = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&state).unwrap();
+    let p = plan();
+    store.create(&p).unwrap();
+    let ledger = state.join("plans/ep_store/evidence");
+    fs::create_dir(&ledger).unwrap();
+
+    // Fill every allowed slot but one directly on disk: paying
+    // MAX_OBSERVATIONS_PER_PLAN fsynced appends is not what this regression is
+    // about, and the guard has to hold at the bound either way.
+    for index in 0..MAX_OBSERVATIONS_PER_PLAN - 1 {
+        let seeded = observation(&format!("seed_{index}"), EvidenceStatus::Passed);
+        fs::write(
+            ledger.join(format!("{}.json", seeded.id())),
+            seeded.canonical_json().unwrap(),
+        )
+        .unwrap();
+    }
+    // A staging file left by an interrupted atomic write is not an observation.
+    // If the count included it, the append below would already be past the
+    // bound and the two entry counts would disagree with the listing.
+    fs::write(ledger.join(".tmp-interrupted"), b"partial write").unwrap();
+
+    let through_bound = observation("through_bound", EvidenceStatus::Passed);
+    store.append_observation(&p.id, &through_bound).unwrap();
+    let stored = ledger.join(format!("{}.json", through_bound.id()));
+    assert_eq!(
+        fs::read(&stored).unwrap(),
+        through_bound.canonical_json().unwrap()
+    );
+    assert_eq!(
+        store.get_observation(&p.id, through_bound.id()).unwrap(),
+        through_bound
+    );
+
+    let past_bound = observation("past_bound", EvidenceStatus::Passed);
+    assert!(matches!(
+        store.append_observation(&p.id, &past_bound),
+        Err(RepoError::ObservationLimit)
+    ));
+    assert!(!ledger.join(format!("{}.json", past_bound.id())).exists());
+}
+
 #[cfg(unix)]
 #[test]
 fn symlinked_observation_ledger_is_rejected() {
@@ -572,6 +622,42 @@ fn symlinked_observation_ledger_is_rejected() {
         Err(RepoError::UnsafePath(_))
     ));
     assert!(fs::read_dir(outside.path()).unwrap().next().is_none());
+}
+
+/// Opening for mutation must not deep-load every Plan in the repository.
+///
+/// `open` used to end in a discarded whole-repository scan, so every mutating
+/// command paid for Plans it never touches, and an unrelated corrupt Plan
+/// failed the open itself. Integrity is reported by the operation that loads
+/// the Plan: this test pins that `open` succeeds and a mutation on the touched
+/// Plan works, while the untouched Plan still reports its own corruption.
+#[test]
+fn open_does_not_deep_load_plans_the_caller_does_not_touch() {
+    let dir = tempdir().unwrap();
+    let state = dir.path().join(".eggplan");
+    let store = RepositoryStore::open(&state).unwrap();
+    let touched = plan();
+    store.create(&touched).unwrap();
+    let mut untouched = plan();
+    untouched.id = PlanId::new("ep_unrelated").unwrap();
+    untouched.items[0].id = PlanItemId::new("epi_unrelated").unwrap();
+    store.create(&untouched).unwrap();
+    fs::write(
+        state.join("plans/ep_unrelated/plan.json"),
+        b"corrupt stored envelope",
+    )
+    .unwrap();
+
+    let reopened = RepositoryStore::open(&state).unwrap();
+    let updated = reopened
+        .compare_and_swap(&touched.id, 0, &next(touched.clone(), "mutated after open"))
+        .unwrap();
+    assert_eq!(updated.revision, 1);
+    assert_eq!(reopened.get(&touched.id).unwrap(), updated);
+    assert!(matches!(
+        reopened.get(&untouched.id),
+        Err(RepoError::Corrupt { .. })
+    ));
 }
 
 fn init_git_repo(root: &std::path::Path) -> Repository {
@@ -940,8 +1026,11 @@ fn guarded_closure_persists_integrity_and_reopens() {
     assert!(root.join("plans/ep_store/closure.json").exists());
     let observation_path = root.join(format!("plans/ep_store/evidence/{}.json", "epe_close_pass"));
     fs::write(&observation_path, b"{}").unwrap();
+    // Opening no longer deep-loads every Plan in the state root. Integrity is
+    // still refused, by the deep load that every read and mutation of this
+    // Plan performs.
     assert!(matches!(
-        RepositoryStore::open(&root),
+        reopened.get(&active.id),
         Err(RepoError::Corrupt { .. })
     ));
 }

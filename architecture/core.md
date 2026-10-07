@@ -41,6 +41,7 @@ Text bounds count Unicode scalar values and reject empty strings and NUL:
 | Criterion statement | 2,000 |
 | Requirement description | 1,000 |
 | Artifact reference | 2,000 |
+| Supersession reason | 2,000 |
 | Plan items | 512 |
 | Dependencies per item | 64 |
 | Criteria per item | 128 |
@@ -89,13 +90,18 @@ evidence remain incomplete.
 ## Closure schema v1
 
 Closure IDs (`epcl_`) and evidence-supersession IDs (`eps_`) are distinct typed
-identities. Supersession records are append-only digest-protected links;
-assessment uses only terminal observations in the validated lineage. A pure
-ClosureCandidate snapshots the exact active Plan revision, subject, complete
-assessment, satisfying observation digests, supersession digests, and sorted
-provider-policy authority facts. A ClosureRecord binds that candidate to the
-next Closed Plan revision and its canonical digest. Stored policy is historical
-evidence and does not auto-trust providers in later assessments.
+identities. Supersession records are append-only digest-protected links; the
+supersession reason is bounded text and, like every other bounded field, rejects
+empty values and NUL. Assessment uses only terminal observations in the validated
+lineage. A pure ClosureCandidate snapshots the exact active Plan revision,
+subject, complete assessment, satisfying observation digests, supersession
+digests, and sorted provider-policy authority facts. A ClosureRecord binds that
+candidate to the next Closed Plan revision and its canonical digest. Stored
+policy is historical evidence and does not auto-trust providers in later
+assessments. Records are parsed with unknown fields rejected at every level,
+including the assessment snapshot nested inside a candidate — the record digest
+covers known fields only, so an injected key would otherwise pass every
+corruption check.
 
 The repository alone finalizes closure and owns current-subject authority:
 the finalizer recaptures the Git `SubjectRevision` from the configured

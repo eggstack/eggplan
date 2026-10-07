@@ -14,6 +14,8 @@ pub(crate) enum Positional {
     None,
     /// Exactly one.
     One,
+    /// Zero or one.
+    ZeroOrOne,
     /// One or more, bounded by [`Bounds::MAX_EXPLICIT_PLAN_IDS`].
     OneOrMore,
     /// A subcommand word followed by exactly one more positional.
@@ -145,13 +147,15 @@ const EXPECTED_REVISION: ValueOption = ValueOption::flag(
 );
 const RECOVER: Flag = Flag::new("--recover-pending", "explicitly recover pending closures");
 
+// The serialized `PlanItemStatus` spellings. Help, validation, and completions
+// all read this table, so it must name the values the parser actually accepts.
 const ITEM_STATUS_VALUES: &[&str] = &[
-    "Pending",
-    "Actionable",
-    "InProgress",
-    "Blocked",
-    "Completed",
-    "Cancelled",
+    "pending",
+    "actionable",
+    "in_progress",
+    "blocked",
+    "completed",
+    "cancelled",
 ];
 const INPUT: ValueOption = ValueOption::flag("--input", "PLAN.json", "plan definition to import");
 const OUTPUT: ValueOption =
@@ -192,7 +196,7 @@ pub(crate) const COMMANDS: &[CommandSpec] = &[
     ),
     CommandSpec::new(
         "new",
-        Positional::One,
+        Positional::None,
         &[],
         &[STATE_ROOT, INPUT],
         &[],
@@ -246,7 +250,7 @@ pub(crate) const COMMANDS: &[CommandSpec] = &[
     ),
     CommandSpec::new(
         "check",
-        Positional::OneOrMore,
+        Positional::ZeroOrOne,
         &[],
         &[STATE_ROOT, PROVIDER_POLICY],
         &[RECOVER],
@@ -346,7 +350,7 @@ pub(crate) const COMMANDS: &[CommandSpec] = &[
     ),
     CommandSpec::new(
         "help",
-        Positional::One,
+        Positional::ZeroOrOne,
         &[],
         &[],
         &[HELP_FLAG],
@@ -412,6 +416,7 @@ pub(crate) fn usage() -> String {
             let shape = match spec.positional {
                 Positional::None => String::new(),
                 Positional::One => " ARG".to_string(),
+                Positional::ZeroOrOne => " [ARG]".to_string(),
                 Positional::OneOrMore => " [ARG ...]".to_string(),
                 Positional::Subcommand => " SUBCOMMAND".to_string(),
                 Positional::SubcommandThenOne => " SUBCOMMAND ARG".to_string(),
@@ -434,6 +439,7 @@ pub(crate) fn command_help(name: &str) -> Option<String> {
     let shape = match spec.positional {
         Positional::None => "",
         Positional::One => " <ARG>",
+        Positional::ZeroOrOne => " [<ARG>]",
         Positional::OneOrMore => " <ARG>...",
         Positional::Subcommand => " <SUBCOMMAND>",
         Positional::SubcommandThenOne => " <SUBCOMMAND> <ARG>",

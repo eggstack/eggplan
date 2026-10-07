@@ -340,6 +340,14 @@ defects, and none warrants a corrective plan or blocks closure.
    per-plan reason codes, so a supplied policy changes its assessment status
    without any accompanying per-plan warning text. Left as-is rather than
    changing the registry projection shape in a CLI-ergonomics milestone.
+   **Corrected after closure:** this record described behavior the code did not
+   have. `registry render` parsed no policy at all, so a supplied
+   `--provider-policy` changed *no* assessment status, and the
+   `assessment_uses_empty_provider_registry` warning fired unconditionally even
+   when a policy *had* been supplied. Both halves are now fixed: the option is
+   resolved and applied to the projected assessments, and the warning fires only
+   for a policy-less invocation. The projection shape was not changed, so the
+   underlying limitation above still holds.
 4. **Informational — the declarative table initially disagreed with the real CLI
    surface in four places.** Caught by `tests/commands.rs` before merge, and
    recorded in "Deriving the table honestly" above. The compatibility fixture,

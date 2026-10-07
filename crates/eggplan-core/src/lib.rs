@@ -53,6 +53,7 @@ pub mod bounds {
     pub const CRITERION_CHARS: usize = 2_000;
     pub const REQUIREMENT_CHARS: usize = 1_000;
     pub const ARTIFACT_REF_CHARS: usize = 2_000;
+    pub const SUPERSESSION_REASON_CHARS: usize = 2_000;
     pub const MAX_ITEMS: usize = 512;
     pub const MAX_DEPENDENCIES: usize = 64;
     pub const MAX_CRITERIA: usize = 128;

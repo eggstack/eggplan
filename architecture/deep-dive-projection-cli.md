@@ -25,10 +25,12 @@ polices dependencies and process spawning only, not file writes; see finding 4.
 - Bounds: `OUTPUT_SCHEMA_VERSION = 1`, `MAX_PROJECTED_PLANS = 100`,
   `MAX_PROJECTED_ITEMS = 100`, `MAX_TEXT_CHARS = 512`, `MAX_WARNINGS = 32`
   (`crates/eggplan-projection/src/lib.rs:12-16`).
-- Envelope: `OutputEnvelope<T>` with `schema_version/command/ok/data/error/warnings`
-  and `deny_unknown_fields` (`lib.rs:18-27`). `success` bounds warnings
-  (`lib.rs:37-46`); `failure` char-truncates the message to 512
-  (`lib.rs:48-64`).
+- Envelope: `OutputEnvelope<T>` with
+  `schema_version/command/ok/data/error/warnings/warnings_truncated`
+  and `deny_unknown_fields` (`lib.rs:18-29`). `success` bounds warnings
+  (`lib.rs:39-49`) and reports whether that bound dropped any, so a machine
+  consumer can tell "no warnings" from "warnings truncated"; `failure`
+  char-truncates the message to 512 (`lib.rs:51-67`).
 - `summarize_plan` (`lib.rs:187-222`): truncates objective, counts item statuses
   via `item_status_code` (`lib.rs:430-439`), sorts/dedups assessment reason codes
   via `reason_code` (`lib.rs:441-470`), reports `projected_item_count` /
@@ -90,16 +92,21 @@ polices dependencies and process spawning only, not file writes; see finding 4.
     It classifies per plan via `assessment_state` (`lib.rs:1323-1345`) into 10
     states — `complete`, `incomplete`, `unavailable`, `stale`, `invalid_or_stale`,
     `in_flight`, `blocked`, `failed`, `inconclusive`, `awaiting_human_judgment` —
-    where `stale` is contributed by `check` itself (`lib.rs:657-658`) and
+    where `stale` is contributed by `check` itself (`lib.rs:657-658`) and is
+    reserved for a stale closure record, so evidence on a superseded subject
+    stays an assessment classification (`invalid_or_stale`) and `check` agrees
+    with `status`/`list`/`show` for one identical plan and evidence state;
     `unavailable` also covers an uncapturable subject (`lib.rs:666`). Stale
     closures are flagged with the reason code `closure_subject_stale`
     (`lib.rs:647-656`). It warns on unavailable subjects and abandoned staging
     files, and accepts an optional `--provider-policy` (`lib.rs:501`,
     `lib.rs:604-612`) that is used in memory for the report only; absent it, the
     empty registry cannot promote any observation to trusted proof.
-  - `registry render` (`lib.rs:1166-1221`) derives from canonical state with an
-    empty provider registry and always warns
-    `assessment_uses_empty_provider_registry` when plans exist (`lib.rs:1216-1219`).
+  - `registry render` (`lib.rs:1166-1221`) derives from canonical state. A supplied
+    `--provider-policy` is applied to the projected assessments exactly as it is
+    for `list`/`status`/`show`; with no policy it derives from the empty provider
+    registry and warns `assessment_uses_empty_provider_registry` when plans exist
+    (`lib.rs:1216-1219`).
   - `markdown render|inspect|import` (`lib.rs:710-837`): render optionally writes
     `--output`; `import` requires explicit `--state-root` (`lib.rs:750-757`) and
     creates one Draft via `store.create`.

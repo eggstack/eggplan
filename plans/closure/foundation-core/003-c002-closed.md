@@ -8,10 +8,13 @@ Source roadmap: plans/subsystems/foundation-core-roadmap.md
 
 Reviewed baseline: `37ad290ca6b971a68d2871aedb39f4882f4eb2a8`.
 
-Implementation state: the implementation is complete in the working tree and
-was not committed by the coordinator. The commit identifier is to be added to
-this record as a factual amendment once the change is committed, following the
-precedent of `plans/closure/evidence-closure/002-c004-closed.md`.
+Implementation commit: `1e33069271f8a802190078e640f3db942b15ce7a`
+("fix: resolve the Foundation M003 corrective lines from the 2026-10-23
+repository audit").
+
+Hosted CI was not run for this change. The job identifiers are to be added to
+this record as a factual amendment once CI has run, following the precedent of
+`plans/closure/evidence-closure/002-c004-closed.md`.
 
 ## Executive finding
 
@@ -287,9 +290,8 @@ pushed.
 |---|---|---|---|
 | 1 | medium | The `show` read path now fails where it previously succeeded, with `subject_unavailable` and exit 2. This satisfies §9.3 and the CLI rule against presenting a subjectless result as a complete one, and it contradicts §6/§9.6 of the same plan. | Accepted as the intended diagnostics change and recorded here, as required by the plan. Consumers that relied on `show` exiting 0 with a null `current_subject` will see a different outcome. A follow-up corrective is **not** proposed: this is the behavior the plan required. |
 | 2 | medium | The hosted CI matrix (ubuntu, macOS, Windows native) was not run. | Must be run by CI after the change is pushed; record the job identifiers here as an amendment. |
-| 3 | low | The implementation is in the working tree and is not yet committed. | The commit identifier is to be appended after the commit. |
-| 4 | low | `architecture/deep-dive-repository.md` retains further pre-existing stale citations outside the paragraphs this pass touched (for example the crate's public-surface range and several `store.rs` ranges). | Pre-existing debt, out of this corrective's scope. Not repaired here so that the scope of this record stays exactly what the plan covered. |
-| 5 | informational | In the both-captures-failed soft case, the snapshot records the *start* capture error and discards the end capture error. | Intentional: the start capture is the original point of failure. In the realistic both-fail scenario both are the same `NotGit` error, so the observable warning text is unchanged. Recorded so the choice is not mistaken for an oversight. |
+| 3 | low | `architecture/deep-dive-repository.md` retains further pre-existing stale citations outside the paragraphs this pass touched (for example the crate's public-surface range and several `store.rs` ranges). | Pre-existing debt, out of this corrective's scope. Not repaired here so that the scope of this record stays exactly what the plan covered. |
+| 4 | informational | In the both-captures-failed soft case, the snapshot records the *start* capture error and discards the end capture error. | Intentional: the start capture is the original point of failure. In the realistic both-fail scenario both are the same `NotGit` error, so the observable warning text is unchanged. Recorded so the choice is not mistaken for an oversight. |
 
 ## Roadmap disposition
 

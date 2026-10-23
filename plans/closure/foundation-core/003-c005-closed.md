@@ -8,10 +8,13 @@ Source roadmap: plans/subsystems/foundation-core-roadmap.md
 
 Reviewed baseline: `37ad290ca6b971a68d2871aedb39f4882f4eb2a8`.
 
-Implementation state: the implementation is complete in the working tree and
-was not committed by the coordinator. The commit identifier is to be added to
-this record as a factual amendment once the change is committed, following the
-precedent of `plans/closure/evidence-closure/002-c004-closed.md`.
+Implementation commit: `1e33069271f8a802190078e640f3db942b15ce7a`
+("fix: resolve the Foundation M003 corrective lines from the 2026-10-23
+repository audit").
+
+Hosted CI was not run for this change. The job identifiers are to be added to
+this record as a factual amendment once CI has run, following the precedent of
+`plans/closure/evidence-closure/002-c004-closed.md`.
 
 ## Executive finding
 
@@ -282,9 +285,8 @@ pushed.
 | # | Severity | Finding | Disposition |
 |---|---|---|---|
 | 1 | medium | The hosted CI matrix (ubuntu, macOS, Windows native) was not run. | Must be run by CI after the change is pushed; record the job identifiers here as an amendment. |
-| 2 | low | The implementation is in the working tree and is not yet committed. | The commit identifier is to be appended after the commit. |
-| 3 | low | `architecture/deep-dive-repository.md` retains further pre-existing stale citations outside the paragraphs this pass touched. | Pre-existing debt, out of this corrective's scope. |
-| 4 | informational | The hardened core guard now fails CI on a runner without `rg`. The CI workflow installs `ripgrep`; the failure is loud rather than silent, which is the intended outcome. | No action required. Recorded so that a future workflow change removing the `ripgrep` install is not mistaken for a guard regression. |
+| 2 | low | `architecture/deep-dive-repository.md` retains further pre-existing stale citations outside the paragraphs this pass touched. | Pre-existing debt, out of this corrective's scope. |
+| 3 | informational | The hardened core guard now fails CI on a runner without `rg`. The CI workflow installs `ripgrep`; the failure is loud rather than silent, which is the intended outcome. | No action required. Recorded so that a future workflow change removing the `ripgrep` install is not mistaken for a guard regression. |
 
 ## Roadmap disposition
 

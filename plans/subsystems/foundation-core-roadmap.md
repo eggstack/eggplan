@@ -163,6 +163,11 @@ inspection and diagnostics changes (C002, C004) landed in `eggplan-repo` and
 `eggplan-cli`, and the tooling change (C005) landed in `scripts/` and the
 design record. No capability plan waited on any of them.
 
+Implementation commit: `1e33069` ("fix: resolve the Foundation M003 corrective
+lines from the 2026-10-23 repository audit"). Hosted ubuntu/macos/windows CI
+was not run for that change; the job identifiers are to be added to each
+closure record as a factual amendment once CI has run.
+
 The closure records carry one behavior change that a reader of this roadmap
 should know about: M003 C002 changed the `show` command's read path so that a
 subject capture failure is reported as `subject_unavailable` instead of

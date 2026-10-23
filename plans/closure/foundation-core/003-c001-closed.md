@@ -8,10 +8,13 @@ Source roadmap: plans/subsystems/foundation-core-roadmap.md
 
 Reviewed baseline: `37ad290ca6b971a68d2871aedb39f4882f4eb2a8`.
 
-Implementation state: the implementation is complete in the working tree and
-was not committed by the coordinator. The commit identifier is to be added to
-this record as a factual amendment once the change is committed, following the
-precedent of `plans/closure/evidence-closure/002-c004-closed.md`.
+Implementation commit: `1e33069271f8a802190078e640f3db942b15ce7a`
+("fix: resolve the Foundation M003 corrective lines from the 2026-10-23
+repository audit").
+
+Hosted CI was not run for this change. The job identifiers are to be added to
+this record as a factual amendment once CI has run, following the precedent of
+`plans/closure/evidence-closure/002-c004-closed.md`.
 
 ## Executive finding
 
@@ -208,16 +211,15 @@ amendment once the change is pushed and CI has run.
 | # | Severity | Finding | Disposition |
 |---|---|---|---|
 | 1 | medium | The hosted CI matrix (ubuntu, macOS, Windows native) was not run for this change. The local evidence is Linux-native only, plus the Rust 1.89.0 MSRV job. | Must be run by CI after the change is pushed; record the job identifiers in this record as an amendment. No known platform-specific risk was introduced — the change is a `match` over a `Copy` enum. |
-| 2 | low | The implementation is in the working tree and is not yet committed. | The commit identifier is to be appended to this record after the commit. The precedent `plans/closure/evidence-closure/002-c004-closed.md` shows this amendment being made as a factual addition after the fact. |
-| 3 | informational | The plan claimed the `eggplan-codegg-compat` crate has 15 `deny_unknown_fields` uses across its public contract types. Verified: the count is 15, but all 15 are on *structs*. The public `Loss` enum is adjacently tagged and does not carry the attribute, so it is also open. | Recorded in `architecture/deep-dive-codegg-compat.md`. The claim was not repeated as written anywhere in the design record. |
-| 4 | informational | `architecture/deep-dive-integrations.md` carries pre-existing citation drift for `crates/eggplan-core/src/schema.rs` that this pass did not introduce and did not repair. | Left as-is and recorded here rather than silently rewriting an unrelated claim. |
+| 2 | informational | The plan claimed the `eggplan-codegg-compat` crate has 15 `deny_unknown_fields` uses across its public contract types. Verified: the count is 15, but all 15 are on *structs*. The public `Loss` enum is adjacently tagged and does not carry the attribute, so it is also open. | Recorded in `architecture/deep-dive-codegg-compat.md`. The claim was not repeated as written anywhere in the design record. |
+| 3 | informational | `architecture/deep-dive-integrations.md` carries pre-existing citation drift for `crates/eggplan-core/src/schema.rs` that this pass did not introduce and did not repair. | Left as-is and recorded here rather than silently rewriting an unrelated claim. |
 
 ## Roadmap disposition
 
 Foundation-core roadmap M003 corrective line C001 is closed. The
 "M003 corrective lines" table in `plans/subsystems/foundation-core-roadmap.md`
 is updated to record this closure, its closure record, and its implementation
-commit placeholder.
+commit `1e33069`.
 
 The finding that opened this corrective — three independent copies of the
 execution-derived kind set — is closed for the three crates that carried

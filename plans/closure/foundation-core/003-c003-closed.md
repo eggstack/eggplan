@@ -8,10 +8,13 @@ Source roadmap: plans/subsystems/foundation-core-roadmap.md
 
 Reviewed baseline: `37ad290ca6b971a68d2871aedb39f4882f4eb2a8`.
 
-Implementation state: the implementation is complete in the working tree and
-was not committed by the coordinator. The commit identifier is to be added to
-this record as a factual amendment once the change is committed, following the
-precedent of `plans/closure/evidence-closure/002-c004-closed.md`.
+Implementation commit: `1e33069271f8a802190078e640f3db942b15ce7a`
+("fix: resolve the Foundation M003 corrective lines from the 2026-10-23
+repository audit").
+
+Hosted CI was not run for this change. The job identifiers are to be added to
+this record as a factual amendment once CI has run, following the precedent of
+`plans/closure/evidence-closure/002-c004-closed.md`.
 
 ## Executive finding
 
@@ -212,10 +215,9 @@ the change is pushed.
 | # | Severity | Finding | Disposition |
 |---|---|---|---|
 | 1 | medium | The hosted CI matrix (ubuntu, macOS, Windows native) was not run. | Must be run by CI after the change is pushed; record the job identifiers here as an amendment. |
-| 2 | low | The implementation is in the working tree and is not yet committed. | The commit identifier is to be appended after the commit. |
-| 3 | medium | The bridge's outward projection types remain lenient by decision, and the external `dbowm91/codegg` repository has not been consulted. | Recorded in `architecture/codegg-compat.md` as an open coordination item. A CodeGG consumer must not treat an unknown key as an error on these two types, and must not rely on strict rejection as a signal. If the external repository prefers strictness on the outward contract, the decision can be revisited with a versioned schema bump. |
-| 4 | low | The plan's claim that the `eggplan-codegg-compat` crate has 15 `deny_unknown_fields` uses "across its public contract types" was imprecise: all 15 are on structs, and the public adjacently tagged `Loss` enum does not carry the attribute, so it is also open. | Recorded in `architecture/deep-dive-codegg-compat.md`. The claim was not repeated as written in the design record. |
-| 5 | low | `architecture/deep-dive-integrations.md` carries pre-existing citation drift for `crates/eggplan-core/src/schema.rs` that this pass did not introduce and did not repair. | Left as-is and recorded here rather than silently rewriting an unrelated claim. |
+| 2 | medium | The bridge's outward projection types remain lenient by decision, and the external `dbowm91/codegg` repository has not been consulted. | Recorded in `architecture/codegg-compat.md` as an open coordination item. A CodeGG consumer must not treat an unknown key as an error on these two types, and must not rely on strict rejection as a signal. If the external repository prefers strictness on the outward contract, the decision can be revisited with a versioned schema bump. |
+| 3 | low | The plan's claim that the `eggplan-codegg-compat` crate has 15 `deny_unknown_fields` uses "across its public contract types" was imprecise: all 15 are on structs, and the public adjacently tagged `Loss` enum does not carry the attribute, so it is also open. | Recorded in `architecture/deep-dive-codegg-compat.md`. The claim was not repeated as written in the design record. |
+| 4 | low | `architecture/deep-dive-integrations.md` carries pre-existing citation drift for `crates/eggplan-core/src/schema.rs` that this pass did not introduce and did not repair. | Left as-is and recorded here rather than silently rewriting an unrelated claim. |
 
 ## Roadmap disposition
 

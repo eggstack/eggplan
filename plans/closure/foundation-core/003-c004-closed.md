@@ -8,10 +8,13 @@ Source roadmap: plans/subsystems/foundation-core-roadmap.md
 
 Reviewed baseline: `37ad290ca6b971a68d2871aedb39f4882f4eb2a8`.
 
-Implementation state: the implementation is complete in the working tree and
-was not committed by the coordinator. The commit identifier is to be added to
-this record as a factual amendment once the change is committed, following the
-precedent of `plans/closure/evidence-closure/002-c004-closed.md`.
+Implementation commit: `1e33069271f8a802190078e640f3db942b15ce7a`
+("fix: resolve the Foundation M003 corrective lines from the 2026-10-23
+repository audit").
+
+Hosted CI was not run for this change. The job identifiers are to be added to
+this record as a factual amendment once CI has run, following the precedent of
+`plans/closure/evidence-closure/002-c004-closed.md`.
 
 ## Executive finding
 
@@ -225,8 +228,7 @@ the change is pushed.
 |---|---|---|---|
 | 1 | low | The lock file check-then-use race is **not closed**; it is documented and accepted. | Recorded at `crates/eggplan-repo/src/store.rs:1369-1375`, `crates/eggplan-repo/src/snapshot.rs:240-246`, and in `architecture/repository.md`. Closing it would require a platform-specific no-follow open, which the plan's scope excluded. The residual risk requires write access to the caller-owned state root. |
 | 2 | medium | The hosted CI matrix (ubuntu, macOS, Windows native) was not run. | Must be run by CI after the change is pushed; record the job identifiers here as an amendment. |
-| 3 | low | The implementation is in the working tree and is not yet committed. | The commit identifier is to be appended after the commit. |
-| 4 | low | `architecture/deep-dive-repository.md` retains further pre-existing stale citations outside the paragraphs this pass touched. | Pre-existing debt, out of this corrective's scope. |
+| 3 | low | `architecture/deep-dive-repository.md` retains further pre-existing stale citations outside the paragraphs this pass touched. | Pre-existing debt, out of this corrective's scope. |
 
 ## Roadmap disposition
 

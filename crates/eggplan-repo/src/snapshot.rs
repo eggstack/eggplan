@@ -76,11 +76,6 @@ impl InspectionSelection {
         }
     }
 
-    /// Does this selection enumerate the whole repository?
-    pub fn is_repository_wide(&self) -> bool {
-        !matches!(self, Self::One(_))
-    }
-
     /// The keyset cursor, when this selection is a keyset scan.
     pub fn after(&self) -> Option<&PlanId> {
         match self {
@@ -182,6 +177,12 @@ impl InspectionSnapshot {
         self.subject.as_ref()
     }
 
+    /// Why this snapshot has no subject, when it has none.
+    ///
+    /// The value is the rendered capture failure that occurred at the start of
+    /// the scan — the original point of failure. It exists so a read command
+    /// can report the specific cause instead of only stating that the subject
+    /// was unavailable.
     pub fn subject_error(&self) -> Option<&str> {
         self.subject_error.as_deref()
     }
@@ -236,6 +237,13 @@ pub(crate) fn acquire_shared_lock(
     timeout: Duration,
 ) -> Result<SharedLockGuard, RepoError> {
     let path = root.join(".lock");
+    // Accepted residual race, recorded as defense-in-depth. The symlink guard
+    // below is a check-then-use pair: `create(true)` follows symlinks, so a
+    // process that can write to the state root could replace the lock path
+    // between the check and the open. The state root is caller-owned, and there
+    // is no portable no-follow open across Linux, macOS, and Windows with the
+    // current dependency set, so the residual window is accepted rather than
+    // closed. See `architecture/repository.md`.
     if let Ok(meta) = fs::symlink_metadata(&path)
         && (meta.file_type().is_symlink() || !meta.is_file())
     {
@@ -268,7 +276,11 @@ pub(crate) fn acquire_shared_lock(
 pub(crate) struct SharedLockGuard(File);
 impl Drop for SharedLockGuard {
     fn drop(&mut self) {
-        let _ = self.0.unlock();
+        // A destructor cannot report an error and the unlock result carries no
+        // recovery action: closing the handle releases the lock regardless.
+        // The result is named and discarded rather than silently dropped, so
+        // the intent is explicit.
+        let _unlock = self.0.unlock();
     }
 }
 
@@ -289,7 +301,12 @@ pub(crate) fn capture_subject(
 /// Everything a sealed snapshot carries, gathered before the terminality check.
 pub(crate) struct SealedInput {
     pub(crate) repository_id: String,
-    pub(crate) subject_at_start: Option<SubjectRevision>,
+    /// The subject captured before the scan began.
+    ///
+    /// A capture failure is carried as `Err`, not discarded: the terminality
+    /// contract must be able to report *why* the start capture failed instead
+    /// of reporting a diagnosis the read cannot support.
+    pub(crate) subject_at_start: Result<SubjectRevision, GitSubjectError>,
     pub(crate) plans: Vec<LoadedPlanSnapshot>,
     pub(crate) total_plans: usize,
     pub(crate) observations_counted: usize,
@@ -324,21 +341,34 @@ pub(crate) fn seal(
     } = input;
     let subject_at_end = capture_subject(subject_source, &mut counters);
 
-    // A capture that fails on recapture while S1 succeeded is drift, not an
-    // ordinary unavailability: the worktree changed underneath the read.
+    // Terminality. The four outcomes are distinct and each is reported with
+    // the cause that actually happened:
+    //
+    // * both captures succeeded and agree -> a stable subject.
+    // * both captures succeeded and disagree -> drift: the subject really did
+    //   change under the read, so the read fails closed.
+    // * the end capture failed -> the read fails closed with that failure.
+    // * the start capture failed -> the read fails closed with *that* failure.
+    //   A failed start capture is a capture failure, not drift; reporting it
+    //   as drift would name a cause the read cannot support and would discard
+    //   the original error.
+    //
+    // Only the both-failed case degrades: the snapshot is returned without a
+    // subject and the cause is recorded, because a read that cannot capture
+    // the subject at all must still report what it did see.
     let (subject, subject_error) = match (subject_at_start, subject_at_end) {
-        (Some(start), Ok(end)) => {
+        (Ok(start), Ok(end)) => {
             if start != end {
                 return Err(RepoError::SubjectDrift);
             }
             (Some(start), None)
         }
-        (Some(_), Err(error)) => return Err(RepoError::InspectionSubject(error)),
-        (None, Err(error)) => (None, Some(error.to_string())),
-        (None, Ok(_)) => {
-            // Unavailable at start and available at end: the worktree came into
-            // existence mid-scan. Treat as drift rather than trusting either.
-            return Err(RepoError::SubjectDrift);
+        (Ok(_), Err(error)) => return Err(RepoError::InspectionSubject(error)),
+        (Err(error), Ok(_)) => return Err(RepoError::InspectionSubject(error)),
+        (Err(error), Err(_)) => {
+            // The start capture is the original point of failure, so it is the
+            // cause this snapshot records.
+            (None, Some(error.to_string()))
         }
     };
 
@@ -577,7 +607,7 @@ mod tests {
         let sealed = seal(
             SealedInput {
                 repository_id: store.repository_id().to_string(),
-                subject_at_start: Some(s1),
+                subject_at_start: Ok(s1),
                 plans: loaded,
                 total_plans: 20,
                 observations_counted: 40,
@@ -597,21 +627,20 @@ mod tests {
     }
 
     #[test]
-    fn a_subject_that_appears_mid_scan_is_drift_not_trust() {
-        // Symmetric to the drift case: if capture is unavailable at S1 and
-        // available at S2, the worktree came into existence during the scan.
-        // Neither subject may be trusted.
+    fn a_failed_start_capture_is_reported_as_a_capture_failure_not_drift() {
+        // The start capture failed and the end capture succeeded. That is a
+        // capture failure, not drift: the read fails closed and names the
+        // original cause instead of reporting a drift the read cannot support.
         let dir = tempdir().unwrap();
         let _repo = init_git_repo(dir.path());
         let (store, _) = seeded_repository(dir.path(), 2, 0);
         let subject_source = store.subject_source();
-        let mut counters = SnapshotCounters::default();
-        let s1 = capture_subject(&subject_source, &mut counters).unwrap();
+        let counters = SnapshotCounters::default();
 
         let outcome = seal(
             SealedInput {
                 repository_id: store.repository_id().to_string(),
-                subject_at_start: None,
+                subject_at_start: Err(GitSubjectError::NotGit(dir.path().to_path_buf())),
                 plans: Vec::new(),
                 total_plans: 0,
                 observations_counted: 0,
@@ -623,19 +652,102 @@ mod tests {
             &subject_source,
             counters,
         );
-        assert!(
-            matches!(outcome, Err(RepoError::SubjectDrift)),
-            "got {outcome:?}"
-        );
+        match outcome {
+            Err(RepoError::InspectionSubject(error)) => {
+                assert!(
+                    matches!(error, GitSubjectError::NotGit(_)),
+                    "the original capture failure must be preserved: {error}"
+                );
+            }
+            Err(other) => panic!("expected a capture failure, got {other}"),
+            Ok(snapshot) => {
+                panic!("a failed start capture must not return a snapshot: {snapshot:?}")
+            }
+        }
+    }
 
+    #[test]
+    fn a_failed_start_capture_keeps_its_cause_in_the_error_source_chain() {
+        // The original error must be recoverable through the standard error
+        // source chain, not only through the rendered message.
+        let dir = tempdir().unwrap();
+        let _repo = init_git_repo(dir.path());
+        let (store, _) = seeded_repository(dir.path(), 2, 0);
+        let subject_source = store.subject_source();
+        let counters = SnapshotCounters::default();
+
+        let outcome = seal(
+            SealedInput {
+                repository_id: store.repository_id().to_string(),
+                subject_at_start: Err(GitSubjectError::NotGit(dir.path().to_path_buf())),
+                plans: Vec::new(),
+                total_plans: 0,
+                observations_counted: 0,
+                supersessions_counted: 0,
+                closures_counted: 0,
+                pending_closures: Vec::new(),
+                abandoned_staging_files: Vec::new(),
+            },
+            &subject_source,
+            counters,
+        );
+        let error = outcome.expect_err("a failed start capture must fail the read");
+        assert!(
+            !matches!(error, RepoError::SubjectDrift),
+            "a capture failure must never be reported as drift: {error}"
+        );
+        let source = std::error::Error::source(&error).expect("the cause must be in the chain");
+        assert!(
+            matches!(
+                source.downcast_ref::<GitSubjectError>(),
+                Some(GitSubjectError::NotGit(_))
+            ),
+            "the original capture failure must be reachable through the source chain: {source}"
+        );
+    }
+
+    #[test]
+    fn a_capture_failure_on_both_sides_degrades_and_records_the_start_cause() {
         // A capture failure on both sides degrades to an unavailable subject
         // rather than failing the whole read, which is what `status` reports as
-        // `current_subject_unavailable`.
-        let mut counters = SnapshotCounters::default();
-        let subject = capture_subject(&subject_source, &mut counters).unwrap();
-        let _ = s1;
-        assert_eq!(counters.subject_captures, 1);
-        assert!(subject.dirty_digest.is_none());
+        // `current_subject_unavailable`. The recorded cause is the start
+        // capture failure: the original point of failure.
+        let dir = tempdir().unwrap();
+        let _repo = init_git_repo(dir.path());
+        let (store, _) = seeded_repository(dir.path(), 2, 0);
+        // A Git repository with an unborn HEAD: discovery succeeds but the
+        // capture fails, which is the deterministic way to make the *end*
+        // capture fail with a cause distinguishable from the start cause.
+        let unborn = tempdir().unwrap();
+        git2::Repository::init(unborn.path()).unwrap();
+        let failing_source = GitSubjectSource::new(unborn.path(), "epr_test");
+        let counters = SnapshotCounters::default();
+        let start_path = PathBuf::from("/start/capture/failed");
+
+        let sealed = seal(
+            SealedInput {
+                repository_id: store.repository_id().to_string(),
+                subject_at_start: Err(GitSubjectError::NotGit(start_path.clone())),
+                plans: Vec::new(),
+                total_plans: 0,
+                observations_counted: 0,
+                supersessions_counted: 0,
+                closures_counted: 0,
+                pending_closures: Vec::new(),
+                abandoned_staging_files: Vec::new(),
+            },
+            &failing_source,
+            counters,
+        )
+        .expect("both captures failing must degrade, not fail the read");
+        assert!(sealed.subject().is_none());
+        let cause = sealed
+            .subject_error()
+            .expect("the soft path must record the capture cause");
+        assert!(
+            cause.contains(start_path.to_str().unwrap()),
+            "the recorded cause must be the start capture failure: {cause}"
+        );
     }
 
     #[test]

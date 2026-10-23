@@ -71,6 +71,16 @@ observation without a binding is legacy policy and is reported as
 observations cannot satisfy a bound v2 execution requirement. See
 [evidence architecture](evidence.md) for the binding rules.
 
+`eggplan-core` is the single owner of the execution-derived evidence-kind
+classification, exposed as `is_execution_evidence`
+(`crates/eggplan-core/src/lib.rs:47-60`). The classification is
+compiler-enforced: the function matches exhaustively over `EvidenceKind` with no
+wildcard arm, so adding a variant is a compile error until the new variant is
+classified. `eggplan-integrations` and `eggplan-codegg-compat` consume that
+predicate instead of re-deriving the kind set, so the provider SPI's
+verification-binding gate and the CodeGG bridge's binding requirement cannot
+drift from the domain rule.
+
 Finalized observation fields are private and have read-only accessors. A
 provider ID in an observation is not authority: pure assessment receives an
 explicit host-constructed `ProviderRegistry`. Only registered descriptors may

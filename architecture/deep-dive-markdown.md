@@ -31,7 +31,7 @@ Markdown document has no representation to land in. A grep of `src/lib.rs` for
 opened, or executed: links, includes, URLs, and paths are only ever text. Both importers
 construct their plan once — native at `src/lib.rs:275-284`, CodeGG via `Plan::new` at
 `src/lib.rs:612-617`, which core fixes at revision 0, `PlanStatus::Draft`, `subject: None`
-(`eggplan-core/src/model.rs:270-287`) — and the CLI writes exactly that one plan
+(`eggplan-core/src/model.rs:275-292`) — and the CLI writes exactly that one plan
 (`crates/eggplan-cli/src/lib.rs:805-809`), where the store re-asserts revision 0 + Draft and
 rejects an existing ID (`crates/eggplan-repo/src/store.rs:851-862`).
 
@@ -74,7 +74,7 @@ means a rendered item is visibly self-duplicating.
 Render is deterministic: `plan.validate()` first (`src/lib.rs:121-122`), pre-render size
 estimate (`src/lib.rs:123`, `820-862`), stable pretty JSON field order, items sorted by
 `(position, id)` (`src/lib.rs:161-162`; a total order, because `plan.validate()` rejects duplicate
-item IDs at `eggplan-core/src/model.rs:324-326`), dependencies sorted (`src/lib.rs:174-178`),
+item IDs at `eggplan-core/src/model.rs:330-332`), dependencies sorted (`src/lib.rs:174-178`),
 `markdown_text` escaping (`src/lib.rs:1021-1029`: `&`/`<`/`>` escaped, `\r` stripped,
 `\n` → `<br>`, then a leading fence run neutralized by `escape_leading_fence`
 (`src/lib.rs:1031-1041`) so a description carrying a ``` `eggplan-plan-json` fence or the
@@ -135,8 +135,8 @@ labels fail (`src/lib.rs:500-502`), self-edges fail (`src/lib.rs:503-505`), and
 multi-node cycles fail at the final `plan.validate()` via core graph validation
 (`src/lib.rs:710-711`; cycle errors in `eggplan-core/src/graph.rs:6-11,36-43`). Duplicate
 references (`Dependencies: A, A`) are rejected too, by core's per-item duplicate check
-(`eggplan-core/src/model.rs:259-264`), and every edge target must resolve to a known item
-(`eggplan-core/src/model.rs:331-341`). Order
+(`eggplan-core/src/model.rs:264-269`), and every edge target must resolve to a known item
+(`eggplan-core/src/model.rs:336-346`). Order
 alone never creates edges: `dependencies` is populated only from those two line prefixes
 (`src/lib.rs:471-487`) plus the synthetic plan-level intent item's edges (`src/lib.rs:599`).
 Acceptance criteria attach per `Work package <label>: …`
@@ -293,7 +293,7 @@ Gaps/risks (all verified against source, not speculation):
    differs only past the 2,000-char criterion bound keeps its ID — a stability property worth
    knowing, but an implicit one. The `used` collision set covers only item IDs
    (`src/lib.rs:452`, `src/lib.rs:468`, `src/lib.rs:593`), and core's duplicate-criterion check is
-   per item (`eggplan-core/src/model.rs:252-258`), so a 96-bit collision between criteria
+   per item (`eggplan-core/src/model.rs:257-263`), so a 96-bit collision between criteria
    attached to *different* work packages would be silently accepted rather than rejected. Low
    likelihood, but work-package item IDs get the explicit guard and these do not.
 8. **Rendered items print their description twice.** The derived human section emits the

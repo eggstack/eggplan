@@ -1,6 +1,7 @@
 # Projection and CLI Roadmap
 
-Status: active / current; M003a and M003b planned and ready
+Status: active / current; M001-M003 (M003a and M003b) closed; M003b corrective
+lines C001-C003 open; M004 proposed
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -87,6 +88,45 @@ M003b command metadata/compact DTO work may proceed in parallel with M003a.
 Repository-wide batch execution must consume the M003a inspection snapshot
 rather than restoring repeated per-Plan reads.
 
+### M003b corrective lines
+
+Raised by the 2026-10-23 repository-wide audit against baseline
+`37ad290ca6b971a68d2871aedb39f4882f4eb2a8`. All planned verification was run
+and green at that baseline, and every finding is inference- and
+reachability-established against the source rather than a test failure. The
+M003 milestones themselves remain closed; these are corrective lines against
+them. None of them gates M004 or another subsystem.
+
+| Line | Class | Scope | Plan |
+|---|---|---|---|
+| C001 | non-blocking documentation correction | Correct four `docs/cli-reference.md` statements that the implementation contradicts, and document `init` and `help` | plans/implementation/projection-cli/003b-c001-cli-user-documentation-contract-corrections.md |
+| C002 | correctness / completeness of a promised capability | One completion depth across all four generated shells, with per-shell depth assertions | plans/implementation/projection-cli/003b-c002-shell-completion-depth-parity.md |
+| C003 | non-blocking maintenance | Remove the only production `unreachable!()` in the workspace and name the repeated Markdown bound | plans/implementation/projection-cli/003b-c003-markdown-interchange-panic-path-and-bound-hygiene.md |
+
+### M004 — Plan lifecycle transitions and plan structure editing
+
+Class: capability
+
+Status: proposed.
+
+Plan: plans/implementation/projection-cli/004-plan-lifecycle-and-structure-editing.md
+
+The normative lifecycle at `plans/000-long-term-specification.md:199-205` is
+`Draft -> Active <-> Blocked -> Closed \-> Cancelled`, and the domain
+implements eight legal transitions at
+`crates/eggplan-core/src/model.rs:391-403`. The CLI can perform one:
+`PlanStatus::Blocked` and `PlanStatus::Cancelled` are unreachable through any
+command. Separately, the CLI cannot change a plan's items, dependencies,
+acceptance criteria, evidence requirements, or objective at all, so the
+completion criterion at §6 below is not met.
+
+M004 documents decisions D1-D6 and is **not dependency-ready** until they are
+made. The decisions concern the command surface for lifecycle transitions,
+whether `Blocked -> Closed` is legal, and the shape of plan-structure editing.
+They are product decisions and belong to this roadmap and the specification,
+not to an implementation plan.
+
+
 ## 5. Verification
 
 CLI snapshots, JSON schema fixtures, invalid-state diagnostics, roundtrip
@@ -97,3 +137,11 @@ cross-platform path/terminal behavior.
 
 A human or agent can inspect and update planning/evidence state without direct
 file surgery, while canonical authority remains explicit.
+
+This criterion is **not yet met**. Inspection is met. Updating is met only
+partially: item status, blocker, and next action can be changed through the
+CLI, but plan lifecycle transitions other than `Draft -> Active -> Closed` and
+all plan-structure changes cannot. The gap is recorded and scoped in the
+proposed M004 milestone above; it is not closed by any corrective line, and
+it must not be reported as satisfied until M004 closes or this criterion is
+amended.

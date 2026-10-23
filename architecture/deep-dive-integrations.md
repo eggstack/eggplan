@@ -10,14 +10,14 @@ facts into Eggplan observations. See [overview](overview.md),
 - Pure normalization SPI: no acquisition, auth, network, async, process,
   scheduler, or artifact-store ownership. Hosts retain transports, native
   clients, authentication, and registry membership
-  (`crates/eggplan-integrations/src/lib.rs:1-9`).
+  (`crates/eggplan-integrations/src/lib.rs:3-6`).
 - Dependency surface is minimal by construction
   (`crates/eggplan-integrations/Cargo.toml:8-13`): only `eggplan-core`,
   `serde`/`serde_json`, `sha2`, `thiserror`. No sibling (`eggwork`/`eggsearch`/\
   `eggbench`/`eggsact`), transport (`tokio`/`reqwest`), or runtime crates.
 - Must never enroll trust: adapters produce a core `ProviderDescriptor` for the
   host to consider, but only the host can add it to its trusted
-  `ProviderRegistry` (`crates/eggplan-integrations/src/lib.rs:102-113`).
+  `ProviderRegistry` (`crates/eggplan-core/src/evidence.rs:140-160`).
   The boundary script covers only part of this
   (`scripts/check-integrations-boundary.sh:7-25`): forbidden dependency names in
   `Cargo.toml` (`:7-10`), forbidden `use`/async/process/transport tokens under
@@ -30,48 +30,53 @@ facts into Eggplan observations. See [overview](overview.md),
 
 ## 2. Public contract walkthrough (`src/lib.rs`)
 
-- `ProviderClass` (`src/lib.rs:30-38`): `Execution`, `Research`, `Benchmark`,
-  `Utility`, `Other`. `Capabilities` (`src/lib.rs:40-47`) declares
+- `ProviderClass` (`src/lib.rs:34-40`): `Execution`, `Research`, `Benchmark`,
+  `Utility`, `Other`. `Capabilities` (`src/lib.rs:44-49`) declares
   `supports_in_progress`, `artifacts`, `verification_binding`, and
   `research_trust_metadata` — every downstream gate keys off these flags.
-- `AdapterDescriptor` (`src/lib.rs:49-59`; `new` at `src/lib.rs:62-84`,
-  `validate` at `src/lib.rs:86-100`): bounded provider ID, class, non-empty
+- `AdapterDescriptor` (`src/lib.rs:53-61`; `new` at `src/lib.rs:64-86`,
+  `validate` at `src/lib.rs:88-102`): bounded provider ID, class, non-empty
   deduped `allowed_kinds`, version text; explicitly rejects
-  `EvidenceKind::HumanJudgment` (`src/lib.rs:96-98`). Deserialization also
-  rejects duplicate kinds (`src/lib.rs:232-242`).
-- `ObservationContext` (`src/lib.rs:115-128`; `validate` at
-  `src/lib.rs:131-145`): observation ID, exact subject, requested kind, time,
+  `EvidenceKind::HumanJudgment` (`src/lib.rs:98-100`). Deserialization also
+  rejects duplicate kinds (`src/lib.rs:234-244`).
+- `ObservationContext` (`src/lib.rs:119-130`; `validate` at
+  `src/lib.rs:133-147`): observation ID, exact subject, requested kind, time,
   optional `invocation_ref` and `verification_digest`, bounded metadata
-  (`MAX_CONTEXT_METADATA = 16`, `src/lib.rs:25`). Invocation refs that look
-  like secrets/endpoints are rejected (`src/lib.rs:137-141`).
-- `NormalizedProviderResult` (`src/lib.rs:148-160`; `validate` at
-  `src/lib.rs:170-190`): truthful status, optional `source_trust`
-  (`ProviderTrusted` / `ExternalUntrusted`, `src/lib.rs:162-167`), bounded
+  (`MAX_CONTEXT_METADATA = 16`, `src/lib.rs:27`). Invocation refs that look
+  like secrets/endpoints are rejected (`src/lib.rs:137-144`).
+- `NormalizedProviderResult` (`src/lib.rs:154-162`; `validate` at
+  `src/lib.rs:172-191`): truthful status, optional `source_trust`
+  (`ProviderTrusted` / `ExternalUntrusted`, `src/lib.rs:166-169`), bounded
   metadata and artifact refs. Deliberately has no provider ID — authority comes
-  from the descriptor at finalization (`src/lib.rs:148-149`). Artifact refs are
+  from the descriptor at finalization (`src/lib.rs:150-151`). Artifact refs are
   length-bounded, secret/endpoint-scanned, then core-validated
-  (`src/lib.rs:172-188`).
-- `finalize_observation` (`src/lib.rs:285-366`) enforces, in order: descriptor/
-  context/result validation; declared-kind membership (`src/lib.rs:293-295`);
-  human-judgment refusal (`src/lib.rs:296-298`); research results must carry a
-  trust marker and the capability must be declared (`src/lib.rs:299-308`);
-  in-progress/artifact gates (`src/lib.rs:309-315`); execution-derived kinds
+  (`src/lib.rs:174-189`).
+- `finalize_observation` (`src/lib.rs:287-371`) enforces, in order: descriptor/
+  context/result validation; declared-kind membership (`src/lib.rs:295-297`);
+  human-judgment refusal (`src/lib.rs:298-300`); research results must carry a
+  trust marker and the capability must be declared (`src/lib.rs:301-310`);
+  in-progress/artifact gates (`src/lib.rs:311-317`); execution-derived kinds
   (`Command`/`Test`/`StaticAnalysis`/`DelegatedRun`/`Benchmark`) require a host
   verification binding, and a binding requires the capability
-  (`src/lib.rs:316-329`); reserved `source_trust` key and duplicate context/
-  result key rejection on merge (`src/lib.rs:330-352`); then delegates to
+  (`src/lib.rs:318-329`); reserved `source_trust` key and duplicate context/
+  result key rejection on merge (`src/lib.rs:330-356`); then delegates to
   `EvidenceObservation::finalize` for v2 validation/digest
-  (`src/lib.rs:353-365`).
-- `verification_digest` (`src/lib.rs:215-230`): nonzero schema version, bounded
+  (`src/lib.rs:358-370`).
+  The execution-derived set is not re-listed here: that gate calls the
+  canonical core predicate `eggplan_core::is_execution_evidence`
+  (`crates/eggplan-core/src/lib.rs:47-60`), which owns the classification for
+  the whole workspace and matches `EvidenceKind` exhaustively, so a new kind
+  is a compile error until it is classified.
+- `verification_digest` (`src/lib.rs:217-232`): nonzero schema version, bounded
   namespace text, recursive payload bound check (`MAX_VERIFICATION_SPEC_DEPTH =
   32`, `NODES = 4096`, strings to 4000 chars, arrays/objects to 512 entries;
-  `src/lib.rs:244-283`), then delegates to
+  `src/lib.rs:246-285`), then delegates to
   `eggplan-core::verification_digest` for canonical-JSON domain-separated
   hashing — the envelope domain is the literal
   `eggplan.provider-verification.v1` and the 65_536-byte cap is applied in core
   (`crates/eggplan-core/src/schema.rs:78-87`). Matches [provider SPI](provider-spi.md)
   lines 24-25.
-- Generic metadata hygiene (`src/lib.rs:368-412`): entry-count and length
+- Generic metadata hygiene (`src/lib.rs:373-417`): entry-count and length
   bounds plus a denylist — sensitive key substrings (`token`, `password`,
   `secret`, `credential`, `authorization`, `endpoint`) and credential/endpoint-
   like values (`://` anywhere, `sk-` as a prefix, `bearer `/`token=`/`password=`/
@@ -177,7 +182,7 @@ adapters; safe-listed metadata (explicit `insert` lists at
 `src/eggwork.rs:248-306` and `src/eggsearch.rs:197-380`) with content fields
 structurally excluded; reason/detail prose reduced to outcome labels
 (`src/eggwork.rs:279-305`); verification binding enforced for all
-execution-derived kinds including `StaticAnalysis` (`src/lib.rs:316-323` plus
+execution-derived kinds including `StaticAnalysis` (`src/lib.rs:318-326` plus
 `src/eggwork.rs:176-178`); trust-marker discipline on the research path with
 deterministic digests preserving auditability without copying content.
 
@@ -201,9 +206,10 @@ Gaps and risks:
   section cites a recheck at `d870512a…` with manifest v2 separating execution
   status from comparison verdict. The manifest is therefore stale for the
   stated M003 readiness baseline, and no Eggbench adapter exists yet
-  (`src/lib.rs:8-9` exports only `eggwork`/`eggsearch`) despite Eggbench rows
+  (`src/lib.rs:8-9` at review time exported only `eggwork`/`eggsearch`; §7 below
+  records the later additions) despite Eggbench rows
   in both fixture files. Scope the next fixture refresh to M003 planning.
-- Generic-layer metadata protection is a denylist (`src/lib.rs:384-412`):
+- Generic-layer metadata protection is a denylist (`src/lib.rs:389-417`):
   substring key matching plus `://`/`sk-`/credential-prefix value heuristics.
   Adequate as defense-in-depth behind per-adapter safe-listing, but it misses
   secret shapes without those markers (bare high-entropy tokens, PEM blocks)
@@ -211,7 +217,7 @@ Gaps and risks:
   primary control; keep adapters safe-listing (they do today).
 - Provider identity is caller-supplied, not adapter-bound. `finalize_observation`
   stamps whatever `descriptor.provider_id` the caller passes into the
-  observation (`src/lib.rs:285-289`, `src/lib.rs:353-355`), so nothing in this
+  observation (`src/lib.rs:287-291`, `src/lib.rs:360`), so nothing in this
   crate ties the facts being normalized to the provider that claims them; a
   caller can label a `Passed` result with any `epp_`-prefixed ID. The only
   mechanical gate is the host registry, and the tests demonstrate exactly that
@@ -224,18 +230,18 @@ Gaps and risks:
   (`scripts/check-integrations-boundary.sh:17-20`), never in `src/lib.rs`, so a
   registry mutation added to the SPI module would pass the boundary check.
   Nothing in `lib.rs` builds a registry today — only `ProviderDescriptor`
-  (`src/lib.rs:104-112`) — but widen the grep before relying on it.
+  (`src/lib.rs:106-114`) — but widen the grep before relying on it.
 - `SourceTrust::ProviderTrusted` is recordable through the SPI: any `Research`
   descriptor declaring `research_trust_metadata` may carry it, and it is
   persisted verbatim as `source_trust: "provider_trusted"`
-  (`src/lib.rs:304-308`, `src/lib.rs:331-340`). Eggsearch hardcodes the
+  (`src/lib.rs:306-310`, `src/lib.rs:342-351`). Eggsearch hardcodes the
   opposite (`src/eggsearch.rs:403`) and Eggwork passes `None`
   (`src/eggwork.rs:333`), but a future adapter has no such guard rail in this
   crate — only host-registry assessment downstream.
-- `MAX_VERIFICATION_SPEC_BYTES` (`src/lib.rs:26`) is declared and never
+- `MAX_VERIFICATION_SPEC_BYTES` (`src/lib.rs:28`) is declared and never
   referenced; the 65_536-byte cap is enforced in core
   (`crates/eggplan-core/src/schema.rs:85-87`), and the in-crate check
-  (`src/lib.rs:244-283`) covers depth/nodes/strings/collections only. Not a
+  (`src/lib.rs:246-285`) covers depth/nodes/strings/collections only. Not a
   hole — core rejects the oversize payload (`tests/conformance.rs:163`) — but
   the constant misleads a reader of this crate alone.
 - Eggsearch identity digests have no domain separator: `hex_digest` is plain
@@ -248,7 +254,7 @@ Gaps and risks:
 - The Eggsearch bundle artifact is undigested: `digest: None`
   (`src/eggsearch.rs:393-397`) is accepted because `ArtifactRef.digest` is
   optional in core (`crates/eggplan-core/src/model.rs:63-69`,
-  `crates/eggplan-core/src/model.rs:365-379`). The research observation
+  `crates/eggplan-core/src/model.rs:370-384`). The research observation
   therefore binds to a host-supplied `bundle_id` only, while Eggwork refs are
   content-bound (`src/eggwork.rs:209-213`); a host-side bundle swap is not
   detectable from the observation.
@@ -313,7 +319,7 @@ is the post-M003a delta.
 - The plan's suggested free-form provider class `eggbench-verified-evidence-v1`
   is not expressible in the frozen `ProviderClass` vocabulary that
   `AdapterDescriptor::provider_descriptor` derives from
-  (`src/lib.rs:104-113`). `Benchmark` is used instead, yielding core class
+  (`src/lib.rs:106-114`). `Benchmark` is used instead, yielding core class
   `benchmark`. Documented as a deviation rather than silently substituted.
 - **Section 6 finding on the adapter-file-scoped trust guard is now resolved.**
   `scripts/check-integrations-boundary.sh` was rewritten into six scope-labelled

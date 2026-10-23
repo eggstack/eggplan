@@ -52,9 +52,9 @@ Planning-system bootstrap:
 
 | Subsystem | Status | Current milestone | Authority |
 |---|---|---|---|
-| Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified | plans/subsystems/foundation-core-roadmap.md |
+| Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified. Five M003 corrective lines (C001-C005) were raised by the 2026-10-23 repository audit and are now implemented and closed; none gated another subsystem | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M002 and C001/C002/C003/C004 closed; the C004 durability defect is resolved — ordinary CAS can no longer modify a Closed Plan, so no reachable path desynchronizes it from its ClosureRecord | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | active/current | M001/M002/M003a/M003b closed; the M003 inspection snapshot is hosted-qualified and batch/completion work builds on it | plans/subsystems/projection-cli-roadmap.md |
+| Projection/CLI | active/current | M001/M002/M003a/M003b closed; the M003 inspection snapshot is hosted-qualified and batch/completion work builds on it. Three M003b corrective lines (C001-C003) are registered and open from the 2026-10-23 repository audit, and M004 is proposed pending its open decisions | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001-M003 and C001/C002 closed; the roadmap is terminal. C002 closed the boundary guard's filesystem gap: `check-codegg-compat-boundary.sh` now fails on filesystem access, every guard message states its actual scan scope, and all five guards have synthetic self-proofs. The bridge source was already pure; the defect was in the enforcement | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | active/current | M001, M002, M003a (`674264d`), and M003b (`93d65b0`) closed; Eggsact and Eggup candidates unchanged and deferred | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
@@ -86,6 +86,15 @@ Planning-system bootstrap:
 | Eggstack integrations | M002 Eggwork + Eggsearch evidence adapters | closed | plans/implementation/eggstack-integration/002-eggwork-and-eggsearch-evidence-adapters.md | closure plans/closure/eggstack-integration/002-closed.md |
 | Eggstack integrations | M003a Eggbench verified bundle + comparison evidence | closed | plans/implementation/eggstack-integration/003a-eggbench-verified-bundle-and-comparison-evidence.md | closure plans/closure/eggstack-integration/003a-closed.md; Eggplan `674264d`, hosted run `37350383159`; Eggbench fixture baseline `30a38251` (CI `37143714313`, live `37143714261`) |
 | Eggstack integrations | M003b GitHub CI/forge + artifact evidence | closed | plans/implementation/eggstack-integration/003b-github-ci-forge-and-artifact-evidence.md | closure plans/closure/eggstack-integration/003b-closed.md; Eggplan `93d65b0`, hosted run `37351818356`; qualified against GitHub REST API `2022-11-28` |
+| Foundation | M003 C001 canonical execution-kind predicate | closed | plans/implementation/foundation-core/003-c001-canonical-execution-kind-predicate.md | raised by the 2026-10-23 repository audit; consolidates one trust rule into one owner; closure: plans/closure/foundation-core/003-c001-closed.md |
+| Foundation | M003 C002 subject-capture error fidelity | closed | plans/implementation/foundation-core/003-c002-subject-capture-error-fidelity.md | raised by the 2026-10-23 repository audit; diagnostics fidelity in the inspection snapshot and CLI read path; closure: plans/closure/foundation-core/003-c002-closed.md |
+| Foundation | M003 C003 core assessment reason schema fail-closed parity | closed | plans/implementation/foundation-core/003-c003-core-assessment-reason-schema-fail-closed.md | raised by the 2026-10-23 repository audit; nested `AssessmentReason` unknown-field parity; closure: plans/closure/foundation-core/003-c003-closed.md |
+| Foundation | M003 C004 unreachable public surface + panic-path hygiene | closed | plans/implementation/foundation-core/003-c004-unreachable-public-surface-and-panic-path-hygiene.md | raised by the 2026-10-23 repository audit; non-blocking maintenance; closure: plans/closure/foundation-core/003-c004-closed.md |
+| Foundation | M003 C005 core boundary guard + tooling-governance reconciliation | closed | plans/implementation/foundation-core/003-c005-core-boundary-guard-and-tooling-governance-reconciliation.md | raised by the 2026-10-23 repository audit; tooling hardening and design-record truthfulness; closure: plans/closure/foundation-core/003-c005-closed.md |
+| Projection/CLI | M003b C001 CLI user-documentation contract corrections | ready | plans/implementation/projection-cli/003b-c001-cli-user-documentation-contract-corrections.md | raised by the 2026-10-23 repository audit; non-blocking documentation correction; no closure record yet |
+| Projection/CLI | M003b C002 shell completion depth parity | ready | plans/implementation/projection-cli/003b-c002-shell-completion-depth-parity.md | raised by the 2026-10-23 repository audit; completion depth and test strength; no closure record yet |
+| Projection/CLI | M003b C003 Markdown interchange panic-path + bound hygiene | ready | plans/implementation/projection-cli/003b-c003-markdown-interchange-panic-path-and-bound-hygiene.md | raised by the 2026-10-23 repository audit; non-blocking maintenance; no closure record yet |
+| Projection/CLI | M004 plan lifecycle transitions + plan structure editing | proposed | plans/implementation/projection-cli/004-plan-lifecycle-and-structure-editing.md | capability gap against the normative lifecycle and the roadmap completion criterion; decisions D1-D6 are open, so it is not dependency-ready |
 
 ## Corrective history and current maintenance
 
@@ -143,8 +152,122 @@ inference- and reachability-established, not test failures.
   `std::collections` — so the defect was in the enforcement, not the crate.
   No crate file changed.
 
-C004 and C002 are both closed, so no registered corrective remains open in any
-subsystem. Neither gated the terminal CodeGG roadmap or any other subsystem.
+C004 and C002 are both closed. Neither gated the terminal CodeGG roadmap or
+any other subsystem.
+
+### Correctives raised by the 2026-10-23 repository audit
+
+A repository-wide read-only audit was performed against baseline
+`37ad290ca6b971a68d2871aedb39f4882f4eb2a8`. All planned verification was run
+and green at that baseline — `cargo fmt --all -- --check`,
+`cargo clippy --workspace --all-targets --locked -- -D warnings`,
+`cargo test --workspace --locked`, and all five boundary guards. Every
+finding below is inference- and reachability-established against the source,
+not a test failure, and each carries a recorded reproduction where one was
+possible. No production code, schema, or document was changed by the audit
+itself.
+
+Eight plans are registered from that audit. Seven are corrective lines against
+closed milestones; one is a proposed capability milestone. None of the
+correctives is blocking, and none gates another subsystem.
+
+**Status:** the five Foundation corrective lines (M003 C001-C005) have been
+implemented and are closed with their own closure records. The three
+Projection/CLI corrective lines (M003b C001-C003) and the proposed Projection/CLI
+M004 milestone remain open. The findings below are kept as the audit's record
+of what was found; each closed line names its closure record.
+
+**Foundation core/repository** — five corrective lines against M003, all closed:
+
+- **M003 C001** — the execution-evidence kind set is implemented in three
+  places (`crates/eggplan-core/src/lib.rs:33-42`,
+  `crates/eggplan-codegg-compat/src/lib.rs:598-607`,
+  `crates/eggplan-integrations/src/lib.rs:318-325`) with no exhaustive owner,
+  so a new `EvidenceKind` variant would not fail compilation and could reach
+  the evidence ledger without a verification binding. The classification
+  itself is correct and unchanged. **Closed** —
+  `plans/closure/foundation-core/003-c001-closed.md`. The classification now has
+  one owner, `eggplan-core::is_execution_evidence`, whose exhaustive `match`
+  makes a new `EvidenceKind` variant a compile error until it is classified.
+- **M003 C002** — the Git subject capture error is discarded at
+  `crates/eggplan-repo/src/store.rs:1154-1155` and at
+  `crates/eggplan-cli/src/lib.rs:1636`. A failed start capture followed by a
+  successful recapture is reported as `SubjectDrift`
+  (`crates/eggplan-repo/src/snapshot.rs:329-343`), and the CLI read path
+  reports a generic warning where the closure path reports the specific
+  cause. Diagnostics fidelity only; no read that failed before now succeeds.
+  **Closed** — `plans/closure/foundation-core/003-c002-closed.md`. A start-capture
+  failure is now reported as the capture failure it is and never as
+  `SubjectDrift`; the CLI read path reports the specific cause under the
+  existing `subject_unavailable` code. One user-visible change is recorded in
+  the closure evidence: `show` on an unavailable subject now fails with
+  `subject_unavailable` instead of exiting 0 with a subjectless summary.
+- **M003 C003** — `AssessmentReason`
+  (`crates/eggplan-core/src/assessment.rs:30-54`) does not deny unknown
+  fields while all four assessment structs that contain it do, and the
+  injected-field regression at `crates/eggplan-core/src/closure.rs:585-596`
+  enumerates only struct-level paths. Schema-integrity gap, not a closure
+  bypass. **Closed** — `plans/closure/foundation-core/003-c003-closed.md`. The
+  nested enum now denies unknown fields, with all 21 variants proven to
+  round-trip under the strict rule; the bridge's outward projection contract
+  was decided explicitly (kept open) and pinned by a test.
+- **M003 C004** — unreachable public surface and panic-path hygiene:
+  `InspectionSelection::is_repository_wide` has no consumer,
+  `RepoError::Domain` is never constructed, and `Criterion::validate`
+  contains an `expect` on a path reachable from parsed input. Non-blocking
+  maintenance; no observable behavior changes. **Closed** —
+  `plans/closure/foundation-core/003-c004-closed.md`. The unreachable accessor
+  and the unconstructible error variant are removed, the production `expect` is
+  now a typed error, and the residual lock race is recorded as an explicit
+  accepted risk rather than left implicit.
+- **M003 C005** — `scripts/check-core-boundary.sh` is the only guard without a
+  tool precondition and the only one that does not scan core's production
+  source for impure access. Both were reproduced: without ripgrep the guard
+  reports a pass, and a synthetic core source containing `std::fs` passes the
+  guard. `architecture/deep-dive-tooling-governance.md` also misdescribes the
+  integrations guard's mechanism, guard count, scan scope, and precondition.
+  The core crate itself is pure; the defect was in the enforcement.
+  **Closed** — `plans/closure/foundation-core/003-c005-closed.md`. The core
+  guard now refuses to report a pass without its tool, scans core's production
+  source for impure access, and carries deterministic self-proofs; the
+  tooling-governance deep dive now describes the integrations guard correctly.
+
+**Projection/CLI** — three corrective lines against M003b, plus one proposed
+milestone, all still open:
+
+- **M003b C001** — four statements in `docs/cli-reference.md` contradict the
+  implementation, including the safety-relevant claim that `--state-root` is
+  "Never implicit" while `crates/eggplan-cli/src/lib.rs:320-324` defaults it
+  to `.eggplan`. `init` and `help` are undocumented, and the value-taking
+  flag list is incomplete. Non-blocking documentation correction; the CLI's
+  behavior is correct and self-consistent.
+- **M003b C002** — the four generated completion scripts consume the one
+  command metadata source to different depths. Fish reaches commands,
+  subcommands, options, and values; Bash omits subcommands; Zsh omits
+  subcommands, options, and values; PowerShell omits subcommands and values.
+  The test at `crates/eggplan-cli/tests/batch_and_completions.rs:1212-1241`
+  asserts only that a script mentions a name, so it cannot detect the gap.
+- **M003b C003** — the Markdown import path contains the workspace's only
+  production `unreachable!()`
+  (`crates/eggplan-markdown/src/lib.rs:114`), and the 512-character bound is
+  a repeated bare literal at six sites rather than a named constant.
+  Non-blocking maintenance; imported plans and rendered documents are
+  unchanged.
+- **M004** — capability, not a corrective. `PlanStatus::Blocked` and
+  `PlanStatus::Cancelled` are unreachable through the CLI although the domain
+  permits them (`crates/eggplan-core/src/model.rs:391-403`), and the CLI
+  cannot change a plan's items, dependencies, criteria, requirements, or
+  objective at all, which the roadmap's completion criterion
+  (`plans/subsystems/projection-cli-roadmap.md:96-99`) rules out. The plan
+  documents decisions D1-D6 and is registered **proposed**, not ready.
+
+Two items from the audit are explicitly *not* findings and are recorded here
+so they are not reopened: the deferred Interop/distribution subsystem
+(`plans/subsystems/interoperability-distribution-roadmap.md`), which is out
+of scope by design; and the fact that `eggplan-integrations` and
+`eggplan-codegg-compat` have no in-repo consumer, which follows from the
+host-owned acquisition boundary and from CodeGG being an external consumer.
+
 
 ## Current execution order
 
@@ -190,6 +313,27 @@ subsystem. Neither gated the terminal CodeGG roadmap or any other subsystem.
    - Eggstack M003a is closed at Eggplan `674264d`, hosted-qualified by run `37350383159`. The dual-green gate was rechecked on 2026-10-05 and `30a38251...` remains the newest exact Eggbench SHA with both ordinary CI and live qualification green; every revision above it on main has both workflows failing or cancelled, so the current head stayed research evidence. M003b was never serialized behind that gate, landed independently, and is closed at Eggplan `93d65b0` hosted-qualified by run `37351818356`. It was qualified against GitHub REST API version `2022-11-28` using both live authenticated responses and GitHub's published OpenAPI description. That cross-check corrected an assumption in the plan: GitHub does supply `artifact.digest` as `sha256:<hex>`, but only for `upload-artifact` v4 or newer and null otherwise, so the adapter records it when present and never infers one.
 10. Interoperability/distribution remains deferred until the local capability
     wave is qualified.
+11. The 2026-10-23 repository audit raised five Foundation corrective lines
+    (M003 C001-C005) and three Projection/CLI corrective lines (M003b
+    C001-C003), plus proposed Projection/CLI M004. Every one of them is
+    non-blocking: the C001-C005 lines do not gate CodeGG, Eggstack, or
+    Projection/CLI capability work, and the M003b lines do not gate M004.
+    The Foundation lines touch `eggplan-core`, `eggplan-repo`,
+    `eggplan-integrations`, and `eggplan-codegg-compat`; the Projection/CLI
+    lines touch `eggplan-cli` and `eggplan-markdown`. They are independent of
+    each other except that M003 C002 and M003b C001 both correct
+    subject-capture diagnostics, and M003b C002's completion-depth
+    assertions will need to cover any command added by M004. M004 remains
+    **proposed** until decisions D1-D6 in its plan are made.
+    **The five Foundation lines are now implemented and closed**, each with its
+    own closure record under `plans/closure/foundation-core/`. They did not
+    serialize against each other or against any capability work: M003 C001,
+    C003, and C004 closed together in the core and repository crates, M003
+    C002 closed with the CLI read-path diagnostics change recorded in its
+    closure evidence, and M003 C005 closed with the hardened core boundary
+    guard. The three Projection/CLI lines and M004 remain open and are
+    unaffected by the Foundation closures, except that M003b C001's
+    documentation corrections should now reflect the C002 read-path change.
 
 ## External interface research baselines
 

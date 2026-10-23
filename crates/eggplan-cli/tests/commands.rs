@@ -81,7 +81,6 @@ fn native_cli_smoke_reads_mutates_and_derives_registry() {
     );
 
     for args in [
-        vec!["show", "ep_cli_plan"],
         vec!["status", "ep_cli_plan"],
         vec!["ready", "ep_cli_plan"],
         vec!["graph", "ep_cli_plan"],
@@ -95,6 +94,28 @@ fn native_cli_smoke_reads_mutates_and_derives_registry() {
         command.push("--json");
         assert_eq!(json_ok(&invoke(&command))["ok"], true);
     }
+
+    // `show` must not silently present a subjectless result as a complete one.
+    // It reports the capture failure with the existing `subject_unavailable`
+    // diagnostic code and the underlying cause, matching the closure path.
+    let unavailable_show = invoke(&[
+        "--state-root",
+        state.to_str().unwrap(),
+        "show",
+        "ep_cli_plan",
+        "--json",
+    ]);
+    assert_eq!(unavailable_show.status.code(), Some(2));
+    let show_envelope: Value = serde_json::from_slice(&unavailable_show.stdout).unwrap();
+    assert_eq!(show_envelope["error"]["code"], "subject_unavailable");
+    assert!(
+        show_envelope["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("not inside a Git worktree"),
+        "the specific capture cause must reach the operator: {}",
+        show_envelope["error"]["message"]
+    );
 
     let activated = invoke(&[
         "activate",

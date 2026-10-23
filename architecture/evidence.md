@@ -57,6 +57,13 @@ binding before status can contribute to satisfaction. Reason ordering and
 observation ordering are deterministic. Missing, stale, untrusted, mismatched,
 legacy-unbound, and ordinary status outcomes have separate reason codes.
 
+The four assessment output structs deny unknown fields, and the nested
+`AssessmentReason` enum carries `deny_unknown_fields` itself, exactly like the
+four structs that contain it — serde does not inherit the attribute from a
+parent struct into nested types, so the enum has to declare it. An injected key
+inside a reason element therefore fails closed instead of riding along outside
+the record digest's coverage.
+
 Observations are append-only in repository storage. Replaying identical
 canonical content is idempotent; reusing an ID for different content conflicts.
 Assessment is pure and performs no network or process side effects.

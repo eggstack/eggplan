@@ -173,6 +173,11 @@ Both also require a **resolvable Git subject**. In a repository with no commits 
 branch — subject capture fails and the command exits nonzero with `subject_unavailable`.
 Make at least one commit first.
 
+`show` also requires a resolvable Git subject: it reports the current subject, so a failed
+capture exits nonzero with `subject_unavailable` rather than returning a plan summary with
+no subject. `status`, `list`, `check`, and `registry render` do not require one — they
+report `current_subject_unavailable` as a warning instead.
+
 `close` delegates entirely to the repository's guarded finalizer, which revalidates the
 current Git subject itself. The CLI cannot assert subject authority at commit time.
 

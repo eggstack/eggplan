@@ -65,11 +65,30 @@ declares `git_subject` + `store`, and re-exports exactly
 `GitSubjectFingerprintV1`, `GitSubjectOptions`, `GitSubjectSource`,
 `PlanStore`, `RepoError`, `RepositoryStore`, `StoreOptions`.
 
-- **Open paths.** `open_read_only` (`store.rs:174-199`) reads `config.toml`
+- **Open paths.** `open_read_only` (`store.rs:183-208`) reads `config.toml`
   without creating files or recovering pending closures — the inspection
-  path for check commands. `pending_closures` (`store.rs:202-232`) lists
+  path for check commands. `pending_closures` (`store.rs:211-241`) lists
   pending intents sorted, rejecting symlinked entries. `open_with_options`
-  (`store.rs:580-618`) takes a short-lived init lock, then recovers.
+  (`store.rs:607-644`) takes a short-lived init lock, then recovers.
+- **Inspection snapshot subject handling.** `inspection_snapshot`
+  (`store.rs:1159-1250`) captures the subject at the start of the scan and
+  carries the result — success *or* failure — into the crate-private sealing
+  step (`store.rs:1171`). `SealedInput.subject_at_start`
+  (`snapshot.rs:302-317`) is a `Result<SubjectRevision, GitSubjectError>`, so
+  the capture failure is carried from the point of failure to the point of
+  reporting instead of being discarded there. `seal` (`snapshot.rs:326-373`)
+  then distinguishes four outcomes (`snapshot.rs:359-373`): two agreeing
+  captures yield a stable subject; two disagreeing captures are
+  `RepoError::SubjectDrift`, which carries no payload because the diagnosis is
+  the whole message; a failed end capture is
+  `RepoError::InspectionSubject` carrying that `GitSubjectError` as its
+  source; and a failed *start* capture is also `RepoError::InspectionSubject`
+  carrying the start error — never `SubjectDrift`, because a read that could
+  not capture the subject at all cannot support a diagnosis of a subject that
+  changed. When both captures fail the read degrades instead of failing: the
+  snapshot carries no subject and records the start cause — the original point
+  of failure — which `InspectionSnapshot::subject_error`
+  (`snapshot.rs:186-188`) exposes to the read command.
 - **Plan CAS.** Above plus `load_unlocked` (`store.rs:679-849`): storage
   version check, domain validation, digest check, directory/object identity
   check, `RecoveryRequired` if `closure.pending.json` exists
@@ -119,18 +138,20 @@ declares `git_subject` + `store`, and re-exports exactly
   directories fail as `UnsafePath`. Plan directory names must parse as
   `PlanId` (restricted alphabet), observation filenames must match
   `<id>.json`.
-- **Error taxonomy.** `RepoError` (`store.rs:54-110`) declares 25 variants and
-  constructs all but one: `Domain` (`store.rs:58-59`) is an unused
-  `Box<dyn Error + Send + Sync>` catch-all that can never carry a diagnostic.
+- **Error taxonomy.** `RepoError` (`store.rs:54-119`) declares 26 variants, and
+  every one of them is constructed on a reachable path: a variant no caller can
+  observe would weaken the taxonomy the CLI maps onto diagnostic codes, so an
+  unreachable variant is removed rather than kept. The variant set is pinned by
+  an exhaustive match in `crates/eggplan-repo/tests/repository.rs`.
   Lifecycle triggers: `InvalidUpdate` for identity/revision/digest/assessment
   mismatch and every pre-write refusal, `InvalidTransition` for plan or item
-  status moves the core transition tables forbid (`store.rs:938-953`),
+  status moves the core transition tables forbid (`store.rs:1019-1032`),
   `GuardedClosureRequired` for CAS entry into Closed, `ClosedPlanImmutable` for
   any CAS against an already-Closed plan, `Conflict` for a stale
   expected-revision, `AlreadyExists`/`NotFound` for directory presence,
   `LockTimeout` for `fs2` contention past the deadline
-  (`store.rs:1113-1125`), `DurabilityUnknown` when a rename succeeded but the
-  parent-directory `sync_all` did not (`store.rs:484-487,1221-1224`),
+  (`store.rs:1388-1394`), `DurabilityUnknown` when a rename succeeded but the
+  parent-directory `sync_all` did not (`store.rs:493-496,1513-1516`),
   `UnsafePath` for a symlinked or non-directory managed path, `Corrupt` for
   unknown storage schema, digest mismatch, ID/filename disagreement and
   unreproducible closure chains, `InvalidPlan` for a domain-valid plan that
@@ -318,9 +339,9 @@ symlink discipline are applied uniformly, not just on the plan path; and
   by E-M002-C004-01).** *This was a real code defect: the guard fired only when
   `current.status != Closed`, so for Closed→Closed the status-equality
   short-circuit at `store.rs:938` skipped `plan_transition_allowed` (which has
-  no `Closed` row at all, `crates/eggplan-core/src/model.rs:391-403`) and
+  no `Closed` row at all, `crates/eggplan-core/src/model.rs:396-408`) and
   `Plan::validate` constrained nothing Closed-specific
-  (`crates/eggplan-core/src/model.rs:288-347`). `atomic_write` at
+  (`crates/eggplan-core/src/model.rs:293-352`). `atomic_write` at
   `store.rs:960` persisted a Closed plan at `revision + 1` that no longer matched
   `closure.json`, and the trailing re-read at `store.rs:961` returned `Corrupt`
   only *after* the bad bytes landed — verified against the pre-fix code as

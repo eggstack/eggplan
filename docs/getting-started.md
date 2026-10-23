@@ -23,8 +23,10 @@ eggplan assess ep_release --state-root .eggplan --provider-policy policy.json
 # assess: subject_unavailable: Git operation failed: reference 'refs/heads/master' not found
 ```
 
-So make at least one commit first. `init`, `new`, `show`, and `status` work without one;
-`assess` and `close` do not.
+So make at least one commit first. `init` and `new` work without one; `status`
+works but warns `current_subject_unavailable`. `show`, `assess`, and `close`
+require a resolvable subject: `show` exits nonzero with `subject_unavailable`,
+and `assess` and `close` do the same.
 
 ```sh
 git init && git add -A && git commit -m "init"

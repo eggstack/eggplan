@@ -20,7 +20,9 @@ state authority.
 - `finalize_observation` takes provider identity from the descriptor, checks
   declared kinds and capabilities, requires verification binding for
   execution-derived kinds, and delegates final v2 validation/digest creation
-  to eggplan-core.
+  to eggplan-core. That verification-binding gate is driven by the canonical
+  core predicate `eggplan_core::is_execution_evidence`, not by a local kind
+  list, so the SPI's rule cannot drift from the domain rule.
 - `verification_digest` hashes canonical JSON inside a domain-separated
   envelope containing provider namespace and nonzero schema version.
 

@@ -137,6 +137,41 @@ Evidence M001:
 The historical M001/M002 closure records remain unchanged. M003 closure
 establishes the current corrected qualification state.
 
+### M003 corrective lines
+
+Raised by the 2026-10-23 repository-wide audit against baseline
+`37ad290ca6b971a68d2871aedb39f4882f4eb2a8`. All planned verification was run
+and green at that baseline, and every finding is inference- and
+reachability-established against the source rather than a test failure. The
+M003 milestone itself remains closed; these are corrective lines against it.
+None of them gates another subsystem.
+
+| Line | Class | Scope | Plan | Closure |
+|---|---|---|---|---|
+| C001 | invariant / trust-rule consolidation | One canonical owner for the execution-evidence kind classification, so a new `EvidenceKind` variant cannot silently escape the verification-binding requirement | plans/implementation/foundation-core/003-c001-canonical-execution-kind-predicate.md | closed — plans/closure/foundation-core/003-c001-closed.md |
+| C002 | correctness / diagnostics fidelity | Carry the Git subject capture error instead of collapsing it, in the inspection snapshot and the CLI read path | plans/implementation/foundation-core/003-c002-subject-capture-error-fidelity.md | closed — plans/closure/foundation-core/003-c002-closed.md |
+| C003 | invariant / schema integrity | `deny_unknown_fields` parity for the nested `AssessmentReason` enum and reason-level injection-path coverage | plans/implementation/foundation-core/003-c003-core-assessment-reason-schema-fail-closed.md | closed — plans/closure/foundation-core/003-c003-closed.md |
+| C004 | non-blocking maintenance | Unreachable public surface, an unconstructed error variant, and a panic path in validation | plans/implementation/foundation-core/003-c004-unreachable-public-surface-and-panic-path-hygiene.md | closed — plans/closure/foundation-core/003-c004-closed.md |
+| C005 | tooling governance | Core boundary guard tool precondition and source-purity enforcement, plus tooling-governance design-record truthfulness | plans/implementation/foundation-core/003-c005-core-boundary-guard-and-tooling-governance-reconciliation.md | closed — plans/closure/foundation-core/003-c005-closed.md |
+
+All five lines were implemented together against baseline
+`37ad290ca6b971a68d2871aedb39f4882f4eb2a8` and are closed. They did not
+serialize against each other: the core-side changes (C001, C003, C004) landed
+in `eggplan-core`, the downstream consumption and bridge-decision changes
+(C001, C003) landed in `eggplan-integrations` and `eggplan-codegg-compat`, the
+inspection and diagnostics changes (C002, C004) landed in `eggplan-repo` and
+`eggplan-cli`, and the tooling change (C005) landed in `scripts/` and the
+design record. No capability plan waited on any of them.
+
+The closure records carry one behavior change that a reader of this roadmap
+should know about: M003 C002 changed the `show` command's read path so that a
+subject capture failure is reported as `subject_unavailable` instead of
+returning a subjectless summary with no diagnostic. The plan's own §6 and §9.6
+conflicted with its §9.3 on this point; the acceptance criterion was followed
+and the conflict is recorded in the closure evidence rather than left implicit.
+
+
+
 ## 8. Cross-cutting requirements
 
 Persistence is local-first; no network. Paths are confined. Schema versions are

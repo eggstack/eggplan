@@ -71,6 +71,63 @@ enable deterministic stale / drift / capture-failure regressions inside
 change re-exports those types as public or reintroduces an alternate
 capture-injected finalizer.
 
+## Repository inspection read path
+
+`RepositoryStore::inspection_snapshot` is the only supported multi-plan read
+entry point. It captures the Git subject twice — once before the scan and once
+immediately before the shared lock is released — and it keeps two different
+failures apart, because they are not the same event:
+
+- **Drift.** Both captures succeeded and the two subjects disagree: the
+  subject really did change under the read. The read fails closed with
+  `RepoError::SubjectDrift`, which carries no payload because the diagnosis is
+  the whole message.
+- **Unavailability.** A capture could not be performed at all. The read fails
+  closed with `RepoError::InspectionSubject`, which carries the original
+  `GitSubjectError` as its error source, so the specific cause — a path
+  outside a Git worktree, a Git failure, a bound overflow — reaches the
+  caller.
+
+An unavailability at the *start* of the scan is reported as the capture failure
+it is. It is never reported as drift: a read that could not capture the
+subject at all cannot support a diagnosis of a subject that changed, and the
+original error is preserved through the standard error source chain rather
+than being discarded at the point of failure.
+
+A read that cannot capture the subject at *either* end of its scan degrades
+instead of failing. The snapshot is returned with no subject, and the cause of
+the start capture — the original point of failure — is recorded on the snapshot
+and readable through `InspectionSnapshot::subject_error`. Read commands surface
+that cause; see [CLI control surface](cli-control-surface.md).
+
+## Error taxonomy
+
+`RepoError` is the repository layer's complete error vocabulary, and it
+carries one invariant: every variant is constructed on a reachable path. A
+variant no caller can observe would weaken the taxonomy that the CLI maps onto
+diagnostic codes, so an unreachable variant is removed rather than kept. The
+variant set is pinned by an exhaustive match in
+`crates/eggplan-repo/tests/repository.rs`.
+
+## Cooperative lock and the accepted residual race
+
+The repository lock is a cooperative file lock in the state root. Both the
+exclusive write path and the shared read path refuse to open a lock path that
+is a symlink or not a regular file, but that check and the open are not atomic:
+`create(true)` follows symlinks, so a process that can write to the state root
+could replace the lock path in the interval between the check and the open.
+
+This residual race is accepted as defense-in-depth rather than closed. There is
+no portable no-follow open across Linux, macOS, and Windows with the current
+dependency set, and the state root is caller-owned: a caller that grants write
+access to the state root to an untrusted process has already granted that
+process the ability to write canonical state directly, so the lock is not the
+boundary that protects the store. The guard still refuses the common case — a
+lock path that already is a symlink or a directory — and the repository's
+integrity guarantees come from digest and closure-record validation rather than
+from the lock alone. The same statement is recorded in code at both lock sites
+in `eggplan-repo`.
+
 The store validates each managed path component with `symlink_metadata`,
 rejects symlinked roots/directories/plan files, uses PlanId's restricted
 alphabet for directory names, and stages writes in the destination directory.

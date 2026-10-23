@@ -620,4 +620,75 @@ mod tests {
             }
         }
     }
+
+    /// The struct-level injection paths above stop one level above the reason
+    /// enum. A reason element is persisted inside a closure record whose
+    /// content digest covers known fields only, so an injected key inside a
+    /// reason element must fail closed as well.
+    #[test]
+    fn closure_shapes_reject_unknown_fields_inside_assessment_reasons() {
+        let plan = closable_plan();
+        let mut closed = plan.clone();
+        closed.revision = 1;
+        closed.status = crate::PlanStatus::Closed;
+
+        let mut candidate = candidate(&plan);
+        candidate.assessment.reasons = vec![crate::AssessmentReason::PlanBlocked];
+        candidate.assessment.items[0].reasons = vec![crate::AssessmentReason::PlanNotActive];
+        candidate.assessment.items[0].criteria[0].reasons =
+            vec![crate::AssessmentReason::NoAcceptanceCriteria];
+        candidate.assessment.items[0].criteria[0].requirements[0].reasons =
+            vec![crate::AssessmentReason::MissingObservation];
+
+        let record = ClosureRecord::finalize(
+            ClosureId::new("epcl_unknown_reason").unwrap(),
+            candidate,
+            &closed,
+            2,
+        )
+        .unwrap();
+        assert!(record.validate(&closed).is_ok());
+        let value = serde_json::to_value(&record).unwrap();
+
+        for path in [
+            vec!["candidate", "assessment", "reasons", "0"],
+            vec!["candidate", "assessment", "items", "0", "reasons", "0"],
+            vec![
+                "candidate",
+                "assessment",
+                "items",
+                "0",
+                "criteria",
+                "0",
+                "reasons",
+                "0",
+            ],
+            vec![
+                "candidate",
+                "assessment",
+                "items",
+                "0",
+                "criteria",
+                "0",
+                "requirements",
+                "0",
+                "reasons",
+                "0",
+            ],
+        ] {
+            let mut tampered = value.clone();
+            inject_unknown_field(&mut tampered, &path);
+            assert!(
+                serde_json::from_value::<ClosureRecord>(tampered.clone()).is_err(),
+                "ClosureRecord accepted an injected field inside a reason at {path:?}"
+            );
+            assert!(
+                serde_json::from_value::<crate::PlanAssessment>(
+                    tampered["candidate"]["assessment"].clone()
+                )
+                .is_err(),
+                "PlanAssessment accepted an injected field inside a reason at {path:?}"
+            );
+        }
+    }
 }

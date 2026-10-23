@@ -77,6 +77,30 @@ observations to trusted proof. Current Git subject unavailability is explicit.
 closure transactions. The separate normal open path retains repository
 startup recovery semantics for mutation and explicit `check --recover-pending`.
 
+## Current-subject diagnostics
+
+The current Git subject can fail to be captured for two different reasons, and
+the CLI keeps them apart:
+
+- **Unavailability** — the subject could not be captured at all. The read path
+  reports it with the stable `subject_unavailable` diagnostic code and carries
+  the underlying capture cause in the message, matching the guarded closure
+  path that already reported `subject_unavailable` the same way. `show`
+  therefore fails with `subject_unavailable` instead of returning a
+  subjectless summary: a subjectless result is never presented as a complete
+  one.
+- **Drift** — the subject changed under the read. The repository layer reports
+  that as `RepoError::SubjectDrift`, and the CLI maps it to
+  `subject_drifted_during_inspection`.
+
+A read that could not capture the subject at either end of its scan degrades
+instead of failing: the read succeeds, the Plan is reported with the
+`unavailable` check state or without an assessment, and the CLI emits the
+`current_subject_unavailable` warning. The warning token is exactly
+`current_subject_unavailable`; the specific capture cause is appended to the
+warning text and never enters the reason-code list, so a consumer that keys on
+the token or on `reason_codes` is unaffected. The set of commands that warn and
+the number of warnings they emit are unchanged.
 
 ## M003b additions
 

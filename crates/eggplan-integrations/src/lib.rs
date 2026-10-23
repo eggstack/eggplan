@@ -315,15 +315,13 @@ pub fn finalize_observation(
     if !result.artifacts.is_empty() && !descriptor.capabilities.artifacts {
         return Err(SpiError::ArtifactsNotSupported);
     }
-    let execution_derived = matches!(
-        context.requested_kind,
-        EvidenceKind::Command
-            | EvidenceKind::Test
-            | EvidenceKind::StaticAnalysis
-            | EvidenceKind::DelegatedRun
-            | EvidenceKind::Benchmark
-    );
-    if execution_derived && context.verification_digest.is_none() {
+    // The execution-derived classification is owned by `eggplan-core`
+    // (`eggplan_core::is_execution_evidence`). This crate consumes the
+    // canonical predicate instead of re-deriving the kind set, so the SPI's
+    // verification-binding gate cannot drift from the domain rule.
+    if eggplan_core::is_execution_evidence(context.requested_kind)
+        && context.verification_digest.is_none()
+    {
         return Err(SpiError::MissingVerificationBinding);
     }
     if context.verification_digest.is_some() && !descriptor.capabilities.verification_binding {

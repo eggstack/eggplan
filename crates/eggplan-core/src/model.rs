@@ -213,7 +213,12 @@ impl AcceptanceCriterion {
                 ));
             }
             // Do not collapse semantically different constraints; exact duplicates are noise.
-            let key = serde_json::to_string(req).expect("serializable requirement");
+            // The requirement is serializable by construction, but validation runs on
+            // parsed input and must return a typed error rather than panic if that
+            // ever stops being true.
+            let key = serde_json::to_string(req).map_err(|_| {
+                ValidationError::Invalid("evidence requirement is not serializable")
+            })?;
             if !kinds.insert(key) {
                 return Err(ValidationError::Duplicate("evidence requirement"));
             }
@@ -594,6 +599,78 @@ mod tests {
             plan.items[0].criteria[0].requirements[0].expected_verification_digest =
                 Some(VerificationDigest::new(format!("sha256:{}", "c".repeat(64))).unwrap());
             assert!(plan.validate().is_ok(), "{kind:?} rejected with a binding");
+        }
+    }
+
+    /// `AcceptanceCriterion::validate` runs on every parsed Plan, so every
+    /// failure it can have must be a typed `ValidationError`. The duplicate
+    /// check used to serialize the requirement and `expect` the result; the
+    /// serialization step now reports through the same typed error surface.
+    #[test]
+    fn criterion_validation_reports_typed_errors_instead_of_panicking() {
+        let requirement = EvidenceRequirement {
+            description: "run the test".into(),
+            kind: EvidenceKind::Test,
+            provider: None,
+            subject_policy: SubjectPolicy::Exact,
+            cardinality: EvidenceCardinality::Any,
+            min_count: 1,
+            allow_human_judgment: false,
+            expected_verification_digest: None,
+        };
+        let mut criterion = AcceptanceCriterion {
+            id: CriterionId::new("epc_validate").unwrap(),
+            statement: "passes".into(),
+            human_judgment_allowed: false,
+            requirements: vec![requirement.clone()],
+        };
+
+        // An exact duplicate requirement is reported as a typed duplicate error.
+        criterion.requirements.push(requirement.clone());
+        assert_eq!(
+            criterion.validate().unwrap_err(),
+            ValidationError::Duplicate("evidence requirement")
+        );
+
+        // A human-judgment requirement without an explicit allowance is a typed
+        // invalid-value error.
+        criterion.requirements = vec![EvidenceRequirement {
+            kind: EvidenceKind::HumanJudgment,
+            allow_human_judgment: true,
+            ..requirement.clone()
+        }];
+        assert_eq!(
+            criterion.validate().unwrap_err(),
+            ValidationError::Invalid("criterion must explicitly allow human judgment")
+        );
+
+        // Over-bound text is a typed text error.
+        criterion.requirements = vec![requirement.clone()];
+        criterion.statement = "x".repeat(CRITERION_CHARS + 1);
+        assert!(matches!(
+            criterion.validate().unwrap_err(),
+            ValidationError::Text {
+                field: "criterion.statement",
+                ..
+            }
+        ));
+    }
+
+    /// The production half of this module must not contain a panic macro. The
+    /// scan stops at the `#[cfg(test)]` marker so the assertions below are not
+    /// matched by their own needles.
+    #[test]
+    fn production_validation_contains_no_panic_macro() {
+        let source = include_str!("model.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map(|(production, _)| production)
+            .unwrap_or(source);
+        for needle in [".expect(", "panic!(", "unreachable!("] {
+            assert!(
+                !production.contains(needle),
+                "eggplan-core production validation contains {needle}"
+            );
         }
     }
 }

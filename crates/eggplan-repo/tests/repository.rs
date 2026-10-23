@@ -4,10 +4,11 @@ use eggplan_core::{
     EvidenceObservationInput, EvidenceProviderId, EvidenceRequirement, EvidenceStatus, Plan,
     PlanId, PlanItem, PlanItemId, PlanItemStatus, PlanStatus, ProviderDescriptor,
     ProviderPolicyEntry, ProviderRegistry, SubjectPolicy, SubjectRevision, SubjectState,
-    VerificationDigest, assess_plan, bounds::MAX_OBSERVATIONS_PER_PLAN,
+    ValidationError, VerificationDigest, assess_plan, bounds::MAX_OBSERVATIONS_PER_PLAN,
 };
 use eggplan_repo::{
-    GitSubjectOptions, GitSubjectSource, PlanStore, RepoError, RepositoryStore, StoreOptions,
+    GitSubjectError, GitSubjectOptions, GitSubjectSource, InspectionSelection, PlanStore,
+    RepoError, RepositoryStore, StoreOptions,
 };
 use fs2::FileExt;
 use git2::{Repository, Signature};
@@ -1258,5 +1259,97 @@ fn historical_closure_subject_becomes_stale_after_worktree_change() {
             .subject,
         subject,
         "historical closure subject must not change",
+    );
+}
+
+/// C004: the `RepoError` taxonomy has an invariant — every variant is
+/// constructed on a reachable path. An exhaustive match pins the variant set:
+/// adding or removing a variant breaks this test, and a variant that no caller
+/// can observe cannot survive here.
+#[test]
+fn repo_error_variants_are_exhaustively_nameable() {
+    fn name(error: &RepoError) -> &'static str {
+        match error {
+            RepoError::Io(_) => "io",
+            RepoError::Validation(_) => "validation",
+            RepoError::Serialization(_) => "serialization",
+            RepoError::Config(_) => "config",
+            RepoError::AlreadyExists(_) => "already_exists",
+            RepoError::NotFound(_) => "not_found",
+            RepoError::Conflict { .. } => "conflict",
+            RepoError::InvalidUpdate => "invalid_update",
+            RepoError::InvalidTransition => "invalid_transition",
+            RepoError::GuardedClosureRequired => "guarded_closure_required",
+            RepoError::ClosedPlanImmutable(_) => "closed_plan_immutable",
+            RepoError::LockTimeout => "lock_timeout",
+            RepoError::DurabilityUnknown(_) => "durability_unknown",
+            RepoError::UnsafePath(_) => "unsafe_path",
+            RepoError::Corrupt { .. } => "corrupt",
+            RepoError::InvalidPlan { .. } => "invalid_plan",
+            RepoError::Evidence(_) => "evidence",
+            RepoError::ObservationConflict(_) => "observation_conflict",
+            RepoError::ObservationNotFound(_) => "observation_not_found",
+            RepoError::ObservationLimit => "observation_limit",
+            RepoError::RecoveryRequired(_) => "recovery_required",
+            RepoError::ClosureSubjectStale => "closure_subject_stale",
+            RepoError::ClosureSubjectDrift => "closure_subject_drift",
+            RepoError::ClosureSubjectCapture(_) => "closure_subject_capture",
+            RepoError::SubjectDrift => "subject_drift",
+            RepoError::InspectionSubject(_) => "inspection_subject",
+        }
+    }
+
+    let constructed: Vec<RepoError> = vec![
+        RepoError::NotFound(PlanId::new("ep_absent").unwrap()),
+        RepoError::AlreadyExists(PlanId::new("ep_present").unwrap()),
+        RepoError::Config("configuration is invalid".into()),
+        RepoError::SubjectDrift,
+        RepoError::InspectionSubject(GitSubjectError::NotGit("/absent/worktree".into())),
+        RepoError::Io(std::io::Error::other("fixture io failure")),
+        RepoError::Validation(ValidationError::Duplicate("item id")),
+    ];
+    let names: Vec<&'static str> = constructed.iter().map(name).collect();
+    assert_eq!(
+        names,
+        vec![
+            "not_found",
+            "already_exists",
+            "config",
+            "subject_drift",
+            "inspection_subject",
+            "io",
+            "validation",
+        ]
+    );
+    // Every constructed variant renders a message a caller can act on.
+    for error in &constructed {
+        assert!(
+            !error.to_string().is_empty(),
+            "every variant must render a message: {error:?}"
+        );
+    }
+}
+
+/// C002: the inspection snapshot's soft-unavailability path stays soft, and the
+/// snapshot records the *specific* capture cause so a read command can report
+/// it instead of only stating that the subject was unavailable.
+#[test]
+fn inspection_snapshot_records_the_capture_cause_when_the_subject_is_unavailable() {
+    let dir = tempdir().unwrap();
+    // The state root is not inside a Git worktree, so both captures fail.
+    let store = RepositoryStore::open(dir.path().join(".eggplan")).unwrap();
+    let snapshot = store
+        .inspection_snapshot(&InspectionSelection::Repository { retain: Some(10) })
+        .unwrap();
+    assert!(
+        snapshot.subject().is_none(),
+        "an unavailability must not invent a subject"
+    );
+    let cause = snapshot
+        .subject_error()
+        .expect("the soft path must record the capture cause");
+    assert!(
+        cause.contains("not inside a Git worktree"),
+        "the recorded cause must name the capture failure: {cause}"
     );
 }

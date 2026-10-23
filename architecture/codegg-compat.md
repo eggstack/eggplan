@@ -75,13 +75,45 @@ enforced rather than documented:
 |---|---|---|
 | Which native object a ref names (`TestJob`, `SchedulerJob`, `DelegatedRun`/`AgentRun`) | CodeGG | `CodeggEvidenceRef` kind in the snapshot DTO |
 | Deriving the verification digest from the authoritative execution specification | CodeGG host adapter | `VerificationDigest` equality check in `normalize_snapshot`; Eggplan only compares, never mints |
-| Requiring a binding for execution-derived kinds | Eggplan | `requires_verification_binding` gate; missing or mismatched binding fails the whole mapping closed |
+| Requiring a binding for execution-derived kinds | Eggplan | `requires_verification_binding` gate, which calls the canonical core predicate `eggplan_core::is_execution_evidence`; missing or mismatched binding fails the whole mapping closed |
 | Provider identity and class/trust policy | Eggplan `ProviderRegistry`, supplied by the host | `assess_plan`; `register_trusted` never appears in this crate's `src/` |
 | Artifact/Commit refs needing no execution binding | Eggplan | non-execution kinds bypass the binding gate and keep `expected_verification: None` |
 
 `Artifact` and `Commit` map to `Artifact`/`Revision` and are deliberately exempt:
 they are content/revision references, not executions, so a digest would be
 invented identity. The exemption is a kind allowlist, not a host assertion.
+The allowlist is not re-derived in this crate: the gate calls the canonical
+core predicate `eggplan_core::is_execution_evidence`, which owns the
+execution-derived classification for the whole workspace.
+
+## Outward projection contract: open by decision
+
+`CompatProjection` and `CompatItemSummary` are the bridge's *outward* contract
+types, consumed by the external `dbowm91/codegg` repository. They are
+deliberately **open** — forward-compatible — and do not carry
+`deny_unknown_fields`, unlike the crate's 15 other public contract structs. This
+is an explicit, recorded decision rather than an incidental omission:
+
+- These two types are consumed by a repository that cannot be coordinated from
+  this workspace. The crate's internal contract types remain strict.
+- The bridge is the producer of this contract, so it emits only the keys it
+  defines. Strictness on the read side would primarily constrain a downstream
+  consumer that may legitimately round-trip or extend the payload across
+  versions.
+- Unknown fields are not an extension point inside Eggplan's own persisted
+  schemas, which remain strict. This is an explicitly recorded exception
+  scoped to the bridge's outward projection contract.
+- The contract is versioned by `CompatProjection.schema_version`, so a consumer
+  that needs a new field can negotiate it rather than rely on lenient parsing.
+
+The decision is pinned by `crates/eggplan-codegg-compat/tests/contract_strictness.rs`,
+which asserts that both types accept a forward-compatible unknown key and that
+the crate's internal contract types still reject one.
+
+It remains an open coordination item for the external CodeGG repository: that
+consumer must treat the projection as forward-compatible and must not treat an
+unknown key as an error, while the bridge continues to emit only its own
+defined keys.
 
 
 ## Mapping contract

@@ -460,7 +460,7 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
                 .map_err(|error| repo_failure(&command, error, args.json))?;
             let (subject, assessment, closure, has_evidence) =
                 summary_context(&store, &plan, policy.as_ref(), &command, args.json)?;
-            let summary = summarize_plan(&plan, subject, assessment.as_ref(), closure);
+            let summary = summarize_plan(&plan, Some(subject), assessment.as_ref(), closure);
             let ready = readiness_projection(&plan);
             let items = ready.items;
             let data = PlanDetail {
@@ -627,6 +627,26 @@ fn empty_registry_warning() -> String {
     "assessment_uses_empty_provider_registry:no provider policy was supplied".into()
 }
 
+/// The warning a snapshot-driven read carries when it has no current subject.
+///
+/// The warning token stays exactly `current_subject_unavailable`, so a
+/// consumer that keys on the token is unaffected. `detail` is the existing
+/// per-plan suffix, and `cause` is the specific capture failure the snapshot
+/// recorded; the cause is appended as free text and never becomes part of a
+/// reason code.
+fn subject_unavailable_warning(detail: Option<&str>, cause: Option<&str>) -> String {
+    let mut warning = String::from("current_subject_unavailable");
+    if let Some(detail) = detail {
+        warning.push(':');
+        warning.push_str(detail);
+    }
+    if let Some(cause) = cause {
+        warning.push_str(": ");
+        warning.push_str(cause);
+    }
+    warning
+}
+
 fn assess_read(
     loaded: &LoadedPlanSnapshot,
     subject: Option<&SubjectRevision>,
@@ -722,7 +742,7 @@ fn status_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, Cli
         })
         .collect();
     if snapshot.subject().is_none() {
-        warnings.push("current_subject_unavailable".into());
+        warnings.push(subject_unavailable_warning(None, snapshot.subject_error()));
     } else if !args.options.contains_key("--provider-policy") {
         // Only worth saying when evidence could have changed the verdict. This
         // applies to the repository-wide read exactly as it does to an explicit
@@ -876,7 +896,7 @@ fn list_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFa
         })
         .collect();
     if snapshot.subject().is_none() {
-        warnings.push("current_subject_unavailable".into());
+        warnings.push(subject_unavailable_warning(None, snapshot.subject_error()));
     } else if !args.options.contains_key("--provider-policy")
         && plans.iter().any(|row| row.assessment_status.is_some())
     {
@@ -1071,7 +1091,10 @@ fn check_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliF
             };
             (state.to_string(), Some(assessment.status), codes)
         } else {
-            warnings.push(format!("current_subject_unavailable:{}", plan.id));
+            warnings.push(subject_unavailable_warning(
+                Some(plan.id.as_str()),
+                snapshot.subject_error(),
+            ));
             (
                 "unavailable".into(),
                 None,
@@ -1602,7 +1625,10 @@ fn registry_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, C
                 registry,
             )),
             None => {
-                warnings.push(format!("current_subject_unavailable:{}", loaded.plan().id));
+                warnings.push(subject_unavailable_warning(
+                    Some(loaded.plan().id.as_str()),
+                    snapshot.subject_error(),
+                ));
                 None
             }
         };
@@ -1628,19 +1654,27 @@ fn summary_context(
     policy: Option<&LoadedPolicy>,
     command: &str,
     json: bool,
-) -> Result<(Option<SubjectRevision>, Option<PlanAssessment>, bool, bool), CliFailure> {
+) -> Result<(SubjectRevision, Option<PlanAssessment>, bool, bool), CliFailure> {
     let closure = store
         .closure_record(&plan.id)
         .map_err(|error| repo_failure(command, error, json))?
         .is_some();
-    let current_subject = store.subject_source().capture().ok();
-    let mut has_evidence = false;
-    let assessment = if let Some(policy) = policy.filter(|_| current_subject.is_some()) {
+    // A capture failure is reported as the failure it is. The read path uses
+    // the same `subject_unavailable` diagnostic code and the same underlying
+    // message as the guarded closure path, so an operator sees one cause
+    // reported one way. Returning a subjectless summary instead would present
+    // an incomplete result as a complete one.
+    let current_subject = store
+        .subject_source()
+        .capture()
+        .map_err(|error| failure(command, "subject_unavailable", error.to_string(), json))?;
+    let has_evidence;
+    let assessment = if let Some(policy) = policy {
         let (assessment, _, observations, _) =
             compute_assessment(store, plan, policy, command, json)?;
         has_evidence = !observations.is_empty();
         Some(assessment)
-    } else if let Some(subject) = &current_subject {
+    } else {
         let observations = store
             .list_observations(&plan.id)
             .map_err(|error| repo_failure(command, error, json))?;
@@ -1652,12 +1686,10 @@ fn summary_context(
             .map_err(|message| failure(command, "corrupt_evidence", message, json))?;
         Some(assess_plan(
             plan,
-            subject,
+            &current_subject,
             &effective.into_iter().cloned().collect::<Vec<_>>(),
             &ProviderRegistry::default(),
         ))
-    } else {
-        None
     };
     Ok((current_subject, assessment, closure, has_evidence))
 }
@@ -2013,9 +2045,12 @@ fn repo_failure(command: &str, error: RepoError, json: bool) -> CliFailure {
             "subject_drifted_during_inspection",
             "git subject changed while the repository was being inspected".into(),
         ),
-        RepoError::InspectionSubject(_) => (
+        // The code is a public machine contract and stays exactly
+        // `subject_unavailable`; the message carries the specific cause so the
+        // operator learns *why* the subject could not be captured.
+        RepoError::InspectionSubject(error) => (
             "subject_unavailable",
-            "git subject could not be captured during repository inspection".into(),
+            format!("git subject could not be captured during repository inspection: {error}"),
         ),
         other => ("repository_error", other.to_string()),
     };

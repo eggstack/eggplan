@@ -42,11 +42,13 @@ Two further cases fail closed rather than guessing:
 | available | available, equal | snapshot returned |
 | available | available, different | `SubjectDrift` |
 | available | unavailable | `InspectionSubject` |
-| unavailable | available | `SubjectDrift` (the worktree appeared mid-scan) |
+| unavailable | available | `InspectionSubject` (the start capture failed; the read fails closed on the original capture failure, not on a drift diagnosis) |
 | unavailable | unavailable | snapshot with `subject: None`, `subject_error: Some(..)` |
 
 The last row is why `status` can still report `current_subject_unavailable`
-instead of failing outright. Every other row fails closed.
+instead of failing outright. Every other row fails closed. `SubjectDrift` is
+reserved for the one case it actually describes: both captures succeeded and
+disagreed.
 
 ### Locking portability
 
@@ -124,7 +126,7 @@ schema-v1 failure envelope:
 | `RepoError` | CLI code |
 |---|---|
 | `SubjectDrift` | `subject_drifted_during_inspection` |
-| `InspectionSubject(_)` | `subject_unavailable` |
+| `InspectionSubject(_)` | `subject_unavailable` (the message carries the underlying capture cause) |
 
 `RepoError::LockTimeout` already existed and maps to `lock_timeout`.
 `RecoveryRequired` maps to `recovery_required`, and `Corrupt`/`InvalidPlan`/

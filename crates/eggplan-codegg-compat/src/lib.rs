@@ -516,6 +516,16 @@ pub struct CodeggAssessmentBridgeResult {
     pub reason_codes: Vec<String>,
 }
 
+/// CodeGG-facing bounded display projection.
+///
+/// This is the bridge's *outward* contract, consumed by the external CodeGG
+/// repository, which cannot be coordinated from this workspace. It is
+/// deliberately **open**: unlike the crate's internal contract types, it does
+/// not carry `deny_unknown_fields`, so a downstream consumer may round-trip or
+/// extend the payload across versions. The emitted keys are still exactly the
+/// ones this crate defines, and the payload is versioned by
+/// `CompatProjection::schema_version`. The recorded decision and its
+/// rationale live in `architecture/codegg-compat.md`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompatProjection {
     pub schema_version: u32,
@@ -530,6 +540,11 @@ pub struct CompatProjection {
     pub items: Vec<CompatItemSummary>,
 }
 
+/// One bounded item row inside [`CompatProjection`].
+///
+/// Shares the projection's deliberately **open** contract: it accepts a
+/// forward-compatible unknown key. See [`CompatProjection`] and
+/// `architecture/codegg-compat.md`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompatItemSummary {
     pub id: String,
@@ -596,14 +611,11 @@ fn map_kind(kind: CodeggEvidenceKind) -> EvidenceKind {
 }
 
 fn requires_verification_binding(kind: EvidenceKind) -> bool {
-    matches!(
-        kind,
-        EvidenceKind::Command
-            | EvidenceKind::Test
-            | EvidenceKind::StaticAnalysis
-            | EvidenceKind::DelegatedRun
-            | EvidenceKind::Benchmark
-    )
+    // The execution-derived classification is owned by `eggplan-core`
+    // (`eggplan_core::is_execution_evidence`). This crate consumes the
+    // canonical predicate instead of re-deriving the kind set, so the bridge's
+    // binding gate cannot drift from the domain rule.
+    eggplan_core::is_execution_evidence(kind)
 }
 
 fn map_item_status(status: CodeggItemStatus) -> PlanItemStatus {

@@ -51,12 +51,17 @@ struct StoredPlan {
     plan: Plan,
 }
 
+/// Every failure the repository layer can report.
+///
+/// Invariant: every variant is constructed on a reachable path. A variant no
+/// caller can observe would weaken the taxonomy that the CLI maps onto
+/// diagnostic codes, so an unreachable variant is removed rather than kept.
+/// `crates/eggplan-repo/tests/repository.rs` pins the variant set with an
+/// exhaustive match.
 #[derive(Debug, Error)]
 pub enum RepoError {
     #[error("filesystem operation failed: {0}")]
     Io(#[from] std::io::Error),
-    #[error("plan validation or serialization failed: {0}")]
-    Domain(#[from] Box<dyn std::error::Error + Send + Sync>),
     #[error("domain validation failed: {0}")]
     Validation(#[from] ValidationError),
     #[error("JSON serialization failed: {0}")]
@@ -932,14 +937,22 @@ impl PlanStore for RepositoryStore {
         ensure_dir(&dir)?;
         let bytes = encode_plan(plan)?;
         if bytes.len() as u64 > MAX_PLAN_FILE_BYTES {
-            let _ = fs::remove_dir(&dir);
+            // Best-effort cleanup. The size refusal is the meaningful error the
+            // caller must see, so a failed directory removal is named,
+            // discarded, and deliberately does not replace the refusal.
+            let _cleanup = fs::remove_dir(&dir);
             return Err(RepoError::Config(
                 "plan exceeds 16 MiB storage limit".into(),
             ));
         }
         if let Err(error) = atomic_write(&self.plan_path(&plan.id), &bytes) {
             if !matches!(error, RepoError::DurabilityUnknown(_)) {
-                let _ = fs::remove_dir(&dir);
+                // A possibly-committed write must never be followed by a
+                // directory removal, so `DurabilityUnknown` is skipped here.
+                // For every other failure the write did not commit, and the
+                // empty directory is removed on a best-effort basis: the write
+                // error is the meaningful one and is returned unchanged.
+                let _cleanup = fs::remove_dir(&dir);
             }
             return Err(error);
         }
@@ -1151,8 +1164,11 @@ impl RepositoryStore {
         let subject_source = self.subject_source();
         let guard = crate::snapshot::acquire_shared_lock(&self.root, self.options.lock_timeout)?;
 
-        let subject_at_start =
-            crate::snapshot::capture_subject(&subject_source, &mut counters).ok();
+        // The start capture is carried as a `Result`, not an `Option`: the
+        // terminality contract in `snapshot::seal` must be able to report the
+        // capture failure that happened here rather than a diagnosis it cannot
+        // support.
+        let subject_at_start = crate::snapshot::capture_subject(&subject_source, &mut counters);
 
         // Enumerate without deep-loading: the deep load happens exactly once
         // per selected Plan below. Calling `PlanStore::list` here would decode
@@ -1340,12 +1356,23 @@ impl RepositoryStore {
 pub(crate) struct LockGuard(File);
 impl Drop for LockGuard {
     fn drop(&mut self) {
-        let _ = self.0.unlock();
+        // A destructor cannot report an error and the unlock result carries no
+        // recovery action: closing the handle releases the lock regardless.
+        // The result is named and discarded rather than silently dropped, so
+        // the intent is explicit.
+        let _unlock = self.0.unlock();
     }
 }
 
 pub(crate) fn acquire_lock(root: &Path, timeout: Duration) -> Result<LockGuard, RepoError> {
     let path = root.join(".lock");
+    // Accepted residual race, recorded as defense-in-depth. The symlink guard
+    // below is a check-then-use pair: `create(true)` follows symlinks, so a
+    // process that can write to the state root could replace the lock path
+    // between the check and the open. The state root is caller-owned, and there
+    // is no portable no-follow open across Linux, macOS, and Windows with the
+    // current dependency set, so the residual window is accepted rather than
+    // closed. See `architecture/repository.md`.
     if let Ok(meta) = fs::symlink_metadata(&path)
         && (meta.file_type().is_symlink() || !meta.is_file())
     {

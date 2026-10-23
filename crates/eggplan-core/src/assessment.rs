@@ -27,8 +27,19 @@ pub enum AssessmentStatus {
     InvalidOrStale,
 }
 
+/// Reason a requirement, criterion, item, or plan is not satisfied.
+///
+/// `deny_unknown_fields` matches the four assessment structs that hold this
+/// enum: an assessment is persisted inside a closure record whose content
+/// digest covers known fields only, so an injected key inside a reason element
+/// must fail closed rather than ride along outside the digest's coverage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "code", content = "detail", rename_all = "snake_case")]
+#[serde(
+    tag = "code",
+    content = "detail",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum AssessmentReason {
     MissingObservation,
     NoAcceptanceCriteria,
@@ -1142,5 +1153,60 @@ mod tests {
             assess_plan(&p, &current, &observations, &providers),
             assess_plan(&p, &current, &observations, &providers)
         );
+    }
+
+    /// Every `AssessmentReason` variant must survive a serialize → deserialize
+    /// round trip with `deny_unknown_fields` in force. The enum uses serde's
+    /// adjacently tagged representation, whose unit-variant handling is subtle
+    /// enough that the proof has to be empirical rather than assumed.
+    #[test]
+    fn every_assessment_reason_variant_round_trips_strictly() {
+        let observation_id = EvidenceObservationId::new("epe_reason").unwrap();
+        let provider_id = EvidenceProviderId::new("epp_reason").unwrap();
+        let variants = [
+            AssessmentReason::MissingObservation,
+            AssessmentReason::NoAcceptanceCriteria,
+            AssessmentReason::NoEvidenceRequirement,
+            AssessmentReason::HumanJudgmentRequired,
+            AssessmentReason::StaleSubject(observation_id.clone()),
+            AssessmentReason::UntrustedProvider(provider_id.clone()),
+            AssessmentReason::ProviderKindNotAllowed(provider_id.clone()),
+            AssessmentReason::ProviderMismatch(provider_id.clone()),
+            AssessmentReason::LegacyUnboundExecutionRequirement,
+            AssessmentReason::ObservationMissingVerificationBinding(observation_id.clone()),
+            AssessmentReason::VerificationDigestMismatch(observation_id.clone()),
+            AssessmentReason::EvidenceStatus(observation_id.clone(), EvidenceStatus::Passed),
+            AssessmentReason::HumanJudgmentNotAllowed,
+            AssessmentReason::InvalidObservation(observation_id.clone()),
+            AssessmentReason::DuplicateObservationId(observation_id.clone()),
+            AssessmentReason::PlanNotActive,
+            AssessmentReason::InvalidPlan,
+            AssessmentReason::ItemNotCompleted(PlanItemStatus::Completed),
+            AssessmentReason::PlanBlocked,
+            AssessmentReason::PlanCancelled,
+            AssessmentReason::NoPlanItems,
+        ];
+        assert_eq!(
+            variants.len(),
+            21,
+            "the variant list must cover every AssessmentReason variant"
+        );
+        for variant in variants {
+            let encoded = serde_json::to_string(&variant).unwrap();
+            let decoded: AssessmentReason = serde_json::from_str(&encoded)
+                .unwrap_or_else(|error| panic!("{variant:?} did not round-trip: {error}"));
+            assert_eq!(decoded, variant);
+
+            // The strict rule must reject an injected key inside the reason too.
+            let mut tampered: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+            tampered
+                .as_object_mut()
+                .expect("a reason serializes as an object")
+                .insert("future".into(), serde_json::json!(true));
+            assert!(
+                serde_json::from_value::<AssessmentReason>(tampered).is_err(),
+                "{variant:?} accepted an injected unknown field"
+            );
+        }
     }
 }

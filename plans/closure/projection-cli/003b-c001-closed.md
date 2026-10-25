@@ -8,8 +8,10 @@ Source roadmap: plans/subsystems/projection-cli-roadmap.md
 
 Reviewed baseline: `37ad290ca6b971a68d2871aedb39f4882f4eb2a8`.
 
-Implementation commit: to be recorded once the change is committed; the
-commit identifier is to be added to this record as a factual amendment after
+Implementation commit: `a60d36b` ("feat: complete the Projection/CLI line from
+the 2026-10-23 repository audit").
+
+This commit identifier was added to this record as a factual amendment after
 the fact, following the precedent of
 `plans/closure/evidence-closure/002-c004-closed.md`.
 

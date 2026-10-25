@@ -9,6 +9,29 @@ execute work, acquire evidence, or edit the development planning registry.
 - `init` creates or opens a local state root.
 - `new`, `activate`, and `item update` use strict Plan input or revisioned
   repository compare-and-swap.
+- `plan set-status PLAN_ID --to STATUS --expected-revision N` changes a plan's
+  lifecycle status. `--to` accepts `active`, `blocked`, or `cancelled`. `--to closed` is
+  refused with `guarded_closure_required` and a message pointing at `eggplan close`,
+  because only the guarded closure finalizer may write `Closed`; `--to draft` is refused
+  with `invalid_transition`; any other illegal move is `invalid_transition`; and a stale
+  revision is `revision_conflict`. Legality is decided by
+  `eggplan_core::plan_transition_allowed`, the same table the store consults, so the CLI
+  holds no per-command pre-state rule.
+- `plan edit PLAN_ID --input FILE --expected-revision N` replaces a plan's structure
+  with the Plan JSON in `FILE`, parsed by `eggplan_core::parse_plan` — the same strict
+  parser `new` uses, so unknown fields are rejected. The submitted plan's `id` must
+  match the target (a mismatch is `invalid_plan`), and the command cannot change the
+  plan's status: a differing submitted status is `invalid_transition`. A `Closed` plan
+  is `closed_plan_immutable`, a stale revision is `revision_conflict`, and malformed or
+  unknown-field-bearing input is also `invalid_plan`.
+- `plan export PLAN_ID [--output FILE]` writes the plan's canonical Plan JSON
+  (`eggplan_core::canonical_json`) to stdout or to the named file. It is exactly what
+  `plan edit` consumes, so the export/edit round trip uses one representation of a plan.
+- The `plan` family writes only through the repository's compare-and-swap, under the
+  store's lock, with the revision conflict check and the atomic write the store already
+  performs. It never creates evidence, enrolls a provider, captures a subject revision,
+  or writes a closure record; a structural edit cannot smuggle a `Closed` plan into
+  existence, and `markdown import` still creates only a Draft plan.
 - `show`, `status`, `ready`, and `graph` read canonical Plan state. Readiness
   comes from core dependency semantics; graph output is deterministic.
 - `evidence list|show|supersessions` reads immutable observation and correction
@@ -125,6 +148,29 @@ unless exact CLI JSON/error compatibility is proven first.
 `eggplan_cli::command_metadata()` exposes a read-only view of the table so a test can
 prove help is *derived* from it, and `metadata_drives_help_validation_and_completions_together`
 proves every declared option is accepted while an undeclared one still fails.
+
+### Shell completion depth
+
+The four completion generators reach the *same* depth, and the depth is stated rather
+than implied: the top-level command names; the subcommands of the command being
+completed; that command's options and flags, including the options scoped to one of
+its subcommands; and the fixed values of the option being completed, when that option
+declares a closed value set. `crates/eggplan-cli/src/commands.rs:530-531` records the depth
+as a constant that every generated script states in its own header.
+
+The generators are written from one per-command model — the `CompletionModel`
+(`crates/eggplan-cli/src/commands.rs:557-559`) — rather than from four hand-written fragments,
+so a shell cannot quietly consume less of the table than another. The CLI test
+`completion_scripts_reach_the_same_declared_depth_in_every_shell`
+(`crates/eggplan-cli/tests/batch_and_completions.rs:1555`) asserts the depth per shell
+by reading each script's candidate lists rather than by looking for a name in the
+script text; `completion_scripts_declare_no_unused_shell_variables`
+(`crates/eggplan-cli/tests/batch_and_completions.rs:1625`) asserts that no generated
+script declares a shell variable it never reads, which is the mechanism by which the
+earlier depth gap hid — the shell fragments are format strings, so an unused local is
+invisible to the Rust compiler. `completion_option_value_sets_match_the_metadata`
+(`crates/eggplan-cli/tests/batch_and_completions.rs:1665`) ties the closed value sets
+the scripts offer back to the ones the table declares.
 
 ### Compact plan projection
 

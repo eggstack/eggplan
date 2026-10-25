@@ -1,0 +1,22 @@
+{
+  "ordinary": {
+    "import_sha256": "sha256:13d34e65c4e6325abae3c8c82b199edb5c30c85c273bec9a06b1da0a7ffde926",
+    "render_sha256": "sha256:de5b40cb2b4727ccffa1e2e7c047d5d1f9a5814acafa067683b3fa8a5fe45473"
+  },
+  "ordinary-closure": {
+    "import_sha256": "sha256:13d34e65c4e6325abae3c8c82b199edb5c30c85c273bec9a06b1da0a7ffde926",
+    "render_sha256": "sha256:ac1532fe940cc156f52b488b1a996731aa3b82544eecbf39a433788b4ca48a0b"
+  },
+  "ordinary-native": {
+    "import_sha256": "sha256:83960cf21541b0763fd7942190db2437ba4aec38629d893a462d7d71caf299e7",
+    "render_sha256": "sha256:de5b40cb2b4727ccffa1e2e7c047d5d1f9a5814acafa067683b3fa8a5fe45473"
+  },
+  "corrective": {
+    "import_sha256": "sha256:3a67570ec3acc7ff1642c080a480f0ebcad129780999ecfe2d721e79c41ba7d2",
+    "render_sha256": "sha256:d25443e074d635e619f80c19541d051b07c1fcde1e025ece8adb4d0f816eb941"
+  },
+  "unmapped": {
+    "import_sha256": "sha256:45d1e24ab0f8097ce5c550ab1b1c2cfff2b9a6761d5a125fc025c331ab502796",
+    "render_sha256": "sha256:de643955c373899c91d42c33e69b673617cac5807ca52f203aa485abbbf77c6b"
+  }
+}

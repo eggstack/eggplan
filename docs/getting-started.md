@@ -35,7 +35,9 @@ git init && git add -A && git commit -m "init"
 ## Create a state root
 
 Canonical state lives in a **state root**, conventionally `.eggplan`, held outside version
-control. The path is never implicit — pass `--state-root` explicitly on every invocation.
+control. The path defaults to `.eggplan` **under the directory you happen to be in**, so pass
+`--state-root` explicitly on every invocation rather than relying on the default. The one
+exception is `markdown import`, which refuses the default and requires the flag.
 
 ```sh
 eggplan init --state-root .eggplan
@@ -112,11 +114,50 @@ eggplan item update ep_release epi_tests --state-root .eggplan \
   --expected-revision 2 --status in_progress
 ```
 
+At least one of `--status`, `--blocker`, and `--next-action` is required, and every field
+you supply is applied together in that one revision.
+
+### Moving the plan itself
+
+A plan moves along its own lifecycle: `draft → active ↔ blocked`, with `cancelled` and
+`closed` as the exits.
+
+```sh
+eggplan plan set-status ep_release --to blocked --state-root .eggplan \
+  --expected-revision 2
+# ep_release blocked at revision 3
+```
+
+`closed` is written only by `eggplan close`, which runs the guarded finalizer, so
+`--to closed` is refused. A move the transition table does not allow fails with
+`invalid_transition`.
+
+### Changing a plan's structure
+
+Export the plan's canonical Plan JSON, edit it, and hand it back:
+
+```sh
+eggplan plan export ep_release --output plan.json --state-root .eggplan
+# edit plan.json — the objective, items, dependencies, criteria, requirements
+eggplan plan edit ep_release --input plan.json --state-root .eggplan \
+  --expected-revision 3
+```
+
+`plan edit` changes structure only; it cannot change the plan's status. It goes through the
+same compare-and-swap as every other write, so the plan's bounds and the dependency graph's
+rules still apply. Export the plan again if its status changed in between — a submitted status
+that does not match the current one is refused.
+
 ## Mutations are revision-guarded
 
-Every mutating command requires `--expected-revision N`, which must match the plan's
-current revision. If someone else advanced the plan in between, the command fails instead
-of clobbering their work. Read the current revision with `show` or `status`.
+Every command that changes a plan that already exists requires `--expected-revision N`,
+which must match the plan's current revision. If someone else advanced the plan in between,
+the command fails instead of clobbering their work. Read the current revision with `show` or
+`status`.
+
+The two commands that *create* a plan — `new` and `markdown import` — take no
+`--expected-revision`, because they write revision 0 and there is no prior revision to
+compare against.
 
 Note that each successful mutation increments the revision, so the expected revision
 advances by one per command.

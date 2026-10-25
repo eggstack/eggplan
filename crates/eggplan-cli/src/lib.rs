@@ -41,7 +41,8 @@ use eggplan_core::{
     AssessmentStatus, ClosureCandidate, ClosureId, EvidenceKind, EvidenceObservation,
     EvidenceObservationId, EvidenceProviderId, EvidenceStatus, Plan, PlanAssessment, PlanId,
     PlanItemId, PlanStatus, ProviderDescriptor, ProviderPolicyEntry, ProviderRegistry,
-    SubjectRevision, assess_plan, effective_observations, parse_plan,
+    SubjectRevision, assess_plan, canonical_json, effective_observations, parse_plan,
+    plan_transition_allowed,
 };
 use eggplan_markdown::{ImportFormat, ImportReport};
 use eggplan_projection::{
@@ -212,6 +213,19 @@ struct MutationData {
 struct NewData {
     plan_id: PlanId,
     revision: u64,
+}
+
+/// The canonical Plan JSON a `plan export` produced.
+///
+/// The `plan` field is the plan itself rather than a rendered summary, so the
+/// exported bytes and the envelope describe the same plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PlanExportData {
+    plan_id: PlanId,
+    revision: u64,
+    plan: Plan,
+    output_file: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -513,6 +527,7 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
         "list" => list_command(&args, &state_root),
         "check" => check_command(&args, &state_root),
         "activate" => mutate_activate(&args, &state_root),
+        "plan" => plan_command(&args, &state_root),
         "item" => mutate_item(&args, &state_root),
         "evidence" => evidence_command(&args, &state_root),
         "assess" => assess_command(&args, &state_root),
@@ -1309,6 +1324,259 @@ fn mutate_activate(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, Cl
         Vec::new(),
         format!("{} active at revision {}", updated.id, updated.revision),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Plan lifecycle and structure editing (ADR-0005)
+// ---------------------------------------------------------------------------
+
+/// Dispatch the `plan` command family.
+///
+/// The three subcommands are deliberately separate surfaces: `set-status`
+/// performs lifecycle transitions, `edit` changes structure, and `export`
+/// produces the canonical Plan JSON that `edit` consumes.
+fn plan_command(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
+    match args.positional.first().map(String::as_str) {
+        Some("set-status") => plan_set_status(args, root),
+        Some("edit") => plan_edit(args, root),
+        Some("export") => plan_export(args, root),
+        _ => Err(failure(
+            "plan",
+            "usage",
+            "expected: plan set-status|edit|export PLAN_ID",
+            args.json,
+        )),
+    }
+}
+
+/// Set a plan's lifecycle status.
+///
+/// Legality is decided by `eggplan_core::plan_transition_allowed`, the same
+/// table the store consults. The CLI holds no per-command pre-state rule; it
+/// only reports what the core table says and adds the one rule that is not a
+/// transition at all: only the guarded finalizer may write `Closed`.
+fn plan_set_status(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
+    const COMMAND: &str = "plan set-status";
+    require_positions(args, 2, 2)?;
+    let expected = expected_revision(args)?;
+    let id = plan_id(&args.positional[1], COMMAND, args.json)?;
+    let target = parse_settable_plan_status(required_option(args, "--to")?, COMMAND, args.json)?;
+    let store =
+        RepositoryStore::open(root).map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    let mut plan = store
+        .get(&id)
+        .map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    if plan.revision != expected {
+        return Err(failure(
+            COMMAND,
+            "revision_conflict",
+            format!("expected revision {expected}, current {}", plan.revision),
+            args.json,
+        ));
+    }
+    if plan.status == PlanStatus::Closed {
+        return Err(failure(
+            COMMAND,
+            "closed_plan_immutable",
+            format!("plan {id} is Closed and cannot be modified"),
+            args.json,
+        ));
+    }
+    if !plan_transition_allowed(&plan.status, &target) {
+        return Err(failure(
+            COMMAND,
+            "invalid_transition",
+            format!(
+                "{} -> {} is not a legal plan transition",
+                plan_status_name(&plan.status),
+                plan_status_name(&target)
+            ),
+            args.json,
+        ));
+    }
+    plan.revision = plan
+        .revision
+        .checked_add(1)
+        .ok_or_else(|| failure(COMMAND, "invalid_update", "revision overflow", args.json))?;
+    plan.status = target;
+    let updated = store
+        .compare_and_swap(&id, expected, &plan)
+        .map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    let data = MutationData {
+        plan_id: updated.id.clone(),
+        revision: updated.revision,
+        status: updated.status.clone(),
+    };
+    success(
+        args,
+        data,
+        Vec::new(),
+        format!(
+            "{} {} at revision {}",
+            updated.id,
+            plan_status_name(&updated.status),
+            updated.revision
+        ),
+    )
+}
+
+/// Replace a plan's structure with the Plan JSON in `--input`.
+///
+/// The submitted plan is parsed with the same strict parser `new` uses, so
+/// unknown fields are rejected and the schema version is checked. The
+/// structural rules are not re-implemented here: `compare_and_swap` runs
+/// `Plan::validate`, the graph's bounds and acyclicity checks, the closed-plan
+/// immutability check, the guarded-closure requirement, and the item-status
+/// transition rules.
+fn plan_edit(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
+    const COMMAND: &str = "plan edit";
+    require_positions(args, 2, 2)?;
+    let expected = expected_revision(args)?;
+    let id = plan_id(&args.positional[1], COMMAND, args.json)?;
+    let input = required_option(args, "--input")?;
+    let bytes = read_bounded(Path::new(input), MAX_INPUT_BYTES, COMMAND, args.json)?;
+    let mut next = parse_plan(&bytes)
+        .map_err(|error| failure(COMMAND, "invalid_plan", error.to_string(), args.json))?;
+    if next.id != id {
+        return Err(failure(
+            COMMAND,
+            "invalid_plan",
+            format!(
+                "submitted plan id {} does not match the target plan {id}",
+                next.id
+            ),
+            args.json,
+        ));
+    }
+    let store =
+        RepositoryStore::open(root).map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    let current = store
+        .get(&id)
+        .map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    if current.revision != expected {
+        return Err(failure(
+            COMMAND,
+            "revision_conflict",
+            format!("expected revision {expected}, current {}", current.revision),
+            args.json,
+        ));
+    }
+    if next.status != current.status {
+        return Err(failure(
+            COMMAND,
+            "invalid_transition",
+            format!(
+                "plan edit cannot change the plan status ({} -> {}); use `eggplan plan set-status`",
+                plan_status_name(&current.status),
+                plan_status_name(&next.status)
+            ),
+            args.json,
+        ));
+    }
+    next.revision = expected
+        .checked_add(1)
+        .ok_or_else(|| failure(COMMAND, "invalid_update", "revision overflow", args.json))?;
+    let updated = store
+        .compare_and_swap(&id, expected, &next)
+        .map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    let data = MutationData {
+        plan_id: updated.id.clone(),
+        revision: updated.revision,
+        status: updated.status.clone(),
+    };
+    success(
+        args,
+        data,
+        Vec::new(),
+        format!("{} edited at revision {}", updated.id, updated.revision),
+    )
+}
+
+/// Write a plan's canonical Plan JSON.
+///
+/// The canonical bytes are what `plan edit` consumes, so the export and the
+/// edit round trip use exactly one representation of a plan.
+fn plan_export(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {
+    const COMMAND: &str = "plan export";
+    require_positions(args, 2, 2)?;
+    let id = plan_id(&args.positional[1], COMMAND, args.json)?;
+    let store =
+        RepositoryStore::open(root).map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    let plan = store
+        .get(&id)
+        .map_err(|error| repo_failure(COMMAND, error, args.json))?;
+    let bytes = canonical_json(&plan)
+        .map_err(|error| failure(COMMAND, "serialization", error.to_string(), args.json))?;
+    let output_file = args.options.get("--output").cloned();
+    if let Some(path) = &output_file {
+        fs::write(path, &bytes)
+            .map_err(|error| failure(COMMAND, "output_error", error.to_string(), args.json))?;
+    }
+    let human = if let Some(path) = &output_file {
+        format!("Wrote {path}")
+    } else {
+        String::from_utf8(bytes.clone()).unwrap_or_default()
+    };
+    let data = PlanExportData {
+        plan_id: plan.id.clone(),
+        revision: plan.revision,
+        plan,
+        output_file,
+    };
+    success(args, data, Vec::new(), human)
+}
+
+/// The canonical spelling of a plan status.
+///
+/// Exhaustive on purpose: adding a `PlanStatus` variant is a compile error
+/// here rather than a silently missing name in a diagnostic.
+fn plan_status_name(status: &PlanStatus) -> &'static str {
+    match status {
+        PlanStatus::Draft => "draft",
+        PlanStatus::Active => "active",
+        PlanStatus::Blocked => "blocked",
+        PlanStatus::Closed => "closed",
+        PlanStatus::Cancelled => "cancelled",
+    }
+}
+
+/// Parse the target status of `plan set-status`.
+///
+/// The settable set is narrower than the canonical status vocabulary, and each
+/// exclusion has a reason the caller is told directly: `Closed` is written
+/// only by the guarded closure finalizer, and no transition reaches `Draft`.
+/// Legality of the transition itself is decided by the core table, not here.
+fn parse_settable_plan_status(
+    raw: &str,
+    command: &str,
+    json: bool,
+) -> Result<PlanStatus, CliFailure> {
+    match raw {
+        "active" => Ok(PlanStatus::Active),
+        "blocked" => Ok(PlanStatus::Blocked),
+        "cancelled" => Ok(PlanStatus::Cancelled),
+        "closed" => Err(failure(
+            command,
+            "guarded_closure_required",
+            "Plans may only close through guarded closure; run `eggplan close`",
+            json,
+        )),
+        "draft" => Err(failure(
+            command,
+            "invalid_transition",
+            "a plan cannot return to Draft",
+            json,
+        )),
+        other => Err(failure(
+            command,
+            "usage",
+            format!(
+                "unknown plan status {other:?}; expected one of {}",
+                commands::SETTABLE_PLAN_STATUS_VALUES.join(", ")
+            ),
+            json,
+        )),
+    }
 }
 
 fn mutate_item(args: &ParsedArgs, root: &Path) -> Result<ExecutionResult, CliFailure> {

@@ -1209,6 +1209,329 @@ fn provider_ids_in_observations_never_self_authorize() {
 // completions
 // ---------------------------------------------------------------------------
 
+/// The closed value sets the command table declares, per command and option.
+///
+/// The public metadata view (`command_metadata`) exposes option *names* but
+/// not the value sets they accept, so the expectation is spelled out here.
+/// `completion_option_value_sets_match_the_metadata` ties it back to the
+/// command table.
+const EXPECTED_OPTION_VALUES: &[(&str, &str, &[&str])] = &[
+    (
+        "list",
+        "--status",
+        &["draft", "active", "blocked", "closed", "cancelled"],
+    ),
+    (
+        "item",
+        "--status",
+        &[
+            "pending",
+            "actionable",
+            "in_progress",
+            "blocked",
+            "completed",
+            "cancelled",
+        ],
+    ),
+    ("markdown", "--format", &["eggplan", "codegg", "auto"]),
+];
+
+/// The generated completion script for one shell.
+fn completion_script(shell: &str, root: &str) -> String {
+    let data = json_ok(&invoke(&[
+        "completions",
+        shell,
+        "--state-root",
+        root,
+        "--json",
+    ]));
+    data["data"]["script"].as_str().unwrap().to_string()
+}
+
+/// The names a generated script actually offers as completion candidates.
+///
+/// The check is structural, not textual. A script that merely *mentions* a
+/// name — in a variable it never reads, say — does not offer it, so the
+/// candidate lists are read the way each shell spells them.
+fn offered_names(shell: &str, script: &str) -> Vec<String> {
+    match shell {
+        "bash" | "zsh" => array_literal_names(script),
+        "fish" => fish_candidate_names(script),
+        "powershell" => powershell_array_names(script),
+        other => panic!("unknown shell {other}"),
+    }
+}
+
+/// The names in the array literals a Bash or Zsh script assigns.
+///
+/// A candidate list is spelled `name=(a b c)` or `name+=(a b c)`. A list that
+/// expands another variable offers no name of its own and is skipped.
+fn array_literal_names(script: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for line in script.lines() {
+        let trimmed = line.trim();
+        let mut search_from = 0;
+        while let Some(offset) = trimmed[search_from..].find("=(") {
+            let open = search_from + offset;
+            search_from = open + 2;
+            let head = &trimmed[..open];
+            let identifier = head
+                .rsplit(|c: char| !(c.is_alphanumeric() || c == '_'))
+                .next()
+                .unwrap_or("");
+            if identifier.is_empty() || identifier.starts_with(|c: char| c.is_ascii_digit()) {
+                continue;
+            }
+            let Some(close) = trimmed.rfind(')') else {
+                continue;
+            };
+            if close < open {
+                continue;
+            }
+            let body = &trimmed[open + 2..close];
+            if body.contains('$') {
+                continue;
+            }
+            names.extend(body.split_whitespace().map(|name| name.to_string()));
+        }
+    }
+    names
+}
+
+/// The names a Fish script offers, read from its `complete` statements.
+fn fish_candidate_names(script: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for line in script.lines() {
+        names.extend(quoted_values(line, "-a '"));
+        names.extend(quoted_values(line, "-l '"));
+    }
+    names
+}
+
+/// The whitespace-separated names inside every quoted value a marker opens.
+fn quoted_values(line: &str, marker: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut rest = line;
+    while let Some(start) = rest.find(marker) {
+        rest = &rest[start + marker.len()..];
+        match rest.find('\'') {
+            Some(end) => {
+                names.extend(rest[..end].split_whitespace().map(|name| name.to_string()));
+                rest = &rest[end + 1..];
+            }
+            None => break,
+        }
+    }
+    names
+}
+
+/// The names a PowerShell script offers, read from its array literals.
+fn powershell_array_names(script: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut rest = script;
+    while let Some(start) = rest.find("@(") {
+        rest = &rest[start + 2..];
+        match rest.find(')') {
+            Some(end) => {
+                let body = &rest[..end];
+                if !body.contains('$') {
+                    for part in body.split(',') {
+                        let name = part.trim().trim_matches('\'');
+                        if !name.is_empty() {
+                            names.push(name.to_string());
+                        }
+                    }
+                }
+                rest = &rest[end + 1..];
+            }
+            None => break,
+        }
+    }
+    names
+}
+
+/// How a shell spells an option name. Fish spells long options without the
+/// leading dashes.
+fn option_spelling(shell: &str, option: &str) -> String {
+    if shell == "fish" {
+        option.trim_start_matches("--").to_string()
+    } else {
+        option.to_string()
+    }
+}
+
+/// Every name the command table declares, in each spelling a shell may use.
+fn declared_names(metadata: &[eggplan_cli::CommandInfo]) -> Vec<String> {
+    let mut names = Vec::new();
+    for spec in metadata {
+        names.push(spec.name.to_string());
+        for subcommand in &spec.subcommands {
+            names.push(subcommand.to_string());
+        }
+        for option in spec.options.iter().chain(spec.flags.iter()) {
+            names.push(option.to_string());
+            names.push(option.trim_start_matches("--").to_string());
+        }
+    }
+    for (_, _, values) in EXPECTED_OPTION_VALUES {
+        for value in *values {
+            names.push(value.to_string());
+        }
+    }
+    names
+}
+
+/// The shell variables a script declares, in declaration order.
+fn declared_shell_variables(script: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for line in script.lines() {
+        let trimmed = line.trim();
+        let Some(rest) = trimmed
+            .strip_prefix("local -a ")
+            .or_else(|| trimmed.strip_prefix("local "))
+        else {
+            continue;
+        };
+        let mut chars = rest.chars().peekable();
+        loop {
+            while chars.peek().is_some_and(|c| c.is_whitespace()) {
+                chars.next();
+            }
+            let Some(&first) = chars.peek() else {
+                break;
+            };
+            if !(first.is_alphanumeric() || first == '_') {
+                break;
+            }
+            let mut name = String::new();
+            while let Some(&c) = chars.peek() {
+                if c.is_alphanumeric() || c == '_' {
+                    name.push(c);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            // An inline assignment carries a value, not another declared name.
+            if chars.peek() == Some(&'=') {
+                chars.next();
+                if chars.peek() == Some(&'"') {
+                    chars.next();
+                    for c in chars.by_ref() {
+                        if c == '"' {
+                            break;
+                        }
+                    }
+                }
+            }
+            names.push(name);
+        }
+    }
+    names
+}
+
+/// Whether a script reads a declared shell variable somewhere.
+///
+/// A declaration and a bare assignment do not count as a read: the name must
+/// appear in a position that consumes its value.
+fn shell_variable_is_read(script: &str, name: &str) -> bool {
+    script.lines().any(|line| {
+        let trimmed = line.trim();
+        if trimmed.starts_with("local ") {
+            return false;
+        }
+        let occurrences = identifier_tokens(line)
+            .iter()
+            .filter(|token| token.as_str() == name)
+            .count();
+        if occurrences == 0 {
+            return false;
+        }
+        if trimmed.starts_with(&format!("{name}=")) || trimmed.starts_with(&format!("{name}+=")) {
+            return occurrences > 1;
+        }
+        true
+    })
+}
+
+/// The identifier-like tokens of a line.
+fn identifier_tokens(text: &str) -> Vec<String> {
+    text.split(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .filter(|token| !token.is_empty())
+        .map(|token| token.to_string())
+        .collect()
+}
+
+/// The PowerShell variables a script assigns.
+///
+/// A parameter declaration is not an assignment, so the standard completer
+/// signature contributes nothing here.
+fn powershell_assigned_variables(script: &str) -> Vec<String> {
+    let characters: Vec<char> = script.chars().collect();
+    let mut names: Vec<String> = Vec::new();
+    let mut index = 0;
+    while index < characters.len() {
+        if characters[index] != '$' {
+            index += 1;
+            continue;
+        }
+        let mut cursor = index + 1;
+        let mut name = String::new();
+        while cursor < characters.len()
+            && (characters[cursor].is_alphanumeric() || characters[cursor] == '_')
+        {
+            name.push(characters[cursor]);
+            cursor += 1;
+        }
+        if name.is_empty() {
+            index += 1;
+            continue;
+        }
+        let mut after = cursor;
+        while after < characters.len() && characters[after].is_whitespace() {
+            after += 1;
+        }
+        let assigns = after < characters.len()
+            && characters[after] == '='
+            && !(after + 1 < characters.len() && characters[after + 1] == '=');
+        let adds = after + 1 < characters.len()
+            && characters[after] == '+'
+            && characters[after + 1] == '=';
+        if (assigns || adds) && !names.contains(&name) {
+            names.push(name);
+        }
+        index = cursor;
+    }
+    names
+}
+
+/// Whether a PowerShell script reads an assigned variable somewhere.
+fn powershell_variable_is_read(script: &str, name: &str) -> bool {
+    let needle = format!("${name}");
+    script.lines().any(|line| {
+        let mut rest = line;
+        while let Some(start) = rest.find(&needle) {
+            let before = &rest[..start];
+            let after = &rest[start + needle.len()..];
+            let suffix = after.chars().next();
+            if before.ends_with(|c: char| c.is_alphanumeric() || c == '_' || c == ':')
+                || suffix.is_some_and(|c| c.is_alphanumeric() || c == '_')
+            {
+                rest = after;
+                continue;
+            }
+            let trimmed = after.trim_start();
+            let assigns = trimmed.starts_with('=') && !trimmed.starts_with("==");
+            let adds = trimmed.starts_with("+=");
+            if !assigns && !adds {
+                return true;
+            }
+            rest = after;
+        }
+        false
+    })
+}
+
 #[test]
 fn completion_scripts_are_generated_for_all_four_shells() {
     let dir = tempdir().unwrap();
@@ -1225,17 +1548,158 @@ fn completion_scripts_are_generated_for_all_four_shells() {
         let script = data["data"]["script"].as_str().unwrap();
         assert!(!script.is_empty());
         assert_eq!(data["data"]["bytes"], script.len());
-        for command in ["status", "list", "check", "completions", "registry"] {
+    }
+}
+
+#[test]
+fn completion_scripts_reach_the_same_declared_depth_in_every_shell() {
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    let root = state(&dir);
+    let metadata = eggplan_cli::command_metadata();
+    assert!(!metadata.is_empty());
+    let declared = declared_names(&metadata);
+
+    for shell in ["bash", "zsh", "fish", "powershell"] {
+        let script = completion_script(shell, &root);
+        let offered = offered_names(shell, &script);
+        let offered: Vec<&str> = offered.iter().map(String::as_str).collect();
+
+        // Depth 1: every top-level command name.
+        for spec in &metadata {
             assert!(
-                script.contains(command),
-                "{shell} completion must mention {command}"
+                offered.contains(&spec.name),
+                "{shell} completion must offer the {} command",
+                spec.name
             );
         }
-        assert!(!script.contains("definitely-not-a-command"));
-        // fish spells long options without the leading dashes.
+
+        // Depth 2: every subcommand of every command that has subcommands.
+        for spec in &metadata {
+            for subcommand in &spec.subcommands {
+                assert!(
+                    offered.contains(subcommand),
+                    "{shell} completion must offer the {} subcommand of {}",
+                    subcommand,
+                    spec.name
+                );
+            }
+        }
+
+        // Depth 3: every option and flag of every command that has options.
+        for spec in &metadata {
+            for option in spec.options.iter().chain(spec.flags.iter()) {
+                let expected = option_spelling(shell, option);
+                assert!(
+                    offered.contains(&expected.as_str()),
+                    "{shell} completion must offer the {} option of {}",
+                    option,
+                    spec.name
+                );
+            }
+        }
+
+        // Depth 4: every fixed value of every option that declares values.
+        for (_, _, values) in EXPECTED_OPTION_VALUES {
+            for value in *values {
+                assert!(
+                    offered.contains(value),
+                    "{shell} completion must offer the {} option value",
+                    value
+                );
+            }
+        }
+
+        // The script offers only names the command table declares: it must
+        // not invent a command, option, or value.
+        for name in &offered {
+            assert!(
+                declared.iter().any(|candidate| candidate == name),
+                "{shell} completion offers {name}, which the command table does not declare"
+            );
+        }
+    }
+}
+
+#[test]
+fn completion_scripts_declare_no_unused_shell_variables() {
+    // The shell fragments are format strings, so an assigned-but-unused shell
+    // local is invisible to the Rust compiler. That is the mechanism by which
+    // the depth regression hid, so it is asserted directly on the generated
+    // Bash and Zsh scripts.
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+    let root = state(&dir);
+    for shell in ["bash", "zsh"] {
+        let script = completion_script(shell, &root);
+        let declared = declared_shell_variables(&script);
         assert!(
-            script.contains("--provider-policy") || script.contains("provider-policy"),
-            "{shell} completion must list options"
+            !declared.is_empty(),
+            "{shell} completion must declare shell variables"
+        );
+        for name in declared {
+            assert!(
+                shell_variable_is_read(&script, &name),
+                "{shell} completion declares {name} but never reads it"
+            );
+        }
+    }
+
+    // PowerShell spells its variables differently, but the defect is the same:
+    // an assigned variable nothing reads is a variable the script does not use.
+    let script = completion_script("powershell", &root);
+    let assigned = powershell_assigned_variables(&script);
+    assert!(
+        !assigned.is_empty(),
+        "powershell completion must assign variables"
+    );
+    for name in assigned {
+        assert!(
+            powershell_variable_is_read(&script, &name),
+            "powershell completion assigns ${name} but never reads it"
+        );
+    }
+}
+
+#[test]
+fn completion_option_value_sets_match_the_metadata() {
+    let dir = tempdir().unwrap();
+    clean_repo(&dir);
+
+    // `help COMMAND` renders the closed value sets the command table
+    // declares, so it ties the expectation above back to the table.
+    for (command, option, values) in EXPECTED_OPTION_VALUES {
+        let help = json_ok(&invoke(&["help", command, "--json"]));
+        let text = help["data"]["command"].as_str().unwrap();
+        if !text.contains(option) {
+            // A subcommand-scoped option is not rendered by `help`.
+            continue;
+        }
+        assert!(
+            text.contains(&format!("[{}]", values.join("|"))),
+            "{command} help must render the {option} value set {:?}",
+            values
+        );
+    }
+
+    // `--format` is scoped to a subcommand, so `help` does not render it. Its
+    // value set is cross-checked against the CLI's own usage message.
+    let sample = dir.path().join("sample.md");
+    fs::write(&sample, b"# sample\n").unwrap();
+    let sample = sample.to_string_lossy().to_string();
+    let failure = json_err(&invoke(&[
+        "markdown",
+        "inspect",
+        &sample,
+        "--format",
+        "definitely-not-a-format",
+        "--json",
+    ]));
+    let message = failure["error"]["message"].as_str().unwrap();
+    for value in ["eggplan", "codegg", "auto"] {
+        assert!(
+            message.contains(value),
+            "the --format usage message must name {value}: {message}"
         );
     }
 }

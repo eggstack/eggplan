@@ -8,6 +8,7 @@ ready ARG - ready-to-execute items
 graph ARG - dependency graph
 check [ARG] - read-only integrity and readiness check
 activate ARG - activate a draft plan
+plan SUBCOMMAND ARG - plan lifecycle and structure
 item SUBCOMMAND ARG ARG - update a plan item
 evidence SUBCOMMAND ARG - inspect the evidence ledger
 assess ARG - assess a plan against a policy

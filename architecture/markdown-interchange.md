@@ -52,13 +52,21 @@ is the identity when available; otherwise the document digest is used.
 
 ## Bounds and loss report
 
-Input is limited to 16 MiB, 20,000 lines, 64 KiB per line, 512 source-name
-characters, 256 sections, and
-Eggplan core's item/text/graph limits. NUL, invalid UTF-8, duplicate native
-payloads, malformed JSON, unsupported versions, ambiguous Objective or
-Acceptance Criteria sections, malformed references, and invalid canonical
-Plans are rejected. No links, includes, URLs, local files, or code fences are
-fetched or executed.
+Input is limited to 16 MiB, 20,000 lines, 64 KiB per line, 256 sections, and
+Eggplan core's item/text/graph limits. Imported source text is bounded to 512
+characters by one named bound: the caller's source name, the source `Status:`
+and `Repository baseline:` values copied into the loss report, and the titles of
+unmapped sections. A source name longer than the bound is rejected; the other
+three are truncated and mark the report as truncated. NUL, invalid UTF-8,
+duplicate native payloads, malformed JSON, unsupported versions, ambiguous
+Objective or Acceptance Criteria sections, malformed references, and invalid
+canonical Plans are rejected. No links, includes, URLs, local files, or code
+fences are fetched or executed.
+
+Format selection is total. An explicitly requested format is honoured as given,
+and `auto` resolves to exactly one reader — the native reader or the CodeGG
+subset reader — before parsing begins. Detection never reports a third outcome,
+so no input can reach an unhandled format, and no format request can panic.
 
 Every successful import returns an `ImportReport` schema version 1 with source
 format/name, source lifecycle/revision provenance, generated IDs, preserved

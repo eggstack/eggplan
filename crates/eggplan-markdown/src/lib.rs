@@ -17,6 +17,23 @@ pub const MAX_LINES: usize = 20_000;
 pub const MAX_LINE_BYTES: usize = 64 * 1024;
 pub const MAX_SECTIONS: usize = 256;
 
+/// Maximum characters retained from imported source metadata: the caller's
+/// source name, the source `Status:`/`Repository baseline:` values copied into
+/// the import report, and the titles of unmapped sections named in the loss
+/// report.
+///
+/// This is a distinct concept from `eggplan-core`'s field bounds: it bounds
+/// prose copied out of an untrusted document, not canonical schema fields.
+/// Every site that applies it references this constant, and the "one past the
+/// limit" probe is derived from it rather than written separately.
+const MAX_SOURCE_TEXT_CHARS: usize = 512;
+
+/// Per-entry byte allowance used by the pre-render payload size estimate.
+///
+/// This is an estimation allowance, not the imported-source text bound
+/// ([`MAX_SOURCE_TEXT_CHARS`]).
+const ESTIMATED_ENTRY_BYTES: usize = 512;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ImportFormat {
@@ -84,15 +101,38 @@ struct NativeItem {
     next_action: Option<String>,
 }
 
-pub fn detect_format(input: &[u8]) -> Result<ImportFormat, MarkdownError> {
+/// The concrete formats an import can resolve to.
+///
+/// [`ImportFormat::Auto`] is a *request* to detect a format, not a resolution,
+/// so it has no representation here. The import path resolves the request once,
+/// before dispatch, so the dispatch is total: the compiler rejects any future
+/// variant that cannot be imported rather than leaving a panic arm behind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResolvedFormat {
+    Eggplan,
+    Codegg,
+}
+
+/// Detect the concrete format of `input`.
+///
+/// This never reports `Auto`: an input is either a native Eggplan document or
+/// a document in the supported CodeGG subset.
+fn detect_resolved_format(input: &[u8]) -> Result<ResolvedFormat, MarkdownError> {
     check_input(input)?;
     let text =
         std::str::from_utf8(input).map_err(|_| MarkdownError("input is not UTF-8".into()))?;
     if native_marker_count(text) > 0 {
-        Ok(ImportFormat::Eggplan)
+        Ok(ResolvedFormat::Eggplan)
     } else {
-        Ok(ImportFormat::Codegg)
+        Ok(ResolvedFormat::Codegg)
     }
+}
+
+pub fn detect_format(input: &[u8]) -> Result<ImportFormat, MarkdownError> {
+    Ok(match detect_resolved_format(input)? {
+        ResolvedFormat::Eggplan => ImportFormat::Eggplan,
+        ResolvedFormat::Codegg => ImportFormat::Codegg,
+    })
 }
 
 pub fn import(
@@ -101,19 +141,23 @@ pub fn import(
     source_name: Option<&str>,
 ) -> Result<ImportedPlan, MarkdownError> {
     check_input(input)?;
-    if source_name.is_some_and(|name| name.chars().take(513).count() > 512) {
-        return Err(MarkdownError("source name exceeds 512 characters".into()));
+    if source_name.is_some_and(exceeds_source_text_bound) {
+        return Err(MarkdownError(format!(
+            "source name exceeds {MAX_SOURCE_TEXT_CHARS} characters"
+        )));
     }
     let text =
         std::str::from_utf8(input).map_err(|_| MarkdownError("input is not UTF-8".into()))?;
+    // Resolve the requested format once, into a value that cannot be `Auto`,
+    // so the dispatch below is total and no panic arm is reachable from input.
     let format = match format {
-        ImportFormat::Auto => detect_format(input)?,
-        explicit => explicit,
+        ImportFormat::Auto => detect_resolved_format(input)?,
+        ImportFormat::Eggplan => ResolvedFormat::Eggplan,
+        ImportFormat::Codegg => ResolvedFormat::Codegg,
     };
     match format {
-        ImportFormat::Auto => unreachable!(),
-        ImportFormat::Eggplan => import_native(text, source_name),
-        ImportFormat::Codegg => import_codegg(text, source_name),
+        ResolvedFormat::Eggplan => import_native(text, source_name),
+        ResolvedFormat::Codegg => import_codegg(text, source_name),
     }
 }
 
@@ -386,7 +430,10 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
             package_current = None;
             continue;
         }
-        if current.is_none() {
+        // Before the first `## ` section, only the leading metadata block is
+        // read. The `let ... else` binds the open section index for the rest
+        // of the body, so the import path never unwraps an `Option` on input.
+        let Some(current) = current else {
             if let Some(value) = line.strip_prefix("Status:") {
                 let value = value.trim().to_string();
                 if status.as_ref().is_some_and(|previous| previous != &value) {
@@ -404,8 +451,8 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
                 revision = Some(value);
             }
             continue;
-        }
-        let section = &mut sections[current.unwrap()];
+        };
+        let section = &mut sections[current];
         if is_work_package_section(&section.title) && line.starts_with("### Work package ") {
             if packages_raw.len() >= bounds::MAX_ITEMS {
                 return Err(MarkdownError(
@@ -515,7 +562,8 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
         } else {
             package.body.join("\n").trim().to_string()
         };
-        let description = truncate_chars(&text, bounds::DESCRIPTION_CHARS, &mut truncated);
+        let (description, description_truncated) = truncate_chars(&text, bounds::DESCRIPTION_CHARS);
+        truncated |= description_truncated;
         items.push(PlanItem {
             id: package.id.clone(),
             position: index as u32,
@@ -558,7 +606,8 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
         } else {
             (None, statement)
         };
-        let bounded = truncate_chars(&statement, bounds::CRITERION_CHARS, &mut truncated);
+        let (bounded, statement_truncated) = truncate_chars(&statement, bounds::CRITERION_CHARS);
+        truncated |= statement_truncated;
         let id = eggplan_core::CriterionId::new(format!(
             "epc_md_{}",
             short_hash(&format!("{identity}\0acceptance\0{index}\0{bounded}"))
@@ -612,36 +661,34 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
             next_action: None,
         });
     }
-    let mut plan = Plan::new(
-        plan_id.clone(),
-        truncate_chars(&objective, bounds::OBJECTIVE_CHARS, &mut truncated),
-        items,
-    )
-    .map_err(|e| MarkdownError(format!("imported plan is invalid: {e}")))?;
+    let (objective, objective_truncated) = truncate_chars(&objective, bounds::OBJECTIVE_CHARS);
+    truncated |= objective_truncated;
+    let mut plan = Plan::new(plan_id.clone(), objective, items)
+        .map_err(|e| MarkdownError(format!("imported plan is invalid: {e}")))?;
     let mut report = report_base("codegg", None, source_name, plan_id);
     report.original_source_status = status.as_ref().map(|value| {
-        if value.chars().count() > 512 {
+        if exceeds_source_text_bound(value) {
             truncated = true;
         }
-        value.chars().take(512).collect()
+        value.chars().take(MAX_SOURCE_TEXT_CHARS).collect()
     });
     report.original_source_revision = revision.as_ref().map(|value| {
-        if value.chars().count() > 512 {
+        if exceeds_source_text_bound(value) {
             truncated = true;
         }
-        value.chars().take(512).collect()
+        value.chars().take(MAX_SOURCE_TEXT_CHARS).collect()
     });
     if let Some(value) = status.as_deref() {
-        plan.provenance.insert(
-            "markdown_source_status".into(),
-            truncate_chars(value, bounds::PROVENANCE_CHARS, &mut truncated),
-        );
+        let (status_value, status_truncated) = truncate_chars(value, bounds::PROVENANCE_CHARS);
+        truncated |= status_truncated;
+        plan.provenance
+            .insert("markdown_source_status".into(), status_value);
     }
     if let Some(value) = revision.as_deref() {
-        plan.provenance.insert(
-            "markdown_source_revision".into(),
-            truncate_chars(value, bounds::PROVENANCE_CHARS, &mut truncated),
-        );
+        let (revision_value, revision_truncated) = truncate_chars(value, bounds::PROVENANCE_CHARS);
+        truncated |= revision_truncated;
+        plan.provenance
+            .insert("markdown_source_revision".into(), revision_value);
     }
     report.generated_ids = generated;
     report.preserved_fields = vec![
@@ -689,12 +736,12 @@ fn import_codegg(text: &str, source_name: Option<&str>) -> Result<ImportedPlan, 
         if is_work_package_section(&section.title) || is_acceptance_section(&section.title) {
             continue;
         }
-        if section.title.chars().count() > 512 {
+        if exceeds_source_text_bound(&section.title) {
             truncated = true;
         }
         report
             .dropped_fields
-            .push(section.title.chars().take(512).collect());
+            .push(section.title.chars().take(MAX_SOURCE_TEXT_CHARS).collect());
         report.warning_codes.push("unmapped_section".into());
     }
     if saw_code_fence {
@@ -830,7 +877,7 @@ fn estimated_payload_size(plan: &Plan) -> usize {
     add_text(&mut size, plan.id.as_str());
     add_text(&mut size, &plan.objective);
     for item in &plan.items {
-        size = size.saturating_add(512);
+        size = size.saturating_add(ESTIMATED_ENTRY_BYTES);
         add_text(&mut size, item.id.as_str());
         add_text(&mut size, &item.description);
         if let Some(blocker) = &item.blocker {
@@ -846,11 +893,11 @@ fn estimated_payload_size(plan: &Plan) -> usize {
             add_text(&mut size, parent.as_str());
         }
         for criterion in &item.criteria {
-            size = size.saturating_add(512);
+            size = size.saturating_add(ESTIMATED_ENTRY_BYTES);
             add_text(&mut size, criterion.id.as_str());
             add_text(&mut size, &criterion.statement);
             for requirement in &criterion.requirements {
-                size = size.saturating_add(512);
+                size = size.saturating_add(ESTIMATED_ENTRY_BYTES);
                 add_text(&mut size, &requirement.description);
                 if let Some(provider) = &requirement.provider {
                     add_text(&mut size, provider.as_str());
@@ -874,7 +921,7 @@ fn report_base(
         schema_version: 1,
         source_format: format.into(),
         source_version: version,
-        source_name: source_name.map(|s| s.chars().take(512).collect()),
+        source_name: source_name.map(|s| s.chars().take(MAX_SOURCE_TEXT_CHARS).collect()),
         plan_id,
         original_source_status: None,
         original_source_revision: None,
@@ -883,7 +930,7 @@ fn report_base(
         dropped_fields: Vec::new(),
         lossy_mappings: Vec::new(),
         warning_codes: Vec::new(),
-        truncated: source_name.is_some_and(|s| s.chars().take(513).count() > 512),
+        truncated: source_name.is_some_and(exceeds_source_text_bound),
     }
 }
 
@@ -978,23 +1025,49 @@ fn normalize_label(value: &str) -> String {
     value.trim().trim_matches('`').to_ascii_lowercase()
 }
 
+/// Derive a short identity suffix from `value`.
+///
+/// The result is a bare 24-character hex prefix of a SHA-256 digest. It is
+/// deliberately **not** a canonical `sha256:<64 hex>` digest — the form
+/// `eggplan_core::digest_json` produces — and is never used as one. It exists
+/// only to derive imported plan, item, and criterion identities.
 fn short_hash(value: &str) -> String {
     sha256(value.as_bytes())[..24].to_string()
 }
+
+/// Bare lowercase hex SHA-256 of `value`.
+///
+/// This is the raw digest rendered in hex, not the canonical `sha256:<hex>`
+/// digest form; see [`short_hash`].
 fn sha256(value: &[u8]) -> String {
     format!("{:x}", Sha256::digest(value))
 }
 
-fn truncate_chars(value: &str, max: usize, truncated: &mut bool) -> String {
+/// True when `value` carries more characters than the imported-source text
+/// bound allows.
+///
+/// The "one past the limit" probe is derived from the bound itself, so the
+/// bound and its probe cannot drift apart.
+fn exceeds_source_text_bound(value: &str) -> bool {
+    value.chars().take(MAX_SOURCE_TEXT_CHARS + 1).count() > MAX_SOURCE_TEXT_CHARS
+}
+
+/// Truncate `value` to at most `max` characters, returning the bounded text
+/// and whether characters were dropped.
+///
+/// The return shape matches `eggplan-projection`'s `truncate` helper
+/// (`crates/eggplan-projection/src/lib.rs:478-482`) so a reader moving
+/// between the two crates does not have to translate between them. Unlike that
+/// helper, an all-whitespace result is replaced with `"Imported text"`,
+/// because an imported field must never be blank.
+fn truncate_chars(value: &str, max: usize) -> (String, bool) {
     let mut chars = value.chars();
     let output: String = chars.by_ref().take(max).collect();
-    if chars.next().is_some() {
-        *truncated = true;
-    }
+    let truncated = chars.next().is_some();
     if output.trim().is_empty() {
-        "Imported text".into()
+        ("Imported text".into(), truncated)
     } else {
-        output
+        (output, truncated)
     }
 }
 
@@ -1345,5 +1418,53 @@ mod tests {
     fn bounds_and_nul_are_rejected() {
         assert!(import(b"# x\0", ImportFormat::Auto, None).is_err());
         assert!(import(&vec![b'x'; MAX_INPUT_BYTES + 1], ImportFormat::Auto, None).is_err());
+    }
+
+    /// Pins the imported-source text bound to 512 characters. The constant is
+    /// the single owner of that bound; this test fails if its value drifts.
+    #[test]
+    fn imported_source_text_bound_is_512_characters() {
+        assert_eq!(MAX_SOURCE_TEXT_CHARS, 512);
+        assert_eq!(ESTIMATED_ENTRY_BYTES, 512);
+    }
+
+    /// The "one past the limit" probe is derived from the bound, so it can
+    /// never drift away from it.
+    #[test]
+    fn source_text_bound_probe_is_derived_from_the_bound() {
+        let at_limit = "n".repeat(MAX_SOURCE_TEXT_CHARS);
+        let over_limit = "n".repeat(MAX_SOURCE_TEXT_CHARS + 1);
+        assert!(!exceeds_source_text_bound(&at_limit));
+        assert!(exceeds_source_text_bound(&over_limit));
+    }
+
+    /// The report-side source-name bound is a defensive site: `import` rejects
+    /// an over-limit source name before it reaches `report_base`, so the site
+    /// is exercised here directly.
+    #[test]
+    fn report_base_bounds_the_source_name_and_marks_truncation() {
+        let plan_id = PlanId::new("ep_md_bound_hygiene").unwrap();
+        let at_limit = "n".repeat(MAX_SOURCE_TEXT_CHARS);
+        let report = report_base("codegg", None, Some(&at_limit), plan_id.clone());
+        assert_eq!(report.source_name.as_deref(), Some(at_limit.as_str()));
+        assert!(!report.truncated);
+
+        let over_limit = "n".repeat(MAX_SOURCE_TEXT_CHARS + 1);
+        let report = report_base("codegg", None, Some(&over_limit), plan_id);
+        assert_eq!(
+            report.source_name.as_deref(),
+            Some(&over_limit[..MAX_SOURCE_TEXT_CHARS])
+        );
+        assert!(report.truncated);
+    }
+
+    #[test]
+    fn truncate_chars_returns_the_bounded_text_and_whether_it_truncated() {
+        assert_eq!(truncate_chars("abc", 5), ("abc".to_string(), false));
+        assert_eq!(truncate_chars("abcdef", 3), ("abc".to_string(), true));
+        assert_eq!(
+            truncate_chars("   ", 3),
+            ("Imported text".to_string(), false)
+        );
     }
 }

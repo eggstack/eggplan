@@ -1,6 +1,6 @@
 # Projection/CLI M004 — Plan Lifecycle Transitions and Plan Structure Editing
 
-Status: proposed
+Status: closed (see plans/closure/projection-cli/004-closed.md)
 
 Repository baseline: 37ad290ca6b971a68d2871aedb39f4882f4eb2a8
 
@@ -14,7 +14,7 @@ Long-term requirements:
 - plans/000-long-term-specification.md lifecycle at :199-205
 - plans/001-terminology-and-domain-model.md
 
-Related ADRs: ADR-0002.
+Related ADRs: ADR-0002 and ADR-0005.
 
 Predecessor plan/closure:
 
@@ -44,14 +44,15 @@ who follows the specification:
   edit the objective. The only route to restructuring a plan is to hand-edit
   the canonical JSON in the state root.
 
-This milestone is **proposed**, not ready. The two capabilities above need
-product decisions that the repository's planning hierarchy places above this
-plan: the exact command surface, whether plan-structure editing is a
-first-class command set or a single general-purpose editor, and whether the
-`Blocked → Closed` transition the specification's lifecycle diagram implies is
-in scope. Those decisions are recorded as open in §4. This plan documents the
-gap, the constraints, and the shape of a solution so that the decisions can
-be made against a concrete analysis rather than in the abstract.
+This milestone was raised as **proposed**, not ready, because the two
+capabilities above needed product decisions that the repository's planning
+hierarchy places above this plan: the exact command surface, whether plan-structure
+editing is a first-class command set or a single general-purpose editor, and whether
+the `Blocked → Closed` transition the specification's lifecycle diagram implies is
+in scope. Those decisions were taken and are recorded in §4 and in
+`plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md`.
+The plan now records the chosen surface so that implementation proceeds against
+a concrete decision rather than an abstract one.
 
 ## 2. Finding
 
@@ -67,7 +68,7 @@ be made against a concrete analysis rather than in the abstract.
     Exact transitions may be refined by ADR, but terminal states MUST fail
     closed on ordinary mutation.
 
-The domain implements it in `crates/eggplan-core/src/model.rs:391-403`:
+The domain implements it in `crates/eggplan-core/src/model.rs:396-409`:
 
     pub fn plan_transition_allowed(from: &PlanStatus, to: &PlanStatus) -> bool {
         use PlanStatus::*;
@@ -87,25 +88,25 @@ Eight legal transitions. The CLI reaches one of them.
 
 | CLI path | Plan status effect | Location |
 |---|---|---|
-| `new --input PLAN.json` | requires `revision == 0` and `status == Draft`; the created plan is Draft | `crates/eggplan-cli/src/lib.rs:423-430` |
-| `activate PLAN_ID` | writes `PlanStatus::Active` only | `crates/eggplan-cli/src/lib.rs:1274` |
-| `item update PLAN_ID ITEM_ID` | mutates the item only; never touches `plan.status` | `crates/eggplan-cli/src/lib.rs:1291-1379` |
+| `new --input PLAN.json` | requires `revision == 0` and `status == Draft`; the created plan is Draft | `crates/eggplan-cli/src/lib.rs:437` |
+| `activate PLAN_ID` | writes `PlanStatus::Active` only | `crates/eggplan-cli/src/lib.rs:1312` |
+| `item update PLAN_ID ITEM_ID` | mutates the item only; never touches `plan.status` | `crates/eggplan-cli/src/lib.rs:1582-1670` |
 | `close PLAN_ID` | the guarded finalizer writes `Closed` | `crates/eggplan-cli/src/lib.rs`, closure path |
-| `markdown import FILE` | creates one Draft plan | `crates/eggplan-cli/src/lib.rs:1156-1163` |
+| `markdown import FILE` | creates one Draft plan | `crates/eggplan-cli/src/lib.rs:1192-1281` |
 
 There is no command that writes `PlanStatus::Blocked` or
 `PlanStatus::Cancelled`. The consequences:
 
 - `activate` accepts a `Blocked` plan as a valid pre-state
-  (`crates/eggplan-cli/src/lib.rs:1262`), but nothing can produce one, so
+  (`crates/eggplan-cli/src/lib.rs:1298-1311`), but nothing can produce one, so
   that branch of the guard is dead;
 - `list --status blocked` and `list --status cancelled` are accepted filters
-  (`crates/eggplan-cli/src/commands.rs:185`) that can never match a row;
+  (`crates/eggplan-cli/src/commands.rs:208`) that can never match a row;
 - `check` can report a `blocked` check state
-  (`docs/cli-reference.md:205`), but for a plan status that no CLI-created
+  (`docs/cli-reference.md:309`), but for a plan status that no CLI-created
   plan can hold;
-- `docs/cli-reference.md:152-153` documents "`closed` and `cancelled` are
-  terminal", describing a transition the CLI cannot perform;
+- `docs/cli-reference.md:202` documents "`closed`, `cancelled` | terminal —
+  no transitions", describing a transition the CLI cannot perform;
 - the domain table has no `(Blocked, Closed)` row, so a blocked plan can only
   be closed by first re-activating it. The specification's diagram places
   `-> Closed` after the `Active <-> Blocked` pair, which reads as permitting
@@ -124,7 +125,7 @@ completion criterion:
     A human or agent can inspect and update planning/evidence state without
     direct file surgery, while canonical authority remains explicit.
 
-The command inventory is `crates/eggplan-cli/src/commands.rs:187-360`. It
+The command inventory is `crates/eggplan-cli/src/commands.rs:210-396`. It
 contains four mutators:
 
 - `new` — creates a plan from strict Plan JSON
@@ -198,72 +199,88 @@ Required behavior after this milestone, subject to the decisions in §4:
 - the JSON envelope stays schema version 1, or a versioned change is made
   deliberately with a migration note.
 
-## 4. Open decisions — why this plan is proposed, not ready
+## 4. Decisions — taken and recorded in ADR-0005
 
 These decisions are not made here, because each changes the product surface
 and belongs to the roadmap and the specification, not to an implementation
-plan.
+plan. They were taken, and `plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md`
+records them with their drivers and their rejected alternatives. The summary
+below binds this plan to that decision record.
 
-**D1 — the command surface for lifecycle transitions.** Options:
+**D1 — the command surface for lifecycle transitions. DECIDED: a `plan`
+command family.** The CLI gains `eggplan plan set-status PLAN_ID --to STATUS
+--expected-revision N`, alongside `eggplan plan edit PLAN_ID --input FILE
+--expected-revision N` and `eggplan plan export PLAN_ID [--output FILE]`. The
+core transition table decides legality, so no status rules live in the CLI.
+`eggplan activate` is unchanged and remains the documented `Draft → Active`
+shorthand. `--to closed` is refused with a message directing the caller to
+`eggplan close`, because only the guarded finalizer may write `Closed`.
 
-1. extend `activate` into a general `plan status` command that takes the
-   target status and lets the core's transition table decide legality;
-2. add explicit `plan block` and `plan cancel` commands;
-3. add no command and amend the specification to state that Eggplan's CLI
-   exposes only `Draft → Active → Closed`.
+Option 3 (no command, amend the specification to expose only
+`Draft → Active → Closed`) was considered explicitly and rejected; it would
+leave two `list` filters permanently dead and narrow the specification to
+accommodate a missing adapter.
 
-Option 3 is a real option and must be decided explicitly, not by omission.
-It would require an ADR and an amendment to the roadmap's completion
-criterion.
+**D2 — whether `Blocked → Closed` is legal. DECIDED: legal.** The
+specification's diagram is authoritative, and no ADR had refined it. The
+domain table gains the `(Blocked, Closed)` row so the two agree. `close` on a
+`Blocked` plan stays legal, which is what the guarded finalizer already does
+today because it never consults the transition table. The store's
+guarded-closure requirement is unaffected: a compare-and-swap that would set
+`Closed` is still refused.
 
-**D2 — whether `Blocked → Closed` is legal.** The domain table does not
-permit it; the specification's diagram reads as if it does. The two must be
-reconciled by ADR or by amending the diagram.
+**D3 — the shape of plan-structure editing. DECIDED: full-plan replacement
+applied through the store's compare-and-swap.** `eggplan plan edit` takes a
+full Plan JSON in the same strict form `new` accepts, parsed by
+`eggplan_core::parse_plan`. The CLI requires the submitted plan's `id` to
+equal the target plan's id, rejects a submitted `status` that differs from the
+current plan's status with `invalid_transition`, sets the revision to
+`--expected-revision + 1` itself, and applies the result through
+`RepositoryStore::compare_and_swap`. `eggplan plan export` writes the plan's
+canonical JSON out so the round trip never requires reading the store's own
+files.
 
-**D3 — the shape of plan-structure editing.** Options:
-
-1. a general `plan edit` command that takes a full replacement Plan JSON and
-   applies it through CAS, mirroring `new`'s strict-JSON input. This is the
-   smallest surface and reuses the existing validation path completely;
-2. a set of fine-grained commands (`item add`, `item remove`, `item
-   dependencies`, `criterion add`, …), which is a much larger surface and a
-   much larger review;
-3. no CLI support, with the roadmap's completion criterion amended.
-
-Option 1 deserves serious consideration: it gives the CLI the capability the
-completion criterion asks for with one new command and no new domain
-semantics, because every structural rule already lives in `Plan::validate`
-and the graph's bounds and acyclicity checks.
+Option 2 (a set of fine-grained commands) was considered and rejected: it is a
+much larger surface and needs its own partial-update semantics, which is new
+domain behavior rather than reuse.
 
 **D4 — whether plan-structure editing must reject structural changes to a
-`Closed` plan.** The store already rejects ordinary CAS against a `Closed`
-plan (`crates/eggplan-repo/src/store.rs`, `RepoError::ClosedPlanImmutable`),
-so this likely needs no new rule, but the plan must state it rather than
-inherit it silently.
+`Closed` plan. DECIDED: yes.** The store already refuses it with
+`RepoError::ClosedPlanImmutable`. This plan states the rule rather than
+inheriting it silently, and the CLI surfaces it as a typed failure.
 
-**D5 — whether the `--expected-revision` requirement changes.** The existing
-mutations require it. Structure editing must require it too, because the
-whole point is to avoid clobbering concurrent edits. This is not really in
-doubt, but it is recorded because it is a user-visible consequence.
+**D5 — whether the `--expected-revision` requirement changes. DECIDED: it does
+not.** Both mutating commands require `--expected-revision`. The whole point is
+to avoid clobbering a concurrent edit.
 
-**D6 — whether `markdown import` should remain Draft-only.** The current
-rule is that import creates one Draft intent and never manufactures evidence,
-provider trust, subject authority, or closure
-(`architecture/markdown-interchange.md`). If M004 adds a plan-status command,
-`markdown import` must continue to create Draft plans, and that must remain
-explicit so the import path cannot be used to smuggle in a non-Draft plan.
+**D6 — whether `markdown import` should remain Draft-only. DECIDED: yes.** The
+current rule is that import creates one Draft intent and never manufactures
+evidence, provider trust, subject authority, or closure
+(`architecture/markdown-interchange.md`). `markdown import` must continue to
+create Draft plans, and that must remain explicit so the import path cannot be
+used to smuggle in a non-Draft plan — including now that a status command
+exists.
+
+**Amendment record.** This section was written as "Open decisions — why this
+plan is proposed, not ready". The decisions were taken after the plan was
+registered, and the section was replaced in place with the decided outcomes,
+the ADR reference, and the rejected alternatives. No finding, scope
+boundary, or acceptance criterion was weakened by the amendment; the plan's
+§9 criteria are unchanged and are now decidable.
 
 ## 5. Scope
 
 ### In scope
 
-- the CLI's plan-lifecycle command surface, subject to D1 and D2;
-- the CLI's plan-structure editing surface, subject to D3 and D4;
+- the CLI's `plan` command family — `plan set-status`, `plan edit`, and
+  `plan export` (ADR-0005 D1 and D3);
+- `eggplan-core`'s plan transition table, which gains the `(Blocked, Closed)`
+  row the specification's diagram implies (ADR-0005 D2);
 - the CLI's usage text, command metadata table, help output, and completion
   generation for any new command;
 - `docs/cli-reference.md` and `docs/getting-started.md`;
 - the Projection/CLI roadmap's status line and its completion criterion;
-- an ADR, if D1 or D2 requires refining the specification's lifecycle;
+- the ADR that records the decisions;
 - registry and roadmap lineage updates.
 
 ### Out of scope
@@ -288,16 +305,22 @@ everything that must be enforced; the CLI's job is to expose them.
 
 Required shape, subject to §4:
 
-- a lifecycle command, or an explicit amendment to the specification;
-- a structure-editing command, or an explicit amendment to the roadmap's
-  completion criterion;
+- a `plan set-status` lifecycle command whose legality is decided by the core
+  transition table, plus the core transition table's missing `(Blocked,
+  Closed)` row;
+- a `plan edit` structure-editing command and a `plan export` canonical-JSON
+  export, together closing the roadmap's completion criterion rather than
+  amending it;
 - every new mutation goes through the store's compare-and-swap with an
   explicit `--expected-revision`, and reuses the core's validation and
   transition checks;
+- `plan edit` rejects a submitted `status` that differs from the current
+  plan's status, so structure editing and lifecycle transitions stay separate
+  surfaces and `plan edit` is not a back door to `Closed`;
 - every new command is added to `crates/eggplan-cli/src/commands.rs`'s
   metadata table, so that help, validation, and all four completion shells
   change together — the rule already stated at
-  `docs/cli-reference.md:122`;
+  `docs/cli-reference.md:141`;
 - every new command's JSON envelope is schema version 1 and uses the existing
   envelope shape;
 - new commands are read-then-write with the plan's current revision read
@@ -329,8 +352,13 @@ At minimum:
 - a CLI test asserting that a structure edit against a `Closed` plan is
   rejected;
 - a CLI test asserting that `markdown import` still creates a Draft plan;
+- a CLI test asserting that `plan export` writes the plan's canonical JSON and
+  that a `plan export` → edit → `plan edit` round trip preserves the plan's
+  structure;
 - a CLI test asserting the new commands appear in all four completion
   scripts and in the usage text;
+- a core test pinning `(Blocked, Closed)` as a legal transition and the
+  terminal states as fail-closed;
 - the existing `eggplan-cli` suite, green and unchanged apart from the new
   regressions.
 
@@ -383,11 +411,12 @@ M004 closes when:
 
 Stop and report rather than improvise if:
 
-- the decisions in §4 have not been made. This plan must not be handed to an
-  implementation agent while D1, D2, and D3 are open;
+- a decision in §4 turns out to be contradicted by the implementation, in
+  which case the ADR is amended and the deviation recorded, rather than the
+  implementation improvising a different surface;
 - implementing the chosen surface would require changing the domain model,
-  the transition table, or the store's enforcement, without an ADR that
-  authorizes it;
+  the transition table, or the store's enforcement beyond the single
+  `(Blocked, Closed)` row that ADR-0005 authorizes;
 - the JSON envelope would have to change version without a migration note;
 - a new command would need to read and write canonical state without the
   store's lock and CAS;
@@ -413,8 +442,10 @@ Do not convert a planned command into a passing result because it appears in
 
 ## 12. Handoff notes
 
-- This plan is **proposed**. It is not dependency-ready and must not be
-  handed to an implementation agent until the §4 decisions are made.
+- This plan is **ready**. The §4 decisions were taken and are recorded in
+  `plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md`;
+  the plan's §4 was amended in place to bind to that decision record, with the
+  amendment marked inline.
 - Record truthfully that the domain, the store, and the CLI's existing
   commands are correct. The gap is that the CLI does not expose transitions
   the domain supports and cannot express structure changes at all.

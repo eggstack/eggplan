@@ -1,6 +1,6 @@
 # Projection/CLI M003b C002 — Shell Completion Depth Parity and Completion-Test Strength
 
-Status: ready
+Status: closed (see plans/closure/projection-cli/003b-c002-closed.md)
 
 Repository baseline: 37ad290ca6b971a68d2871aedb39f4882f4eb2a8
 

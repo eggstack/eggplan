@@ -403,6 +403,7 @@ pub fn plan_transition_allowed(from: &PlanStatus, to: &PlanStatus) -> bool {
             | (Active, Closed)
             | (Active, Cancelled)
             | (Blocked, Active)
+            | (Blocked, Closed)
             | (Blocked, Cancelled)
     )
 }
@@ -479,13 +480,13 @@ mod tests {
         // so a later pass cannot weaken it.
         //
         // Note the asymmetry, which is deliberate: `(_, Closed)` is *not* all
-        // illegal. `Active -> Closed` is the legitimate lifecycle edge that
-        // `RepositoryStore::finalize_closure` performs, so core must permit it.
-        // Authority is a repository concern, enforced by the
-        // `GuardedClosureRequired` and `ClosedPlanImmutable` guards in
-        // `compare_and_swap`; core states only what is structurally possible,
-        // never who is allowed to do it. That is why the Closed rewrite is
-        // blocked in the repository and not here.
+        // illegal. `Active -> Closed` and `Blocked -> Closed` are the
+        // legitimate lifecycle edges that `RepositoryStore::finalize_closure`
+        // performs, so core must permit them. Authority is a repository
+        // concern, enforced by the `GuardedClosureRequired` and
+        // `ClosedPlanImmutable` guards in `compare_and_swap`; core states only
+        // what is structurally possible, never who is allowed to do it. That is
+        // why the Closed rewrite is blocked in the repository and not here.
         const ALL: [PlanStatus; 5] = [
             PlanStatus::Draft,
             PlanStatus::Active,
@@ -503,12 +504,57 @@ mod tests {
                 }
             }
         }
-        // The one legal edge into Closed, asserted so the terminality pin above
-        // cannot be "fixed" by deleting it.
+        // The two legal edges into Closed, asserted so the terminality pin above
+        // cannot be "fixed" by deleting them.
         assert!(plan_transition_allowed(
             &PlanStatus::Active,
             &PlanStatus::Closed
         ));
+        assert!(plan_transition_allowed(
+            &PlanStatus::Blocked,
+            &PlanStatus::Closed
+        ));
+    }
+
+    /// ADR-0005: the specification's lifecycle diagram
+    /// (`plans/000-long-term-specification.md:199-205`) reads
+    /// `Draft -> Active <-> Blocked -> Closed`, so `Blocked -> Closed` is a
+    /// legal transition. This pins every edge the table now permits, so a
+    /// later pass cannot quietly narrow the lifecycle the specification
+    /// declares. The repository, not core, decides *who* may close a plan.
+    #[test]
+    fn plan_transition_table_matches_the_specified_lifecycle() {
+        use PlanStatus::*;
+        const ALL: [PlanStatus; 5] = [Draft, Active, Blocked, Closed, Cancelled];
+        const LEGAL: [(PlanStatus, PlanStatus); 8] = [
+            (Draft, Active),
+            (Draft, Cancelled),
+            (Active, Blocked),
+            (Active, Closed),
+            (Active, Cancelled),
+            (Blocked, Active),
+            (Blocked, Closed),
+            (Blocked, Cancelled),
+        ];
+        for (from, to) in &LEGAL {
+            assert!(
+                plan_transition_allowed(from, to),
+                "{from:?} -> {to:?} must be a legal plan transition"
+            );
+        }
+        // Every pair that is not in the legal set is refused, so the table is
+        // exactly the specified lifecycle and not a superset of it.
+        for from in &ALL {
+            for to in &ALL {
+                let expected = LEGAL.iter().any(|(f, t)| f == from && t == to);
+                assert_eq!(
+                    plan_transition_allowed(from, to),
+                    expected,
+                    "{from:?} -> {to:?} must {} be a legal plan transition",
+                    if expected { "" } else { "not" }
+                );
+            }
+        }
     }
 
     #[test]

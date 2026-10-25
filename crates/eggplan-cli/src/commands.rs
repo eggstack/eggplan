@@ -176,12 +176,35 @@ const ITEM_STATUS_OPTION: ValueOption =
     ValueOption::enum_of("--status", ITEM_STATUS_VALUES, "set the item status");
 const HELP_FLAG: Flag = Flag::new("--help", "show this help");
 
+/// The plan statuses `plan set-status` can set.
+///
+/// `Closed` is not here because only the guarded closure finalizer may write
+/// it, and `Draft` is not here because no transition reaches it. The value set
+/// is the same one the command accepts, so completion never offers a value
+/// that cannot be applied.
+const SETTABLE_STATUS_VALUES: &[&str] = &["active", "blocked", "cancelled"];
+
+/// The settable plan statuses, shared with the command handler so that the
+/// value set the command accepts and the value set completion offers cannot
+/// drift apart.
+pub(crate) const SETTABLE_PLAN_STATUS_VALUES: &[&str] = SETTABLE_STATUS_VALUES;
+const PLAN_STATUS_OPTION: ValueOption =
+    ValueOption::enum_of("--to", SETTABLE_STATUS_VALUES, "target plan status");
+const PLAN_INPUT: ValueOption =
+    ValueOption::flag("--input", "PLAN.json", "replacement plan definition");
+const PLAN_OUTPUT: ValueOption = ValueOption::flag(
+    "--output",
+    "FILE",
+    "write the canonical plan JSON to a file",
+);
+
 const MARKDOWN_SUBCOMMANDS: &[&str] = &["render", "inspect", "import"];
 const CLOSURE_SUBCOMMANDS: &[&str] = &["show"];
 const REGISTRY_SUBCOMMANDS: &[&str] = &["render"];
 const COMPLETION_SUBCOMMANDS: &[&str] = &["bash", "zsh", "fish", "powershell"];
 const EVIDENCE_SUBCOMMANDS: &[&str] = &["list", "show", "supersessions"];
 const ITEM_SUBCOMMANDS: &[&str] = &["update"];
+const PLAN_SUBCOMMANDS: &[&str] = &["set-status", "edit", "export"];
 const STATUS_VALUES: &[&str] = &["draft", "active", "blocked", "closed", "cancelled"];
 
 pub(crate) const COMMANDS: &[CommandSpec] = &[
@@ -265,6 +288,19 @@ pub(crate) const COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         "activate a draft plan",
+    ),
+    CommandSpec::new(
+        "plan",
+        Positional::SubcommandThenOne,
+        PLAN_SUBCOMMANDS,
+        &[STATE_ROOT],
+        &[],
+        &[
+            ("set-status", &[PLAN_STATUS_OPTION, EXPECTED_REVISION]),
+            ("edit", &[PLAN_INPUT, EXPECTED_REVISION]),
+            ("export", &[PLAN_OUTPUT]),
+        ],
+        "plan lifecycle and structure",
     ),
     CommandSpec::new(
         "item",
@@ -474,135 +510,503 @@ pub(crate) fn command_help(name: &str) -> Option<String> {
 /// couple the shell to repository discovery and its latency.
 pub(crate) const SHELLS: &[&str] = &["bash", "zsh", "fish", "powershell"];
 
-pub(crate) fn completion_script(shell: &str) -> Option<String> {
-    let commands = COMMANDS
-        .iter()
-        .map(|spec| spec.name)
-        .collect::<Vec<_>>()
-        .join(" ");
-    let subcommands = COMMANDS
-        .iter()
-        .filter(|spec| !spec.subcommands.is_empty())
-        .map(|spec| format!("{}:{}", spec.name, spec.subcommands.join("|")))
-        .collect::<Vec<_>>()
-        .join(" ");
-    let options = COMMANDS
-        .iter()
-        .flat_map(|spec| {
-            spec.options
-                .iter()
-                .map(|option| option.name)
-                .chain(spec.flags.iter().map(|flag| flag.name))
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    let values = COMMANDS
-        .iter()
-        .flat_map(|spec| spec.options.iter())
-        .filter(|option| !option.values.is_empty())
-        .map(|option| format!("{}={}", option.name, option.values.join(",")))
-        .collect::<Vec<_>>()
-        .join(" ");
+/// The depth every generated shell script completes to.
+///
+/// Completion is one capability offered on four shells, so all four consume
+/// the command metadata to the same depth:
+///
+/// 1. the top-level command names;
+/// 2. the subcommands of the command being completed;
+/// 3. the options and flags declared for that command, including the options
+///    scoped to one of its subcommands;
+/// 4. the fixed values of the option being completed, when that option
+///    declares a closed value set.
+///
+/// The depth belongs to the generator, not to one shell: a script that stops
+/// at a shallower level offers a user less than the metadata declares. The
+/// four generators below are therefore written from one per-command model,
+/// and the CLI test asserts the depth per shell rather than asserting that a
+/// script merely mentions a name.
+const COMPLETION_DEPTH: &str = "\
+commands, subcommands, options (including subcommand-scoped options), and option values";
 
-    match shell {
-        "bash" => Some(format!(
-            "# eggplan bash completion (generated; do not edit)\n\
-             _eggplan() {{\n\
-             \x20 local cur commands=\"{commands}\" subs=\"{subcommands}\" opts=\"{options}\"\n\
-             \x20 COMPREPLY=()\n\
-             \x20 cur=\"${{COMP_WORDS[COMP_CWORD]}}\"\n\
-             \x20 COMPREPLY=( $(compgen -W \"$commands $opts\" -- \"$cur\") )\n\
-             \x20 return 0\n\
-             }}\n\
-             complete -F _eggplan eggplan\n"
-        )),
-        "zsh" => Some(format!(
-            "#compdef eggplan\n\
-             # eggplan zsh completion (generated; do not edit)\n\
-             _eggplan() {{\n\
-             \x20 local -a commands subcommands options values\n\
-             \x20 commands=({commands})\n\
-             \x20 subcommands=({subcommands})\n\
-             \x20 options=({options})\n\
-             \x20 values=({values})\n\
-             \x20 _describe 'command' commands\n\
-             }}\n\
-             compdef _eggplan eggplan\n"
-        )),
-        "fish" => {
-            let mut out = String::from("# eggplan fish completion (generated; do not edit)\n");
-            for command in COMMANDS {
-                out.push_str(&format!(
-                    "complete -c eggplan -n '__fish_use_subcommand' -a '{}' -d '{}'\n",
-                    command.name, command.help
-                ));
-                for subcommand in command.subcommands {
-                    out.push_str(&format!(
-                        "complete -c eggplan -n '__fish_seen_subcommand_from {}' -a '{subcommand}' -d '{} {subcommand}'\n",
-                        command.name, command.name
-                    ));
+/// One option or flag a command accepts.
+#[derive(Debug, Clone)]
+struct CompletionOption {
+    name: &'static str,
+    help: &'static str,
+    /// The closed value set, when the option declares one.
+    values: Vec<&'static str>,
+}
+
+/// One command's completion entries, resolved from the single metadata table.
+#[derive(Debug, Clone)]
+struct CommandCompletion {
+    name: &'static str,
+    help: &'static str,
+    subcommands: &'static [&'static str],
+    options: Vec<CompletionOption>,
+}
+
+/// The completion model the four shell generators read.
+///
+/// Built once per generation from `COMMANDS`. Nothing here touches the
+/// filesystem, the repository, or the environment, so generation stays
+/// deterministic and side-effect free.
+#[derive(Debug, Clone)]
+struct CompletionModel {
+    commands: Vec<CommandCompletion>,
+}
+
+impl CompletionModel {
+    fn build() -> Self {
+        Self {
+            commands: COMMANDS
+                .iter()
+                .map(|spec| CommandCompletion {
+                    name: spec.name,
+                    help: spec.help,
+                    subcommands: spec.subcommands,
+                    options: completion_options(spec),
+                })
+                .collect(),
+        }
+    }
+
+    /// Every top-level command name, in table order.
+    fn command_names(&self) -> Vec<&'static str> {
+        self.commands.iter().map(|command| command.name).collect()
+    }
+
+    /// Every option and flag name, deduplicated, in table order.
+    fn option_names(&self) -> Vec<&'static str> {
+        let mut names: Vec<&'static str> = Vec::new();
+        for command in &self.commands {
+            for option in &command.options {
+                if !names.contains(&option.name) {
+                    names.push(option.name);
                 }
-                for option in command.options {
-                    out.push_str(&format!(
-                        "complete -c eggplan -n '__fish_seen_subcommand_from {}' -l '{}' -d '{}'\n",
-                        command.name,
-                        option.name.trim_start_matches("--"),
-                        option.help
-                    ));
-                    if !option.values.is_empty() {
-                        out.push_str(&format!(
-                            "complete -c eggplan -n '__fish_seen_subcommand_from {}' -l '{}' -x -a '{}'\n",
-                            command.name,
-                            option.name.trim_start_matches("--"),
-                            option.values.join(" ")
-                        ));
+            }
+        }
+        names
+    }
+}
+
+/// The options and flags a command accepts, in table order.
+///
+/// The subcommand-scoped options are included because they are options the
+/// command really accepts: `options_for` validates against the same set. A
+/// name declared twice keeps one entry whose value set is the union of both,
+/// so an option several subcommands share is offered once.
+fn completion_options(spec: &CommandSpec) -> Vec<CompletionOption> {
+    let mut declared: Vec<(&'static str, &'static str, &'static [&'static str])> = Vec::new();
+    for option in spec.options {
+        declared.push((option.name, option.help, option.values));
+    }
+    for (_, scoped) in spec.sub_options {
+        for option in *scoped {
+            declared.push((option.name, option.help, option.values));
+        }
+    }
+    for flag in spec.flags {
+        declared.push((flag.name, flag.help, &[]));
+    }
+    let mut options: Vec<CompletionOption> = Vec::new();
+    for (name, help, values) in declared {
+        match options.iter_mut().find(|option| option.name == name) {
+            Some(existing) => {
+                for value in values {
+                    if !existing.values.contains(value) {
+                        existing.values.push(value);
                     }
                 }
-                for flag in command.flags {
+            }
+            None => options.push(CompletionOption {
+                name,
+                help,
+                values: values.to_vec(),
+            }),
+        }
+    }
+    options
+}
+
+pub(crate) fn completion_script(shell: &str) -> Option<String> {
+    let model = CompletionModel::build();
+    match shell {
+        "bash" => Some(model.bash()),
+        "zsh" => Some(model.zsh()),
+        "fish" => Some(model.fish()),
+        "powershell" => Some(model.powershell()),
+        _ => None,
+    }
+}
+
+impl CompletionModel {
+    /// The Bash generator.
+    ///
+    /// Bash has no per-word completion helper for this shape, so the
+    /// candidates are collected into one array and handed to `compgen`. Every
+    /// level of the declared depth is reachable: the command names, the
+    /// subcommands of the command in the line, that command's options, and
+    /// the values of the option in the line.
+    fn bash(&self) -> String {
+        let mut out = String::from("# eggplan bash completion (generated; do not edit)\n");
+        out.push_str(&format!("# completion depth: {COMPLETION_DEPTH}\n"));
+        out.push_str("_eggplan() {\n");
+        out.push_str("  local cur previous command\n");
+        out.push_str("  local -a commands options candidates\n");
+        out.push_str("  local index word\n");
+        out.push_str(&format!(
+            "  commands=({})\n",
+            self.command_names().join(" ")
+        ));
+        out.push_str(&format!("  options=({})\n", self.option_names().join(" ")));
+        out.push_str("  cur=\"${COMP_WORDS[COMP_CWORD]}\"\n");
+        out.push_str("  previous=\"${COMP_WORDS[COMP_CWORD-1]}\"\n");
+        out.push_str("  command=\"\"\n");
+        out.push_str("  for ((index = 1; index < COMP_CWORD; index++)); do\n");
+        out.push_str("    word=\"${COMP_WORDS[index]}\"\n");
+        out.push_str("    case \" ${commands[*]} \" in\n");
+        out.push_str("      *\" ${word} \"*) command=\"${word}\"; break ;;\n");
+        out.push_str("    esac\n");
+        out.push_str("  done\n");
+        out.push_str("  candidates=()\n");
+        out.push_str("  if [ \"${COMP_CWORD}\" -eq 1 ]; then\n");
+        out.push_str("    candidates=(\"${commands[@]}\" \"${options[@]}\")\n");
+        out.push_str("  else\n");
+        out.push_str("    case \"${command}:${previous}\" in\n");
+        for command in &self.commands {
+            for option in &command.options {
+                if option.values.is_empty() {
+                    continue;
+                }
+                out.push_str(&format!(
+                    "      {}:{}) candidates=({}) ;;\n",
+                    command.name,
+                    option.name,
+                    option.values.join(" ")
+                ));
+            }
+        }
+        out.push_str("    esac\n");
+        out.push_str("    if [ \"${#candidates[@]}\" -eq 0 ]; then\n");
+        out.push_str("      case \"${command}\" in\n");
+        for command in &self.commands {
+            if command.subcommands.is_empty() {
+                continue;
+            }
+            out.push_str(&format!(
+                "        {}) candidates=({}) ;;\n",
+                command.name,
+                command.subcommands.join(" ")
+            ));
+        }
+        out.push_str("      esac\n");
+        out.push_str("      case \"${command}\" in\n");
+        for command in &self.commands {
+            if command.options.is_empty() {
+                continue;
+            }
+            out.push_str(&format!(
+                "        {}) candidates+=({}) ;;\n",
+                command.name,
+                command
+                    .options
+                    .iter()
+                    .map(|option| option.name)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ));
+        }
+        out.push_str("      esac\n");
+        out.push_str("    fi\n");
+        out.push_str("  fi\n");
+        out.push_str("  COMPREPLY=( $(compgen -W \"${candidates[*]}\" -- \"${cur}\") )\n");
+        out.push_str("  return 0\n");
+        out.push_str("}\n");
+        out.push_str("complete -F _eggplan eggplan\n");
+        out
+    }
+
+    /// The Zsh generator.
+    ///
+    /// The script reads the command word and the word before the cursor out
+    /// of the completion system's `words` array, then offers the matching
+    /// level of the declared depth.
+    fn zsh(&self) -> String {
+        let mut out = String::from("#compdef eggplan\n");
+        out.push_str("# eggplan zsh completion (generated; do not edit)\n");
+        out.push_str(&format!("# completion depth: {COMPLETION_DEPTH}\n"));
+        out.push_str("_eggplan() {\n");
+        out.push_str("  local -a commands options subs opts vals\n");
+        out.push_str("  local command_name previous index\n");
+        out.push_str(&format!(
+            "  commands=({})\n",
+            self.command_names().join(" ")
+        ));
+        out.push_str(&format!("  options=({})\n", self.option_names().join(" ")));
+        out.push_str("  subs=()\n");
+        out.push_str("  opts=()\n");
+        out.push_str("  vals=()\n");
+        out.push_str("  command_name=\"\"\n");
+        out.push_str("  previous=\"\"\n");
+        out.push_str("  if [ \"${CURRENT}\" -gt 1 ]; then\n");
+        out.push_str("    previous=\"${words[CURRENT-1]}\"\n");
+        out.push_str("  fi\n");
+        out.push_str("  if [ \"${CURRENT}\" -gt 2 ]; then\n");
+        out.push_str("    index=2\n");
+        out.push_str("    while [ \"${index}\" -lt \"${CURRENT}\" ]; do\n");
+        out.push_str("      case \"${words[index]}\" in\n");
+        out.push_str(&format!(
+            "        {}) command_name=\"${{words[index]}}\"; break ;;\n",
+            self.command_names().join("|")
+        ));
+        out.push_str("      esac\n");
+        out.push_str("      index=$((index + 1))\n");
+        out.push_str("    done\n");
+        out.push_str("  fi\n");
+        out.push_str("  case \"${command_name}:${previous}\" in\n");
+        for command in &self.commands {
+            for option in &command.options {
+                if option.values.is_empty() {
+                    continue;
+                }
+                out.push_str(&format!(
+                    "    {}:{}) vals=({}) ;;\n",
+                    command.name,
+                    option.name,
+                    option.values.join(" ")
+                ));
+            }
+        }
+        out.push_str("  esac\n");
+        out.push_str("  case \"${command_name}\" in\n");
+        for command in &self.commands {
+            if command.subcommands.is_empty() {
+                continue;
+            }
+            out.push_str(&format!(
+                "    {}) subs=({}) ;;\n",
+                command.name,
+                command.subcommands.join(" ")
+            ));
+        }
+        out.push_str("    *) subs=() ;;\n");
+        out.push_str("  esac\n");
+        out.push_str("  case \"${command_name}\" in\n");
+        for command in &self.commands {
+            if command.options.is_empty() {
+                continue;
+            }
+            out.push_str(&format!(
+                "    {}) opts=({}) ;;\n",
+                command.name,
+                command
+                    .options
+                    .iter()
+                    .map(|option| option.name)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ));
+        }
+        out.push_str("    *) opts=(\"${options[@]}\") ;;\n");
+        out.push_str("  esac\n");
+        out.push_str("  if [ \"${#vals[@]}\" -gt 0 ]; then\n");
+        out.push_str("    _describe 'value' vals\n");
+        out.push_str("    return\n");
+        out.push_str("  fi\n");
+        out.push_str("  if [ \"${CURRENT}\" -eq 2 ]; then\n");
+        out.push_str("    _describe 'command' commands\n");
+        out.push_str("    _describe 'option' options\n");
+        out.push_str("    return\n");
+        out.push_str("  fi\n");
+        out.push_str("  if [ \"${#subs[@]}\" -gt 0 ]; then\n");
+        out.push_str("    _describe 'subcommand' subs\n");
+        out.push_str("  fi\n");
+        out.push_str("  if [ \"${#opts[@]}\" -gt 0 ]; then\n");
+        out.push_str("    _describe 'option' opts\n");
+        out.push_str("  fi\n");
+        out.push_str("}\n");
+        out.push_str("compdef _eggplan eggplan\n");
+        out
+    }
+
+    /// The Fish generator.
+    ///
+    /// Fish conditions are per command, so the script offers the subcommands
+    /// of the command in the line, that command's options, and the values of
+    /// the option in the line.
+    fn fish(&self) -> String {
+        let mut out = String::from("# eggplan fish completion (generated; do not edit)\n");
+        out.push_str(&format!("# completion depth: {COMPLETION_DEPTH}\n"));
+        for command in &self.commands {
+            out.push_str(&format!(
+                "complete -c eggplan -n '__fish_use_subcommand' -a '{}' -d '{}'\n",
+                command.name, command.help
+            ));
+            for subcommand in command.subcommands {
+                out.push_str(&format!(
+                    "complete -c eggplan -n '__fish_seen_subcommand_from {}' -a '{subcommand}' -d '{} {subcommand}'\n",
+                    command.name, command.name
+                ));
+            }
+            for option in &command.options {
+                out.push_str(&format!(
+                    "complete -c eggplan -n '__fish_seen_subcommand_from {}' -l '{}' -d '{}'\n",
+                    command.name,
+                    option.name.trim_start_matches("--"),
+                    option.help
+                ));
+                if !option.values.is_empty() {
                     out.push_str(&format!(
-                        "complete -c eggplan -n '__fish_seen_subcommand_from {}' -l '{}' -d '{}'\n",
+                        "complete -c eggplan -n '__fish_seen_subcommand_from {}' -l '{}' -x -a '{}'\n",
                         command.name,
-                        flag.name.trim_start_matches("--"),
-                        flag.help
+                        option.name.trim_start_matches("--"),
+                        option.values.join(" ")
                     ));
                 }
             }
-            Some(out)
         }
-        "powershell" => {
-            let mut out = String::from(
-                "# eggplan powershell completion (generated; do not edit)\n\
-                 Register-ArgumentCompleter -Native -CommandName eggplan -ScriptBlock {\n\
-                 \x20 param($wordToComplete, $commandAst, $cursorPosition)\n\
-                 \x20 $commands = @(",
-            );
-            out.push_str(
-                &commands
-                    .split_whitespace()
-                    .map(|name| format!("'{name}'"))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            );
-            out.push_str(
-                ")\n\
-                 \x20 $options = @(",
-            );
-            out.push_str(
-                &options
-                    .split_whitespace()
-                    .map(|name| format!("'{name}'"))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            );
-            out.push_str(
-                ")\n\
-                 \x20 $commands + $options | Where-Object { $_ -like \"$wordToComplete*\" } | ForEach-Object {\n\
-                 \x20 \x20 [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)\n\
-                 \x20 }\n\
-                 }\n",
-            );
-            Some(out)
-        }
-        _ => None,
+        out
     }
+
+    /// The PowerShell generator.
+    ///
+    /// The native argument completer receives the command AST, so the command
+    /// word and the word before the cursor are read from the elements the
+    /// user has typed. The same four levels of the declared depth are
+    /// offered.
+    fn powershell(&self) -> String {
+        let mut out = String::from("# eggplan powershell completion (generated; do not edit)\n");
+        out.push_str(&format!("# completion depth: {COMPLETION_DEPTH}\n"));
+        out.push_str("Register-ArgumentCompleter -Native -CommandName eggplan -ScriptBlock {\n");
+        out.push_str("  param($wordToComplete, $commandAst)\n");
+        out.push_str(&format!(
+            "  $commands = @({})\n",
+            powershell_list(&self.command_names())
+        ));
+        out.push_str(&format!(
+            "  $options = @({})\n",
+            powershell_list(&self.option_names())
+        ));
+        out.push_str(&format!(
+            "  $subcommands = @{{{}}}\n",
+            powershell_map(&self.subcommand_map())
+        ));
+        out.push_str(&format!(
+            "  $values = @{{{}}}\n",
+            powershell_map(&self.value_map())
+        ));
+        out.push_str(&format!(
+            "  $commandOptions = @{{{}}}\n",
+            powershell_map(&self.command_option_map())
+        ));
+        out.push_str("  $candidates = @()\n");
+        out.push_str("  $command = ''\n");
+        out.push_str("  $previous = ''\n");
+        out.push_str("  $elements = @()\n");
+        out.push_str(
+            "  if ($null -ne $commandAst) { $elements = @($commandAst.CommandElements) }\n",
+        );
+        out.push_str("  for ($index = 1; $index -lt $elements.Count; $index++) {\n");
+        out.push_str("    if ($commands -contains $elements[$index].Extent.Text) {\n");
+        out.push_str("      $command = $elements[$index].Extent.Text\n");
+        out.push_str("      break\n");
+        out.push_str("    }\n");
+        out.push_str("  }\n");
+        out.push_str("  if ($elements.Count -gt 1) {\n");
+        out.push_str("    $last = $elements[$elements.Count - 1].Extent.Text\n");
+        out.push_str("    if ($last -eq $wordToComplete) {\n");
+        out.push_str(
+            "      if ($elements.Count -gt 2) { $previous = $elements[$elements.Count - 2].Extent.Text }\n",
+        );
+        out.push_str("    } else {\n");
+        out.push_str("      $previous = $last\n");
+        out.push_str("    }\n");
+        out.push_str("  }\n");
+        out.push_str("  $key = $command + ':' + $previous\n");
+        out.push_str("  if ($values.ContainsKey($key)) {\n");
+        out.push_str("    $candidates = @($values[$key])\n");
+        out.push_str("  } else {\n");
+        out.push_str("    if ($command -eq '') {\n");
+        out.push_str("      $candidates = @($commands)\n");
+        out.push_str("    } elseif ($subcommands.ContainsKey($command)) {\n");
+        out.push_str("      $candidates = @($subcommands[$command])\n");
+        out.push_str("    }\n");
+        out.push_str("    if ($commandOptions.ContainsKey($command)) {\n");
+        out.push_str("      $candidates += @($commandOptions[$command])\n");
+        out.push_str("    } else {\n");
+        out.push_str("      $candidates += @($options)\n");
+        out.push_str("    }\n");
+        out.push_str("  }\n");
+        out.push_str(
+            "  $candidates | Where-Object { $_ -like \"$wordToComplete*\" } | ForEach-Object {\n",
+        );
+        out.push_str(
+            "    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)\n",
+        );
+        out.push_str("  }\n");
+        out.push_str("}\n");
+        out
+    }
+
+    /// The subcommand list of every command that has one, keyed by command.
+    fn subcommand_map(&self) -> Vec<(String, Vec<&'static str>)> {
+        self.commands
+            .iter()
+            .filter(|command| !command.subcommands.is_empty())
+            .map(|command| (command.name.to_string(), command.subcommands.to_vec()))
+            .collect()
+    }
+
+    /// The value set of every option that declares one, keyed by
+    /// `command:option`.
+    fn value_map(&self) -> Vec<(String, Vec<&'static str>)> {
+        let mut entries = Vec::new();
+        for command in &self.commands {
+            for option in &command.options {
+                if option.values.is_empty() {
+                    continue;
+                }
+                entries.push((
+                    format!("{}:{}", command.name, option.name),
+                    option.values.clone(),
+                ));
+            }
+        }
+        entries
+    }
+
+    /// The options of every command, keyed by command.
+    fn command_option_map(&self) -> Vec<(String, Vec<&'static str>)> {
+        self.commands
+            .iter()
+            .filter(|command| !command.options.is_empty())
+            .map(|command| {
+                (
+                    command.name.to_string(),
+                    command.options.iter().map(|option| option.name).collect(),
+                )
+            })
+            .collect()
+    }
+}
+
+/// A PowerShell array literal body, e.g. `'a', 'b'`.
+fn powershell_list<S: AsRef<str>>(names: &[S]) -> String {
+    names
+        .iter()
+        .map(|name| format!("'{}'", name.as_ref()))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// A PowerShell hashtable literal body, e.g. `'a' = @('b')`.
+fn powershell_map(entries: &[(String, Vec<&'static str>)]) -> String {
+    entries
+        .iter()
+        .map(|(key, values)| format!("'{key}' = @({})", powershell_list(values)))
+        .collect::<Vec<_>>()
+        .join("; ")
 }

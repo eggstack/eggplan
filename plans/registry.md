@@ -47,6 +47,7 @@ Planning-system bootstrap:
 | plans/adrs/ADR-0002-repository-first-versioned-canonical-state.md | accepted | Versioned structured repository state is canonical; Markdown is projection/import |
 | plans/adrs/ADR-0003-immutable-revision-scoped-evidence.md | accepted | Observations are immutable, provider-authoritative and subject-revision scoped |
 | plans/adrs/ADR-0004-codegg-extraction-without-workorder-conflation.md | accepted | Generalize CodeGG WorkPlan semantics incrementally; WorkOrder remains CodeGG-owned |
+| plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md | accepted | Plan lifecycle legality has one owner in the core transition table; the specification's lifecycle diagram is authoritative over it; plan structure editing is a full-plan replacement applied through the repository's compare-and-swap |
 
 ## Active subsystem roadmaps
 
@@ -54,7 +55,7 @@ Planning-system bootstrap:
 |---|---|---|---|
 | Foundation core/repository | closed/current | M001 closed; M002 historical caveat resolved by M003; M003 closed and cross-platform qualified. Five M003 corrective lines (C001-C005) were raised by the 2026-10-23 repository audit and are now implemented and closed; none gated another subsystem | plans/subsystems/foundation-core-roadmap.md |
 | Evidence/closure | closed/current | M002 and C001/C002/C003/C004 closed; the C004 durability defect is resolved — ordinary CAS can no longer modify a Closed Plan, so no reachable path desynchronizes it from its ClosureRecord | plans/subsystems/evidence-closure-roadmap.md |
-| Projection/CLI | active/current | M001/M002/M003a/M003b closed; the M003 inspection snapshot is hosted-qualified and batch/completion work builds on it. Three M003b corrective lines (C001-C003) are registered and open from the 2026-10-23 repository audit, and M004 is proposed pending its open decisions | plans/subsystems/projection-cli-roadmap.md |
+| Projection/CLI | active/current | M001/M002/M003a/M003b closed; the M003 inspection snapshot is hosted-qualified and batch/completion work builds on it. The three M003b corrective lines (C001-C003) raised by the 2026-10-23 repository audit are now implemented and closed, and M004 is closed with its decisions recorded in ADR-0005 | plans/subsystems/projection-cli-roadmap.md |
 | CodeGG integration | closed/current | M001-M003 and C001/C002 closed; the roadmap is terminal. C002 closed the boundary guard's filesystem gap: `check-codegg-compat-boundary.sh` now fails on filesystem access, every guard message states its actual scan scope, and all five guards have synthetic self-proofs. The bridge source was already pure; the defect was in the enforcement | plans/subsystems/codegg-integration-roadmap.md |
 | Eggstack integrations | active/current | M001, M002, M003a (`674264d`), and M003b (`93d65b0`) closed; Eggsact and Eggup candidates unchanged and deferred | plans/subsystems/eggstack-integration-roadmap.md |
 | Interop/distribution | deferred | waits on local core/CLI/integrations | plans/subsystems/interoperability-distribution-roadmap.md |
@@ -91,10 +92,10 @@ Planning-system bootstrap:
 | Foundation | M003 C003 core assessment reason schema fail-closed parity | closed | plans/implementation/foundation-core/003-c003-core-assessment-reason-schema-fail-closed.md | raised by the 2026-10-23 repository audit; nested `AssessmentReason` unknown-field parity; closure plans/closure/foundation-core/003-c003-closed.md; implementation `1e33069` |
 | Foundation | M003 C004 unreachable public surface + panic-path hygiene | closed | plans/implementation/foundation-core/003-c004-unreachable-public-surface-and-panic-path-hygiene.md | raised by the 2026-10-23 repository audit; non-blocking maintenance; closure plans/closure/foundation-core/003-c004-closed.md; implementation `1e33069` |
 | Foundation | M003 C005 core boundary guard + tooling-governance reconciliation | closed | plans/implementation/foundation-core/003-c005-core-boundary-guard-and-tooling-governance-reconciliation.md | raised by the 2026-10-23 repository audit; tooling hardening and design-record truthfulness; closure plans/closure/foundation-core/003-c005-closed.md; implementation `1e33069` |
-| Projection/CLI | M003b C001 CLI user-documentation contract corrections | ready | plans/implementation/projection-cli/003b-c001-cli-user-documentation-contract-corrections.md | raised by the 2026-10-23 repository audit; non-blocking documentation correction; no closure record yet |
-| Projection/CLI | M003b C002 shell completion depth parity | ready | plans/implementation/projection-cli/003b-c002-shell-completion-depth-parity.md | raised by the 2026-10-23 repository audit; completion depth and test strength; no closure record yet |
-| Projection/CLI | M003b C003 Markdown interchange panic-path + bound hygiene | ready | plans/implementation/projection-cli/003b-c003-markdown-interchange-panic-path-and-bound-hygiene.md | raised by the 2026-10-23 repository audit; non-blocking maintenance; no closure record yet |
-| Projection/CLI | M004 plan lifecycle transitions + plan structure editing | proposed | plans/implementation/projection-cli/004-plan-lifecycle-and-structure-editing.md | capability gap against the normative lifecycle and the roadmap completion criterion; decisions D1-D6 are open, so it is not dependency-ready |
+| Projection/CLI | M003b C001 CLI user-documentation contract corrections | closed | plans/implementation/projection-cli/003b-c001-cli-user-documentation-contract-corrections.md | raised by the 2026-10-23 repository audit; non-blocking documentation correction; closure plans/closure/projection-cli/003b-c001-closed.md |
+| Projection/CLI | M003b C002 shell completion depth parity | closed | plans/implementation/projection-cli/003b-c002-shell-completion-depth-parity.md | raised by the 2026-10-23 repository audit; completion depth and test strength; closure plans/closure/projection-cli/003b-c002-closed.md |
+| Projection/CLI | M003b C003 Markdown interchange panic-path + bound hygiene | closed | plans/implementation/projection-cli/003b-c003-markdown-interchange-panic-path-and-bound-hygiene.md | raised by the 2026-10-23 repository audit; non-blocking maintenance; closure plans/closure/projection-cli/003b-c003-closed.md |
+| Projection/CLI | M004 plan lifecycle transitions + plan structure editing | closed | plans/implementation/projection-cli/004-plan-lifecycle-and-structure-editing.md | capability gap against the normative lifecycle and the roadmap completion criterion; decisions D1-D6 taken and recorded in `plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md`; closure plans/closure/projection-cli/004-closed.md |
 
 ## Corrective history and current maintenance
 
@@ -171,11 +172,12 @@ Eight plans are registered from that audit. Seven are corrective lines against
 closed milestones; one is a proposed capability milestone. None of the
 correctives is blocking, and none gates another subsystem.
 
-**Status:** the five Foundation corrective lines (M003 C001-C005) have been
-implemented and are closed with their own closure records. The three
-Projection/CLI corrective lines (M003b C001-C003) and the proposed Projection/CLI
-M004 milestone remain open. The findings below are kept as the audit's record
-of what was found; each closed line names its closure record.
+**Status:** all nine plans registered from that audit are now implemented and
+closed with their own closure records. The five Foundation corrective lines
+(M003 C001-C005) were implemented first; the three Projection/CLI corrective
+lines (M003b C001-C003) and the Projection/CLI M004 capability milestone
+followed. The findings below are kept as the audit's record of what was found;
+each closed line names its closure record.
 
 **Foundation core/repository** — five corrective lines against M003, all closed:
 
@@ -232,34 +234,54 @@ of what was found; each closed line names its closure record.
   source for impure access, and carries deterministic self-proofs; the
   tooling-governance deep dive now describes the integrations guard correctly.
 
-**Projection/CLI** — three corrective lines against M003b, plus one proposed
-milestone, all still open:
+**Projection/CLI** — three corrective lines against M003b, plus one capability
+milestone, all closed:
 
 - **M003b C001** — four statements in `docs/cli-reference.md` contradict the
   implementation, including the safety-relevant claim that `--state-root` is
   "Never implicit" while `crates/eggplan-cli/src/lib.rs:320-324` defaults it
   to `.eggplan`. `init` and `help` are undocumented, and the value-taking
   flag list is incomplete. Non-blocking documentation correction; the CLI's
-  behavior is correct and self-consistent.
+  behavior is correct and self-consistent. **Closed** —
+  `plans/closure/projection-cli/003b-c001-closed.md`. The guides now describe
+  the `.eggplan` default accurately, the revision-flag requirement is stated
+  per command, the `unavailable` check state is described as the CLI emits it,
+  `item update` is described as taking at least one field, and `init` and
+  `help` are documented.
 - **M003b C002** — the four generated completion scripts consume the one
   command metadata source to different depths. Fish reaches commands,
   subcommands, options, and values; Bash omits subcommands; Zsh omits
   subcommands, options, and values; PowerShell omits subcommands and values.
   The test at `crates/eggplan-cli/tests/batch_and_completions.rs:1212-1241`
   asserts only that a script mentions a name, so it cannot detect the gap.
+  **Closed** — `plans/closure/projection-cli/003b-c002-closed.md`. All four
+  shells now reach the same declared depth, the depth test reads each shell's
+  candidate lists rather than the script text, and no generated script declares
+  an unread variable. The change also found and fixed a defect the audit did
+  not anticipate: the *before* Zsh script was not valid zsh.
 - **M003b C003** — the Markdown import path contains the workspace's only
   production `unreachable!()`
   (`crates/eggplan-markdown/src/lib.rs:114`), and the 512-character bound is
   a repeated bare literal at six sites rather than a named constant.
   Non-blocking maintenance; imported plans and rendered documents are
-  unchanged.
+  unchanged. **Closed** —
+  `plans/closure/projection-cli/003b-c003-closed.md`. The dispatch is now
+  total by construction, the bound is one named constant with a derived probe,
+  and the imported bytes are proven unchanged against recorded golden fixtures.
 - **M004** — capability, not a corrective. `PlanStatus::Blocked` and
   `PlanStatus::Cancelled` are unreachable through the CLI although the domain
   permits them (`crates/eggplan-core/src/model.rs:391-403`), and the CLI
   cannot change a plan's items, dependencies, criteria, requirements, or
   objective at all, which the roadmap's completion criterion
   (`plans/subsystems/projection-cli-roadmap.md:96-99`) rules out. The plan
-  documents decisions D1-D6 and is registered **proposed**, not ready.
+  documents decisions D1-D6 and was registered **proposed**, not ready.
+  **Closed** — `plans/closure/projection-cli/004-closed.md`. The decisions
+  were taken and are recorded in
+  `plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md`:
+  a `plan` command family whose legality is decided by the core transition
+  table, the specification's lifecycle diagram treated as authoritative over
+  the domain table, and full-plan structure editing applied through the
+  repository's compare-and-swap.
 
 Two items from the audit are explicitly *not* findings and are recorded here
 so they are not reopened: the deferred Interop/distribution subsystem
@@ -331,9 +353,31 @@ host-owned acquisition boundary and from CodeGG being an external consumer.
     C003, and C004 closed together in the core and repository crates, M003
     C002 closed with the CLI read-path diagnostics change recorded in its
     closure evidence, and M003 C005 closed with the hardened core boundary
-    guard. The three Projection/CLI lines and M004 remain open and are
-    unaffected by the Foundation closures, except that M003b C001's
-    documentation corrections should now reflect the C002 read-path change.
+    guard.
+    **The three Projection/CLI corrective lines and M004 are now implemented
+    and closed as well**, each with its own closure record under
+    `plans/closure/projection-cli/`. M003b C002 and M003b C003 were
+    implemented in parallel in disjoint files, and M003b C001 was implemented
+    last so that its documentation pass would run against the final command
+    surface rather than an intermediate one. M004 was registered **proposed**
+    until its decisions D1-D6 were taken; they are recorded in
+    `plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md`,
+    and M004 is closed with that ADR as its decision record. The audit's own
+    note about M003b C002's completion-depth assertions covering any command
+    added by M004 held: the assertions are metadata-derived, so the `plan`
+    family is covered by the same per-shell depth check as every other
+    command.
+    Alongside that work, the `architecture/` deep dives had their citations
+    re-verified and corrected. The `plan` family and the core transition row
+    shifted line numbers in the CLI and core crates, and
+    `architecture/deep-dive-repository.md` carried a pre-existing drift of
+    roughly 56 `store.rs` citations anchored to a much older version of
+    `crates/eggplan-repo/src/store.rs`. All 385 citations across the four
+    affected deep dives were re-read after the repair: 0 out of range, 0
+    unresolved, every resolved range checked against the claim it supports.
+    One false status claim was found and corrected — the Markdown deep dive
+    asserted that roadmap M003 had "**no** registered implementation plan",
+    which the registry and the roadmap both contradict.
 
 ## External interface research baselines
 
@@ -423,6 +467,17 @@ integration milestone is actually handed off.
     revision the host pins; those digest bytes are frozen by
     `crates/eggplan-repo/tests/git_subject_digest_golden.rs`, so a host that
     derives a different digest fails loudly rather than silently.
+24. Plan lifecycle legality has one owner: `eggplan_core::plan_transition_allowed`.
+    The CLI asks that table and reports what it says; it must not restate the
+    legal-transition set in the adapter. The specification's lifecycle diagram
+    is authoritative over the domain table, and any refinement of it is
+    recorded by ADR.
+25. Plan structure editing is an ordinary mutation: it writes through the
+    repository's compare-and-swap, and therefore through `Plan::validate`, the
+    dependency graph's rules, the closed-plan immutability guard, and the
+    guarded-closure guard. It must not become a path that writes canonical
+    state outside the store, and it must not be able to change a plan's status
+    or reach `Closed`.
 
 ## Planning hygiene
 

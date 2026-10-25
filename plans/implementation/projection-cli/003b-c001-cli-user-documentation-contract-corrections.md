@@ -1,6 +1,6 @@
 # Projection/CLI M003b C001 — CLI User-Documentation Contract Corrections
 
-Status: ready
+Status: closed (see plans/closure/projection-cli/003b-c001-closed.md)
 
 Repository baseline: 37ad290ca6b971a68d2871aedb39f4882f4eb2a8
 

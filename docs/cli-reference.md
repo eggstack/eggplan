@@ -9,12 +9,32 @@ Every command accepts `--json` for a stable machine-readable envelope.
 
 | Flag | Meaning |
 |---|---|
-| `--state-root PATH` | Location of canonical state (conventionally `.eggplan`). Never implicit. |
+| `--state-root PATH` | Location of canonical state. Defaults to `.eggplan`, relative to the current working directory. |
 | `--json` | Emit the JSON envelope instead of human output. |
 | `--help`, `-h` | Print usage. |
 
 Value-taking flags: `--state-root`, `--input`, `--expected-revision`,
-`--provider-policy`, `--status`, `--blocker`, `--next-action`, `--output`, `--format`.
+`--provider-policy`, `--status`, `--blocker`, `--next-action`, `--output`, `--format`,
+`--limit`, `--after`, `--to`.
+
+`--state-root` is the one flag whose default is worth naming explicitly: omitting it
+operates on `.eggplan` **under the directory you happen to be in**, not on the state root
+you meant. Pass it on every invocation. The single exception is `markdown import`, which
+refuses the default and requires the flag.
+
+## Setup and help
+
+| Command | Purpose |
+|---|---|
+| `init` | Create the state root (`.eggplan` by default) and its repository identity |
+| `help [COMMAND]` | Print the usage text, or one command's own options, flags, and subcommands |
+
+`init` creates the state root, its `plans/` directory, and the repository identity if they
+are not there yet; an existing state root keeps the identity it already has. It creates a
+repository, not a plan, so it takes no `--expected-revision`.
+
+`help` with no argument prints the full usage listing. `help COMMAND` — or `--help
+COMMAND` — prints that one command's own options, flags, and subcommands.
 
 ## Read commands
 
@@ -28,7 +48,8 @@ Value-taking flags: `--state-root`, `--input`, `--expected-revision`,
 | `check [PLAN_ID]` | Read-only validation; omit the ID to check all |
 | `evidence list\|show\|supersessions` | Immutable observation and correction lineage (read-only) |
 | `closure show PLAN_ID` | Bounded summary of the validated closure record |
-| `completions bash\|zsh\|fish\|powershell` | Print a shell completion script to stdout |
+| `plan export PLAN_ID [--output FILE]` | Canonical Plan JSON for one plan |
+| `completions bash\|zsh\|fish\|powershell` | Generate a shell completion script |
 
 `evidence` is **read-only**. The CLI has no command that records an observation, so
 `evidence add` returns a usage error. Writing evidence is a host responsibility — see
@@ -121,18 +142,42 @@ Completion, help text, and option validation are all generated from one declarat
 command inventory, so they cannot drift into three separate lists of what the CLI
 accepts. Add a command there and help and every completion shell change together.
 
+### Completion depth
+
+All four shells complete to the same depth:
+
+- the top-level command names;
+- the subcommands of the command you are completing;
+- that command's options and flags, including the options that belong to one of its
+  subcommands;
+- the fixed values of the option you are completing, when that option accepts a closed
+  set.
+
+So `eggplan evidence <TAB>` offers `list`, `show`, and `supersessions`, and
+`eggplan list --status <TAB>` offers the canonical plan statuses
+(`draft`, `active`, `blocked`, `closed`, `cancelled`). The same holds for `zsh`, `fish`,
+and `powershell`: the depth is a property of the generator, not of one shell.
+
 ## Mutating commands
 
-All require `--expected-revision N`.
+| Command | `--expected-revision` | Purpose |
+|---|---|---|
+| `new --input PLAN.json` | not required | Create from strict Plan JSON |
+| `activate PLAN_ID --expected-revision N` | required | Draft → Active |
+| `item update PLAN_ID ITEM_ID --expected-revision N` | required | Update `--status`, `--blocker`, `--next-action` |
+| `markdown import FILE --state-root PATH` | not required | Create one Draft plan from Markdown intent |
+| `plan set-status PLAN_ID --to STATUS --expected-revision N` | required | Move a plan along its lifecycle |
+| `plan edit PLAN_ID --input FILE --expected-revision N` | required | Replace a plan's structure |
 
-| Command | Purpose |
-|---|---|
-| `new --input PLAN.json` | Create from strict Plan JSON |
-| `activate PLAN_ID --expected-revision N` | Draft → Active |
-| `item update PLAN_ID ITEM_ID --expected-revision N` | Update one of `--status`, `--blocker`, `--next-action` |
-| `markdown import FILE --state-root PATH` | Create one Draft plan from Markdown intent |
+`new` and `markdown import` **create** a plan rather than change an existing
+one. They write revision 0, so there is no prior revision to compare against,
+and they take no `--expected-revision`. Every command that changes a plan
+that already exists requires the flag, so a concurrent edit is reported
+instead of silently overwritten.
 
-`item update` takes exactly one of `--status`, `--blocker`, or `--next-action`.
+`item update` requires **at least one** of `--status`, `--blocker`, or
+`--next-action`, and applies every field you supply — passing two or three
+updates them together in one revision.
 
 Item status changes are checked against a transition table, so you cannot jump states:
 
@@ -146,6 +191,61 @@ Item status changes are checked against a transition table, so you cannot jump s
 
 An illegal move fails with `invalid_transition`. In particular, `pending → in_progress` is
 not legal; go through `actionable` first.
+
+Plan status changes are checked against the plan's own transition table:
+
+| From | Legal next states |
+|---|---|
+| `draft` | `active`, `cancelled` |
+| `active` | `blocked`, `closed`, `cancelled` |
+| `blocked` | `active`, `closed`, `cancelled` |
+| `closed`, `cancelled` | terminal — no transitions |
+
+`plan set-status` can set `active`, `blocked`, or `cancelled`. `closed` is
+written only by `eggplan close`, which runs the guarded finalizer, so
+`--to closed` is refused with `guarded_closure_required` and a message
+pointing at `eggplan close`. `--to draft` is refused with
+`invalid_transition`, because no transition reaches `draft`. Any other
+illegal move fails with `invalid_transition` too. A revision that is not the
+plan's current one fails with `revision_conflict`.
+
+`eggplan activate` is the shorthand for `plan set-status --to active`.
+
+## Plan structure editing
+
+`eggplan plan export PLAN_ID [--output FILE]` writes the plan's canonical Plan
+JSON — the same strict form `new` accepts — to stdout, or to `FILE` when
+`--output` is given. That is exactly what `plan edit` consumes, so the round
+trip is:
+
+```sh
+eggplan plan export ep_release --output plan.json --state-root .eggplan
+# edit plan.json
+eggplan plan edit ep_release --input plan.json --expected-revision 0 --state-root .eggplan
+```
+
+`plan edit` replaces the plan's structure: its objective, its items, their
+dependencies, their acceptance criteria, and their evidence requirements. It
+goes through the repository's compare-and-swap, so the same validation applies
+as for any other write — the plan's bounds, the dependency graph's bounds and
+acyclicity, and the item-status transition rules.
+
+Four rules apply:
+
+- the submitted plan's `id` must match the plan you are editing;
+- `plan edit` **cannot change the plan's status**. Use `plan set-status` for
+  that. A submitted status that differs from the current one is refused with
+  `invalid_transition` — so if the plan's status changed after you exported
+  it, export it again rather than editing the stale copy;
+- a `closed` plan is refused with `closed_plan_immutable`;
+- the revision you pass must be the plan's current revision. A stale one is
+  refused with `revision_conflict`.
+
+An input that is malformed, carries fields the Plan schema does not define, or
+names a different plan is refused with `invalid_plan`.
+
+`plan edit` writes no evidence, no provider trust, no subject revision, and no
+closure record.
 
 ## Status vocabularies
 
@@ -211,12 +311,17 @@ silent.
 | `failed` | Evidence reports failure |
 | `awaiting_human_judgment` | Criteria permit human judgment |
 | `inconclusive` | Evidence is present but does not resolve |
-| `unavailable` | Evidence is unavailable/not-run/skipped, or the subject is unavailable |
+| `unavailable` | An observation's status is `unavailable`, or the Git subject cannot be captured |
 | `stale` | A stored closure record's subject no longer matches the current subject |
 | `invalid_or_stale` | Evidence is bound to an invalid or superseded subject |
 
 Structural problems surface as typed diagnostics instead: `invalid_plan`, `corrupt_state`,
 `recovery_required`.
+
+An observation whose status is `not_run` or `skipped` surfaces as `incomplete`,
+not `unavailable`. The assessment layer maps `not_run`, `skipped`, and
+`unavailable` to the same assessment status; only an observation whose status
+is literally `unavailable` produces the `unavailable` check state.
 
 `check` also emits the check-time reason code `closure_subject_stale`. It is distinct from
 the finalization-time diagnostics `closure_subject_changed`,

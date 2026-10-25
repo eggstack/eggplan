@@ -80,7 +80,7 @@ Planning-system bootstrap:
 | Projection/CLI | M003b batch queries + compact projections + shell completions | closed | plans/implementation/projection-cli/003b-batch-compact-projections-and-shell-completions.md | closure plans/closure/projection-cli/003b-closed.md; implementation `2c32ffe`, hosted run `37368489637` (all four jobs green) |
 | CodeGG integration | M001 golden parity + adapter seam | closed | plans/implementation/codegg-integration/001-golden-parity-and-adapter-seam.md | closure plans/closure/codegg-integration/001-closed.md |
 | CodeGG integration | M002 staged Eggplan assessment adoption | closed | plans/implementation/codegg-integration/002-staged-eggplan-assessment-adoption.md | closure plans/closure/codegg-integration/002-closed.md; Eggplan bridge 088968b + 1291799, CodeGG adoption 3e992291/3c7438c7, CodeGG closure ffa1c15e |
-| CodeGG integration | M003 repository Plan binding contract | closed | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Eggplan contract implementation `3f7c603` qualified by hosted run `36868055136`; the CodeGG consumer is implemented at CodeGG `53dea47f` and hosted-qualified there by run `36938461935` (success), satisfying the former condition. Closure: plans/closure/codegg-integration/003-conditionally-closed.md |
+| CodeGG integration | M003 repository Plan binding contract | closed | plans/implementation/codegg-integration/003-repository-plan-binding-contract.md | Eggplan contract implementation `3f7c603` qualified by hosted run `36868055136`; the CodeGG consumer is implemented at CodeGG `53dea47f` and hosted-qualified there by run `36938461935` (success), satisfying the former condition. Closure: plans/closure/codegg-integration/003-closed.md |
 | CodeGG integration | M003 C001 dirty-subject fingerprint + bound-evidence requalification | closed | plans/implementation/codegg-integration/003-c001-dirty-subject-fingerprint-and-bound-evidence-requalification.md | Eggplan fingerprint contract implemented at `0dd33b7` (hosted run `37063328954`, all four jobs green; earlier Windows failures `37062437251`/`37062837529` retained as non-passing evidence); CodeGG half implemented at `36ec9322`, pinned `0dd33b7` and consumed the API in `3623f65e` + `b470865a` (PR `dbowm91/codegg#90`, hosted `CI` `37084905013` green on `main`). Closure: plans/closure/codegg-integration/003-c001-closed.md. Historical M003 remains closed. |
 | CodeGG integration | M003 C002 compatibility boundary-guard completeness | closed | plans/implementation/codegg-integration/003-c002-boundary-guard-completeness.md | closure plans/closure/codegg-integration/003-c002-closed.md; non-blocking tooling hardening — the bridge source was already pure |
 | Eggstack integrations | M001 evidence provider SPI | closed | plans/implementation/eggstack-integration/001-evidence-provider-spi.md | closure plans/closure/eggstack-integration/001-closed.md |
@@ -96,6 +96,11 @@ Planning-system bootstrap:
 | Projection/CLI | M003b C002 shell completion depth parity | closed | plans/implementation/projection-cli/003b-c002-shell-completion-depth-parity.md | raised by the 2026-10-23 repository audit; completion depth and test strength; closure plans/closure/projection-cli/003b-c002-closed.md; implementation `a60d36b` |
 | Projection/CLI | M003b C003 Markdown interchange panic-path + bound hygiene | closed | plans/implementation/projection-cli/003b-c003-markdown-interchange-panic-path-and-bound-hygiene.md | raised by the 2026-10-23 repository audit; non-blocking maintenance; closure plans/closure/projection-cli/003b-c003-closed.md; implementation `a60d36b` |
 | Projection/CLI | M004 plan lifecycle transitions + plan structure editing | closed | plans/implementation/projection-cli/004-plan-lifecycle-and-structure-editing.md | capability gap against the normative lifecycle and the roadmap completion criterion; decisions D1-D6 taken and recorded in `plans/adrs/ADR-0005-plan-lifecycle-and-structure-editing-through-the-cli.md`; closure plans/closure/projection-cli/004-closed.md; implementation `a60d36b` |
+| Foundation | M004 C001 boundary-guard dependency-key patterns | closed | plans/implementation/foundation-core/004-c001-boundary-guard-dependency-key-patterns.md | raised by the 2026-10-25 defect audit; the seven anchored manifest rules did not match the workspace-inheritance spelling this repository uses, so a dependency the guards forbid passed them; closed — plans/closure/foundation-core/004-c001-closed.md; 23 negative proofs, all five guards green |
+| Projection/CLI | M004 C001 CLI help subcommand fidelity | closed | plans/implementation/projection-cli/004-c001-cli-help-subcommand-fidelity.md | raised by the 2026-10-25 defect audit; the help renderer did not scope options per subcommand, so help and the CLI's own validation disagreed; closed — plans/closure/projection-cli/004-c001-closed.md; the help page and the validator now read one option list |
+| Eggstack integrations | M004 C001 fixture inventory + integrations design-record citations | closed | plans/implementation/eggstack-integration/004-c001-fixture-inventory-and-citation-truthfulness.md | raised by the 2026-10-25 defect audit; the fixture manifest named a subset of its fixtures, and the integrations deep dive carried stale citations (23 in the recorded scope, 35 on audit); closed — plans/closure/eggstack-integration/004-c001-closed.md; manifest now exhaustive, 144 citation tokens verified |
+| CodeGG integration | M004 C001 closure naming + planning-record truthfulness | closed | plans/implementation/codegg-integration/004-c001-closure-naming-and-planning-record-truthfulness.md | raised by the 2026-10-25 defect audit; one closure record's filename contradicted its recorded status, and no written rule governed how a closure commit is staged; closed — plans/closure/codegg-integration/004-c001-closed.md; record renamed with a dated erratum, staging rule added |
+| Evidence | M003 repair or quarantine for desynchronized plans | proposed | plans/implementation/evidence-closure/003-repair-or-quarantine-for-desynchronized-plans.md | capability gap, not a corrective; prevention is closed and the gap is the absence of a repair surface; the semantic choice of what a desynchronized record becomes is undecided, so this is registered and not handed to an implementation agent |
 
 ## Corrective history and current maintenance
 
@@ -289,6 +294,47 @@ so they are not reopened: the deferred Interop/distribution subsystem
 of scope by design; and the fact that `eggplan-integrations` and
 `eggplan-codegg-compat` have no in-repo consumer, which follows from the
 host-owned acquisition boundary and from CodeGG being an external consumer.
+
+### Lines raised by the 2026-10-25 defect audit
+
+A second repository-wide read-only audit was performed against baseline
+`ee54a0b8e2cb0d843565c54930ad2c21111320db`, the state left by the
+Projection/CLI line. It enumerated the *unresolved findings* sections of all
+nine closure records, so the defect set came from the repository's own record
+of what it had left open rather than from a fresh opinion. Eight defects were
+researched; four became corrective plans, one became a milestone plan, and
+three needed no code.
+
+| Line | Subsystem | Scope | Plan | Closure |
+|---|---|---|---|---|
+| C001 | Foundation | Boundary-guard dependency-key patterns | plans/implementation/foundation-core/004-c001-boundary-guard-dependency-key-patterns.md | closed — plans/closure/foundation-core/004-c001-closed.md |
+| C001 | Projection/CLI | CLI help subcommand fidelity | plans/implementation/projection-cli/004-c001-cli-help-subcommand-fidelity.md | closed — plans/closure/projection-cli/004-c001-closed.md |
+| C001 | Eggstack integrations | Fixture inventory + design-record citation truthfulness | plans/implementation/eggstack-integration/004-c001-fixture-inventory-and-citation-truthfulness.md | closed — plans/closure/eggstack-integration/004-c001-closed.md |
+| C001 | CodeGG integration | Closure naming + planning-record truthfulness | plans/implementation/codegg-integration/004-c001-closure-naming-and-planning-record-truthfulness.md | closed — plans/closure/codegg-integration/004-c001-closed.md |
+| M003 | Evidence | Repair or quarantine for desynchronized plans | plans/implementation/evidence-closure/003-repair-or-quarantine-for-desynchronized-plans.md | proposed — capability gap, not a corrective |
+
+The highest-severity finding was the boundary-guard dependency-key bypass, and
+it was verified by direct reproduction before any change was made: the seven
+anchored manifest rules did not match the workspace-inheritance spelling
+`name.workspace = true`, which is how this repository declares every shared
+dependency, so a dependency the guards forbid passed them. The repaired guards
+were proved with 23 negative cases, each of which must now fail.
+
+Three of the eight findings needed no code and are recorded here so they are
+not reopened: the integrations guard's `lib.rs` scan scope was already closed
+by `674264d`; the core guard's tool precondition was already closed by
+Foundation M003 C005; and the `deep-dive-repository` citation drift was
+already closed by the M004 wave. Each of the three is recorded as a dated
+erratum on the record that had carried it open, so the historical conclusion
+stands and the finding does not reappear.
+
+One finding is explicitly *not* a defect. The C004 closed-plan immutability
+invariant holds — an ordinary compare-and-swap can no longer modify a Closed
+Plan — so what is missing is a repair surface for a record that is
+nonetheless desynchronized, not a broken guarantee. It is registered as the
+Evidence M003 milestone plan above, at `proposed`, because the semantic choice
+— delete, demote, quarantine, or re-derive — is a product decision and the
+options differ in consequence for closure authority.
 
 
 ## Current execution order
@@ -489,3 +535,5 @@ integration milestone is actually handed off.
 - No hidden model reasoning in persisted schemas.
 - Mark maintenance gates explicitly: non-blocking hygiene must not serialize
   otherwise independent capability handoffs.
+- Stage a closure-record commit by explicit path in the Git index; never
+  `git add -A` while another milestone's work is in flight.

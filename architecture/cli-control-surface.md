@@ -135,9 +135,21 @@ subcommand-scoped options, closed value sets, and short help text.
 
 Three things read it, so they cannot drift into independent inventories:
 
-1. the top-level `usage()` line and per-command `--help COMMAND` rendering;
+1. the top-level `usage()` line and the per-command and per-subcommand help pages
+   (`eggplan help COMMAND SUBCOMMAND` and `eggplan COMMAND SUBCOMMAND --help`);
 2. unknown-option and unknown-flag validation in `validate_command_options`;
 3. the four shell completion generators.
+
+The help page and the option validator read the same list. A page for a named
+subcommand lists the parent's options plus that subcommand's own options — exactly
+the set `options_for` returns for that command and subcommand — so a page cannot
+list fewer options than the command accepts, and the page and the validator cannot
+disagree. `eggplan help COMMAND SUBCOMMAND` and `eggplan COMMAND SUBCOMMAND --help`
+are the same request and render the same page; a page for a named subcommand
+replaces the parent's `SUBCOMMAND` slot with the subcommand's name and advertises
+only the positional shape that subcommand still consumes. A word that is not a
+subcommand of the named command is a `usage` error naming the accepted subcommands,
+in the validator's own wording.
 
 Parser *execution* remains handwritten. This is deliberately not a parser migration:
 the milestone needed a single inventory to hang completions and validation from, and
@@ -148,6 +160,9 @@ unless exact CLI JSON/error compatibility is proven first.
 `eggplan_cli::command_metadata()` exposes a read-only view of the table so a test can
 prove help is *derived* from it, and `metadata_drives_help_validation_and_completions_together`
 proves every declared option is accepted while an undeclared one still fails.
+`crates/eggplan-cli/tests/help_fidelity.rs` proves the agreement property itself: for
+every command and every subcommand, the options a help page lists are exactly the
+options the validator accepts.
 
 ### Shell completion depth
 
@@ -155,11 +170,11 @@ The four completion generators reach the *same* depth, and the depth is stated r
 than implied: the top-level command names; the subcommands of the command being
 completed; that command's options and flags, including the options scoped to one of
 its subcommands; and the fixed values of the option being completed, when that option
-declares a closed value set. `crates/eggplan-cli/src/commands.rs:530-531` records the depth
+declares a closed value set. `crates/eggplan-cli/src/commands.rs:569-570` records the depth
 as a constant that every generated script states in its own header.
 
 The generators are written from one per-command model — the `CompletionModel`
-(`crates/eggplan-cli/src/commands.rs:557-559`) — rather than from four hand-written fragments,
+(`crates/eggplan-cli/src/commands.rs:596-598`) — rather than from four hand-written fragments,
 so a shell cannot quietly consume less of the table than another. The CLI test
 `completion_scripts_reach_the_same_declared_depth_in_every_shell`
 (`crates/eggplan-cli/tests/batch_and_completions.rs:1555`) asserts the depth per shell

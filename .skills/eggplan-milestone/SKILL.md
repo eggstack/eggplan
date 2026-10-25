@@ -79,3 +79,7 @@ An unqualified sibling path is a broken reference that reads as a local one.
 - Never copy Eggwork/Eggsearch/Eggbench responsibilities into `eggplan-core`.
 - A plan document is never evidence that a capability exists.
 - Current milestone status lives in `registry.md`, never in `architecture/`.
+- Stage a closure-record commit by explicit path in the Git index. Never
+  `git add -A` while another milestone's work is in flight — a blanket stage
+  sweeps unrelated in-flight changes into a closure commit. This is Git-index
+  staging, not the filesystem staging the ADRs use for atomic writes.

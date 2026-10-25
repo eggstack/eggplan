@@ -215,6 +215,27 @@ Deferred. Only after consumers demonstrate need: ancestry-aware subject reuse,
 signed-provider requirements, richer all/any/quorum semantics, or policy
 profiles. Avoid a general policy language.
 
+### M003 — Repair or quarantine for a desynchronized plan
+
+Raised by the 2026-10-25 defect audit against baseline
+`ee54a0b8e2cb0d843565c54930ad2c21111320db`. The C004 invariant holds — an
+ordinary compare-and-swap can no longer modify a Closed Plan, so no reachable
+path desynchronizes it from its ClosureRecord. What is missing is a *repair
+surface* for a record that is nonetheless desynchronized: the store detects
+the condition and the CLI reports it as `corrupt_state`, with no way forward
+and no rule saying what such a record should become.
+
+This is a **capability gap, not a defect**, so it is a milestone plan rather
+than a corrective plan. It is registered `proposed` and has no implementation:
+the semantic choice — whether a desynchronized record should be deleted,
+demoted, quarantined, or re-derived — is a product decision, and the options
+differ in consequence for closure authority. Attempting it inside a corrective
+would risk weakening the closed-plan immutability guard that C004 installed.
+
+| Milestone | Class | Scope | Plan | Closure |
+|---|---|---|---|---|
+| M003 | capability gap | A repair or quarantine surface for a desynchronized plan, and the semantic decision it encodes | plans/implementation/evidence-closure/003-repair-or-quarantine-for-desynchronized-plans.md | proposed — no implementation; no closure record |
+
 ## 8. Verification
 
 Golden matrices must cover every normalized status, missing or dangling refs,

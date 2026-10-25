@@ -4,6 +4,19 @@ set -euo pipefail
 manifest="crates/eggplan-core/Cargo.toml"
 source_dir="crates/eggplan-core/src"
 
+# The pure-crate manifest set, for the production-filesystem rule below.
+# `eggplan-repo` is deliberately absent: it is the one crate that legitimately
+# depends on `tempfile` in production, because its atomic write path is built
+# on it (`crates/eggplan-repo/src/store.rs`).
+pure_crate_manifests=(
+    "crates/eggplan-core/Cargo.toml"
+    "crates/eggplan-projection/Cargo.toml"
+    "crates/eggplan-markdown/Cargo.toml"
+    "crates/eggplan-integrations/Cargo.toml"
+    "crates/eggplan-codegg-compat/Cargo.toml"
+    "crates/eggplan-cli/Cargo.toml"
+)
+
 # Precondition: the guards below run `rg`, and every one of them treats "no
 # match" as success. If `rg` is missing, each invocation exits 127 inside a
 # conditional, the conditional takes the else branch, and the guard reports
@@ -25,15 +38,16 @@ require_tools() {
     return 0
 }
 
-require_tools rg mktemp || exit 1
+require_tools rg mktemp awk || exit 1
 
 # ---------------------------------------------------------------------------
-# Pure-core boundary. Three guards, each stated with the exact scope it scans,
+# Pure-core boundary. Four guards, each stated with the exact scope it scans,
 # so a failure message never claims more than was checked.
 #
-#   1. no_prohibited_dependency  manifest, every section
-#   2. no_impure_source          src tree, all files
-#   3. no_reasoning_field        src tree, all files
+#   1. no_prohibited_dependency      manifest, every section
+#   2. no_impure_source              src tree, all files
+#   3. no_reasoning_field            src tree, all files
+#   4. no_production_tempfile_dep    manifest, [dependencies] section only
 #
 # Guard 1 scans the whole manifest, including [dev-dependencies] and
 # [build-dependencies]: a pure domain crate must not pull in an async runtime,
@@ -45,6 +59,13 @@ require_tools rg mktemp || exit 1
 # so only a source scan can detect them.
 #
 # Guard 3 scans the whole src tree for public reasoning/transcript fields.
+#
+# Guard 4 is section-scoped and spans the pure crates: `tempfile` is a
+# legitimate dev-dependency for the crates whose tests need a scratch
+# directory, and a legitimate production dependency of `eggplan-repo`, whose
+# atomic write path is built on it. No other crate may reach for it in
+# production, because a production filesystem dependency in a pure crate is
+# the same impurity guard 2 forbids in source form.
 #
 # Every guard maps ripgrep's exit status explicitly: 0 is a violation, 1 is
 # clean, and anything else means the scan could not be performed. A scan that
@@ -58,8 +79,59 @@ require_tools rg mktemp || exit 1
 # in a temporary directory. They never write tracked source.
 # ---------------------------------------------------------------------------
 
-# Guard 1 pattern, unchanged from the pre-hardening script.
-PROHIBITED_DEPENDENCY_PATTERN='(^|[[:space:]])(tokio|async-std|reqwest|hyper|sqlx|rusqlite|diesel|subprocess|bollard|rmcp|openai|ollama)([[:space:]]|=|$)'
+# The dependency-key matcher shared by every manifest rule in this script.
+#
+# A Cargo dependency can be declared in four spellings, and a boundary rule
+# that misses one of them is not a boundary:
+#
+#   name = "1"                            plain
+#   name.workspace = true                 workspace inheritance
+#   other = { package = "name" }          renamed
+#   [dependencies.name]                   table form
+#
+# The first spelling alone was the only one the previous pattern modelled.
+# This repository declares every shared dependency in the inheritance form,
+# so a rule that models only the plain form reports success against a
+# manifest that declares exactly what it forbids.
+#
+# A hyphenated sub-crate belongs to the same family and is matched as one
+# (`tokio-util` is `tokio`), except where the name is not a family -- a
+# crate named `eggplan-repo-*` is a plausible future sibling, not a sub-crate
+# of the forbidden `eggplan-repo`, so the suffix is opt-out.
+#
+# Every alternative is anchored to a dependency-key position, so a comment,
+# a field value, or an unrelated crate whose name merely contains a forbidden
+# name is not a false positive.
+dep_pattern() {
+    local names="$1" sub='(-[A-Za-z0-9_-]+)?'
+    if [ "${2:-}" = "no-subcrate" ]; then
+        sub=''
+    fi
+    printf '%s' \
+        "^[[:space:]]*(${names})${sub}[[:space:]]*(=|\\.workspace[[:space:]]*=|\$)" \
+        "|^\\[[^\\]\\n]*\\.(${names})${sub}[[:space:]]*\\]" \
+        "|^[^#\\n]*package[[:space:]]*=[[:space:]]*\"(${names})${sub}\""
+}
+
+# Extract the production `[dependencies]` section of a manifest, so that a
+# section-scoped rule reuses the same dependency-key matcher as the
+# all-sections rules instead of restating it in a second dialect. A
+# `[dependencies.name]` table is a production dependency too and is kept.
+production_section() {
+    awk '
+        /^\[dependencies\][[:space:]]*$/ { active = 1; next }
+        /^\[dependencies\.[^]]+\][[:space:]]*$/ { active = 1; print; next }
+        /^\[/ { active = 0 }
+        active { print }
+    ' "$1"
+}
+
+# Guard 1 pattern: the prohibited dependency families, in every declaration
+# spelling Cargo and this repository actually use.
+PROHIBITED_DEPENDENCY_PATTERN="$(dep_pattern 'tokio|async-std|reqwest|hyper|sqlx|rusqlite|diesel|subprocess|bollard|rmcp|openai|ollama')"
+
+# Guard 4 pattern: `tempfile` as a production dependency.
+PRODUCTION_TEMPFILE_PATTERN="$(dep_pattern 'tempfile')"
 
 # Guard 2 pattern: filesystem, process, network, path, environment, database,
 # and Git access. One alternative per capability, anchored so that a fully
@@ -82,7 +154,8 @@ std::path|\
 \bPath::|\
 \b(sqlx|rusqlite|diesel|sqlite|postgres|sea_orm|tokio_postgres)\b|\
 \b(git2|gix)\b|\
-\bgit::"
+\bgit::|\
+\btempfile::"
 
 # Guard 3 pattern, unchanged from the pre-hardening script.
 REASONING_FIELD_PATTERN='pub[[:space:]]+[^;]*(thinking|scratchpad|chain_of_thought|hidden_reasoning)'
@@ -122,6 +195,28 @@ no_reasoning_field() {
     scan "$REASONING_FIELD_PATTERN" "$1" -n
 }
 
+# Guard 4: no pure crate may take `tempfile` as a production dependency. The
+# rule is section-scoped: a dev-dependency or build-dependency is a legitimate
+# scratch-directory need for a test suite and is not a production dependency.
+no_production_tempfile_dep() {
+    local m="$1" out status=0
+    if [ ! -f "$m" ]; then
+        echo "core boundary guard could not scan $m (manifest not found); refusing to report a pass" >&2
+        return 2
+    fi
+    if out="$(production_section "$m" | rg -n -- "$PRODUCTION_TEMPFILE_PATTERN" -)"; then
+        echo "$m: $out"
+        return 0
+    else
+        status=$?
+    fi
+    if [ "$status" -gt 1 ]; then
+        echo "core boundary guard could not scan $m (rg exited $status); refusing to report a pass" >&2
+        return 2
+    fi
+    return 1
+}
+
 # require_clean <guard-fn> <target> <failure-message>
 #   guard exit 0 -> violation: print the message and fail
 #   guard exit 1 -> clean
@@ -144,7 +239,7 @@ require_clean() {
 }
 
 run_guards() {
-    local m="$1" s="$2"
+    local m="$1" s="$2" pm
 
     require_clean no_prohibited_dependency "$m" \
         "prohibited dependency family found in eggplan-core (scanned: $m, all sections)" || return $?
@@ -154,6 +249,11 @@ run_guards() {
 
     require_clean no_reasoning_field "$s" \
         "reasoning/transcript field found in eggplan-core public source (scanned: $s, all files)" || return $?
+
+    for pm in "${pure_crate_manifests[@]}"; do
+        require_clean no_production_tempfile_dep "$pm" \
+            "production tempfile dependency found outside eggplan-repo (scanned: $pm, [dependencies] section only)" || return $?
+    done
 }
 
 # The tracked tree is checked before the proofs run, so a violation in tracked
@@ -232,6 +332,35 @@ tokio = "1"
 '
 prove "guard1 rejects a dev-dependency" 1 no_prohibited_dependency "$fixtures/Cargo.toml"
 
+# The declaration spellings this repository and Cargo actually use. Each one
+# was invisible to the previous pattern, which modelled only `name = value`.
+for case in \
+    'tokio.workspace = true' \
+    'tokio.workspace=true' \
+    'my-http = { package = "reqwest", version = "0.12" }' \
+    'my-http = { package = "tokio-util" }' \
+    'tokio-util = "1"' \
+    'async-std-util = "0.5"'
+do
+    manifest_fixture "[dependencies]
+$case
+"
+    prove "guard1 rejects: $case" 1 no_prohibited_dependency "$fixtures/Cargo.toml"
+done
+
+manifest_fixture '[dependencies.tokio]
+version = "1"
+'
+prove "guard1 rejects the table form" 1 no_prohibited_dependency "$fixtures/Cargo.toml"
+
+# A commented-out dependency is not a dependency, and a crate whose name
+# merely contains a forbidden name is not the forbidden dependency.
+manifest_fixture '[dependencies]
+# tokio = "1"
+my-http = "x" # package = "reqwest"
+'
+prove "guard1 allows comments and lookalike names" 0 no_prohibited_dependency "$fixtures/Cargo.toml"
+
 # --- guard 2: impure access in the source tree ------------------------------
 source_fixture 'use std::collections::BTreeMap;
 pub fn f() -> BTreeMap<String, String> { BTreeMap::new() }
@@ -268,7 +397,8 @@ for case in \
     'let _ = UdpSocket::bind("x");' \
     'std::env::var("HOME").ok();' \
     'sqlx::query("x");' \
-    'let _ = git2::Repository::open("x");'
+    'let _ = git2::Repository::open("x");' \
+    'let _ = tempfile::NamedTempFile::new();'
 do
     source_fixture "$case
 "
@@ -293,12 +423,53 @@ do
     prove "guard3 rejects: $case" 1 no_reasoning_field "$fixtures/src"
 done
 
+# --- guard 4: production tempfile dependency --------------------------------
+# The rule is section-scoped, so a dev-dependency or build-dependency is
+# allowed: a test suite that needs a scratch directory may declare one.
+manifest_fixture '[dependencies]
+tempfile.workspace = true
+'
+prove "guard4 rejects a production tempfile dependency" 1 no_production_tempfile_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+my-tmp = { package = "tempfile" }
+'
+prove "guard4 rejects a renamed production tempfile dependency" 1 no_production_tempfile_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies.tempfile]
+version = "3"
+'
+prove "guard4 rejects a production tempfile table" 1 no_production_tempfile_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dev-dependencies]
+tempfile.workspace = true
+'
+prove "guard4 allows a dev tempfile dependency" 0 no_production_tempfile_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[build-dependencies]
+tempfile = "3"
+'
+prove "guard4 allows a build tempfile dependency" 0 no_production_tempfile_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+serde.workspace = true
+'
+prove "guard4 allows a clean production section" 0 no_production_tempfile_dep "$fixtures/Cargo.toml"
+
 # --- the real tree ----------------------------------------------------------
-# These three proofs read the tracked manifest and source exactly as the guard
+# These proofs read the tracked manifest and source exactly as the guard
 # itself does. They never write them.
 prove "the real eggplan-core manifest must be free of prohibited dependency families" 0 no_prohibited_dependency "$manifest"
 prove "the real eggplan-core source must be free of impure access" 0 no_impure_source "$source_dir"
 prove "the real eggplan-core source must be free of reasoning/transcript fields" 0 no_reasoning_field "$source_dir"
+
+for pm in "${pure_crate_manifests[@]}"; do
+    prove "the real $pm must have no production tempfile dependency" 0 no_production_tempfile_dep "$pm"
+done
+
+# The eggplan-repo exemption is a deliberate scan-set exclusion, not an inert
+# rule: the same rule flags that manifest when it is scanned.
+prove "the eggplan-repo exemption is deliberate, not an inert rule" 1 no_production_tempfile_dep "crates/eggplan-repo/Cargo.toml"
 
 # --- the precondition -------------------------------------------------------
 # The precondition must refuse a missing tool rather than let the guards run
@@ -309,7 +480,7 @@ if require_tools rg eggplan-boundary-guard-absent-tool >/dev/null 2>&1; then
     exit 1
 fi
 
-if ! require_tools rg mktemp >/dev/null 2>&1; then
+if ! require_tools rg mktemp awk >/dev/null 2>&1; then
     echo "core boundary guard self-proof failed: the precondition rejected the declared tools" >&2
     exit 1
 fi

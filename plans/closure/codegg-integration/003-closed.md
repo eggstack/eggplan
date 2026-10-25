@@ -140,3 +140,37 @@ reference rather than creating a standalone Artifact authority.
 - CodeGG integration subsystem roadmap: `closed`; M003 is its last milestone
   and the CodeGG side is fully closed.
 - No unrelated plan was blocked by the consumer work.
+
+### Factual erratum (2026-10-25): filename corrected to match the recorded status
+
+This record was created as the file `003-conditionally-closed.md` in
+`plans/closure/codegg-integration/` by commit
+`e5cd212`, with `Status: conditionally closed`. Commit `6644725` later
+**amended the file in place** — no rename accompanied it — changing the status
+line to `Status: closed (condition satisfied)` and updating the registry row,
+while the filename was left behind.
+
+The filename therefore contradicted the record's own recorded status, and the
+registry row, the subsystem roadmap, and the registry's own roadmap table all
+read `closed`. `plans/README.md` states the convention: "Closure record:
+`closure/<subsystem>/NNN-status.md`". Enumerating every closure record, this
+was the only filename whose status suffix disagreed with its recorded status;
+`plans/closure/foundation-core/002-conditionally-closed.md` is correctly named,
+because its status really is `conditionally closed`.
+
+The file has been renamed to
+`plans/closure/codegg-integration/003-closed.md` under the corrective plan
+`plans/implementation/codegg-integration/004-c001-closure-naming-and-planning-record-truthfulness.md`.
+
+This is a **factual erratum only**. The status line, the condition-satisfaction
+evidence, the preserved original condition text, the roadmap and registry
+disposition, every finding, and every conclusion in this record are unchanged.
+The rename changes the record's *name* so that it agrees with the status the
+record already stated; it changes nothing the record asserts. The former path
+remains reachable through `git log --follow` on the new path.
+
+Two closure records that carried the registry-row finding as an unresolved
+item — `plans/closure/codegg-integration/003-c002-closed.md` and
+`plans/closure/evidence-closure/002-c004-closed.md` — still name the former
+filename in the body of those findings. Those rows are historical evidence of
+what was open at the time and are deliberately left textually intact.

@@ -541,15 +541,12 @@ fn dispatch(args: ParsedArgs, state_root: PathBuf) -> Result<ExecutionResult, Cl
     }
 }
 
-/// `help COMMAND` and `--help COMMAND` render that command's own metadata; a
-/// bare `help` renders the full usage.
+/// `help COMMAND SUBCOMMAND` and `COMMAND SUBCOMMAND --help` render the same
+/// page: the named command's own metadata, scoped to the named subcommand.
+/// A bare `help` renders the full usage.
 fn help_result(args: &ParsedArgs) -> Result<ExecutionResult, CliFailure> {
-    let requested = args
-        .positional
-        .first()
-        .map(String::as_str)
-        .or_else(|| (args.command != "help").then_some(args.command.as_str()));
-    let detail = requested.and_then(commands::command_help);
+    let (command, subcommand) = help_target(args)?;
+    let detail = command.and_then(|command| commands::command_help(command, subcommand));
     let help = detail.clone().unwrap_or_else(usage);
     success(
         args,
@@ -557,6 +554,96 @@ fn help_result(args: &ParsedArgs) -> Result<ExecutionResult, CliFailure> {
         Vec::new(),
         help,
     )
+}
+
+/// The command and the subcommand a help request names.
+///
+/// Two request forms exist, and they are the same request:
+///
+/// - `eggplan help COMMAND SUBCOMMAND` — the command is the first positional
+///   and the subcommand the second;
+/// - `eggplan COMMAND SUBCOMMAND --help` — the command is the command word
+///   itself and the subcommand the first positional.
+///
+/// `None` means the request named no command the table knows, so the caller
+/// falls back to the top-level usage.
+fn help_target(args: &ParsedArgs) -> Result<(Option<&str>, Option<&str>), CliFailure> {
+    if args.command == "help" {
+        // `help` takes the command and the subcommand as its two positionals;
+        // a third one names nothing.
+        if args.positional.len() > 2 {
+            return Err(failure(
+                &args.command,
+                "usage",
+                format!(
+                    "help accepts a command and a subcommand; got {} positional arguments",
+                    args.positional.len()
+                ),
+                args.json,
+            ));
+        }
+        let command = args.positional.first().map(String::as_str);
+        let subcommand = match (command, args.positional.get(1).map(String::as_str)) {
+            (Some(command), Some(subcommand)) => {
+                resolve_help_subcommand(args, command, subcommand)?
+            }
+            _ => None,
+        };
+        Ok((command, subcommand))
+    } else {
+        // `COMMAND SUBCOMMAND --help`: the command word is the command, and
+        // the first positional is the subcommand — but only for a command that
+        // declares subcommands. For every other command the first positional
+        // is the command's own argument, not a subcommand word.
+        let command = args.command.as_str();
+        let subcommand = match commands::spec(command) {
+            Some(spec) if !spec.subcommands.is_empty() => match args.positional.first() {
+                Some(subcommand) => resolve_help_subcommand(args, command, subcommand)?,
+                None => None,
+            },
+            _ => None,
+        };
+        Ok((Some(command), subcommand))
+    }
+}
+
+/// The subcommand a help request names, or a `usage` error when the word is
+/// not one the named command declares.
+///
+/// An unknown *command* is not an error here: the caller falls back to the
+/// top-level usage, which is what `help` has always done for a name the
+/// command table does not carry.
+fn resolve_help_subcommand<'a>(
+    args: &'a ParsedArgs,
+    command: &'a str,
+    subcommand: &'a str,
+) -> Result<Option<&'a str>, CliFailure> {
+    let Some(spec) = commands::spec(command) else {
+        return Ok(None);
+    };
+    if spec.subcommands.contains(&subcommand) {
+        return Ok(Some(subcommand));
+    }
+    Err(failure(
+        &args.command,
+        "usage",
+        unknown_subcommand_message(command, subcommand),
+        args.json,
+    ))
+}
+
+/// The message for a word that is not a subcommand of the named command.
+///
+/// The validator and the help path share one wording, so the two cannot
+/// describe the same mistake differently.
+fn unknown_subcommand_message(command: &str, subcommand: &str) -> String {
+    match commands::spec(command) {
+        Some(spec) if !spec.subcommands.is_empty() => format!(
+            "unknown subcommand {subcommand:?}; expected one of {}",
+            spec.subcommands.join(", ")
+        ),
+        _ => format!("unknown subcommand {subcommand:?}; {command} accepts no subcommand"),
+    }
 }
 
 /// Validate the supplied options and flags against the declarative command
@@ -572,12 +659,7 @@ fn validate_command_options(args: &ParsedArgs) -> Result<(), CliFailure> {
         return Err(failure(
             &args.command,
             "usage",
-            format!(
-                "unknown subcommand {sub:?}; expected one of {}",
-                commands::spec(&args.command)
-                    .map(|spec| spec.subcommands.join(", "))
-                    .unwrap_or_default()
-            ),
+            unknown_subcommand_message(&args.command, sub),
             args.json,
         ));
     }

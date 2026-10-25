@@ -262,6 +262,25 @@ messages were rewritten for explicit scope regardless, which is what the plan's
 imports only `std::collections`, and no file under `crates/` was modified. The
 defect was in the enforcement, not the crate.
 
+### M004 C001 — Closure naming and planning-record truthfulness
+
+Raised by the 2026-10-25 defect audit against baseline
+`ee54a0b8e2cb0d843565c54930ad2c21111320db`. The M003 closure record's
+filename said `conditionally closed` while its own status line, the registry
+row, this roadmap, and the registry's own roadmap table all said `closed`; the
+status was amended in place by commit `6644725` and the filename was left
+behind. Separately, no written rule governed how a closure-record commit must
+be staged, even though a blanket `git add -A` had once swept another
+milestone's in-flight work into a closure commit.
+
+| Line | Class | Scope | Plan | Closure |
+|---|---|---|---|---|
+| C001 | planning-record truthfulness | Rename the M003 closure record to match its recorded status, correct the references to it, and add a procedure rule for staging a closure commit by explicit path | plans/implementation/codegg-integration/004-c001-closure-naming-and-planning-record-truthfulness.md | closed — plans/closure/codegg-integration/004-c001-closed.md |
+
+This roadmap is terminal and this line does not reopen it; it corrects the
+naming of one of its records. No closed record's status, finding, severity,
+conclusion, or evidence was rewritten.
+
 ## 5. Verification
 
 Golden parity, stale writer races, invalid evidence attribution, bounded

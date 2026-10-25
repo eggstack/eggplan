@@ -184,6 +184,22 @@ Interoperability M001.
 M003a and M003b proceeded independently after their own contract freeze; both
 are now closed, completing the M003 line.
 
+### M004 C001 — Fixture inventory and design-record citation truthfulness
+
+Raised by the 2026-10-25 defect audit against baseline
+`ee54a0b8e2cb0d843565c54930ad2c21111320db`. The integrations fixture manifest
+carried two overlapping inventories whose union named 10 files while the
+directory held 13, so two corpus files were invisible in the manifest a reader
+consults. The integrations deep dive carried stale citations — 23 in the
+recorded scope, 35 on audit.
+
+| Line | Class | Scope | Plan | Closure |
+|---|---|---|---|---|
+| C001 | non-blocking maintenance | Make the fixture manifest exhaustive, and repair and verify every citation in the integrations design record | plans/implementation/eggstack-integration/004-c001-fixture-inventory-and-citation-truthfulness.md | closed — plans/closure/eggstack-integration/004-c001-closed.md |
+
+No fixture byte, digest sidecar, schema version, persisted byte, or production
+Rust source changed.
+
 ## 5. Verification
 
 Provider-specific native failures must remain observable after normalization.

@@ -27,7 +27,7 @@ refuses the default and requires the flag.
 | Command | Purpose |
 |---|---|
 | `init` | Create the state root (`.eggplan` by default) and its repository identity |
-| `help [COMMAND]` | Print the usage text, or one command's own options, flags, and subcommands |
+| `help [COMMAND [SUBCOMMAND]]` | Print the usage text, or one command's own options, flags, and subcommands |
 
 `init` creates the state root, its `plans/` directory, and the repository identity if they
 are not there yet; an existing state root keeps the identity it already has. It creates a
@@ -35,6 +35,19 @@ repository, not a plan, so it takes no `--expected-revision`.
 
 `help` with no argument prints the full usage listing. `help COMMAND` — or `--help
 COMMAND` — prints that one command's own options, flags, and subcommands.
+
+`help COMMAND SUBCOMMAND` — or `COMMAND SUBCOMMAND --help` — prints that subcommand's
+own page: the options it accepts, including the ones scoped to it, and the arguments
+it takes. The two forms are the same request and print the same page, so
+
+```sh
+eggplan help markdown render
+eggplan markdown render --help
+```
+
+both show that `markdown render` accepts `--output`. A word that is not one of the
+named command's subcommands is refused with a usage error that names the subcommands
+it does accept. The built-in usage line still spells the command `help [ARG]`.
 
 ## Read commands
 

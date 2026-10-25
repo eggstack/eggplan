@@ -12,7 +12,7 @@ written.
 Eggplan production implementation is complete, verified locally and on hosted
 Ubuntu/macOS/Windows plus Rust 1.89, and the frozen subject digest bytes are
 unchanged. This is a post-closure correctness corrective: the M003 closure
-(`plans/closure/codegg-integration/003-conditionally-closed.md`) and its
+(`plans/closure/codegg-integration/003-closed.md`) and its
 preserved conditional-closure narrative are unchanged historical evidence.
 
 The cross-repository contract is now complete and qualified on both sides.
@@ -24,7 +24,7 @@ Source roadmap: `plans/subsystems/codegg-integration-roadmap.md`
 
 Predecessor plan/closure (preserved, not rewritten):
 `plans/implementation/codegg-integration/003-repository-plan-binding-contract.md`
-and `plans/closure/codegg-integration/003-conditionally-closed.md`
+and `plans/closure/codegg-integration/003-closed.md`
 
 Reviewed baseline: `52a4be76b631822799e7f1e76fe5b439c94fd058` (pre-refactor
 `GitSubjectSource` implementation used to freeze the golden digests)

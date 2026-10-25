@@ -38,22 +38,81 @@ done
 # a temporary directory. They never read or write tracked source.
 # ---------------------------------------------------------------------------
 
-# Guard 1: no sibling Eggstack runtime may be linked in. Matched on the
+# The dependency-key matcher shared by every manifest rule in this script.
+#
+# A Cargo dependency can be declared in four spellings, and a boundary rule
+# that misses one of them is not a boundary:
+#
+#   name = "1"                            plain
+#   name.workspace = true                 workspace inheritance
+#   other = { package = "name" }          renamed
+#   [dependencies.name]                   table form
+#
+# The first spelling alone was the only one the previous patterns modelled.
+# This repository declares every shared dependency in the inheritance form,
+# so a rule that models only the plain form reports success against a
+# manifest that declares exactly what it forbids.
+#
+# A hyphenated sub-crate belongs to the same family and is matched as one
+# (`tokio-util` is `tokio`).
+#
+# Every alternative is anchored to a dependency-key position, so a comment,
+# a field value, or an unrelated crate whose name merely contains a forbidden
+# name is not a false positive.
+dep_pattern() {
+    local names="$1"
+    printf '%s' \
+        "^[[:space:]]*(${names})(-[A-Za-z0-9_-]+)?[[:space:]]*(=|\\.workspace[[:space:]]*=|\$)" \
+        "|^\\[[^\\]\\n]*\\.(${names})(-[A-Za-z0-9_-]+)?[[:space:]]*\\]" \
+        "|^[^#\\n]*package[[:space:]]*=[[:space:]]*\"(${names})(-[A-Za-z0-9_-]+)?\""
+}
+
+# require_clean <guard-fn> <target> <failure-message>
+#   guard exit 0 -> violation: print the message and fail
+#   guard exit 1 -> clean
+#   guard exit 2 -> the scan could not be performed: fail closed
+require_clean() {
+    local fn="$1" target="$2" message="$3" status=0
+    "$fn" "$target" || status=$?
+    case "$status" in
+        0)
+            echo "$message" >&2
+            return 1
+            ;;
+        1)
+            return 0
+            ;;
+        *)
+            return 2
+            ;;
+    esac
+}
+
+# Guard 1 pattern: no sibling Eggstack runtime may be linked in. Matched on the
 # dependency key position, not as a free substring, so Eggplan's own
 # `eggplan-codegg-compat` is not a false positive while `eggbench-core` is.
+SIBLING_RUNTIME_PATTERN="$(dep_pattern 'eggwork|eggsearch|eggbench|eggsact|eggsec|codegg|eggpool')"
+
+# Guard 2 pattern: no async runtime, HTTP client, or Git transport.
+TRANSPORT_DEPENDENCY_PATTERN="$(dep_pattern 'tokio|reqwest|hyper|ureq|surf|isahc|async-std|axum|octocrab|git2|gix')"
+
+# Guard 3 pattern: no credential or secret-store helper. An adapter is handed
+# already-verified facts and must never hold or request a secret.
+CREDENTIAL_DEPENDENCY_PATTERN="$(dep_pattern 'secrecy|keyring|jsonwebtoken|oauth2|wiremock')"
+
+# Guard 1: no sibling Eggstack runtime may be linked in.
 no_sibling_runtime() {
-    rg -n '^[[:space:]]*(eggwork|eggsearch|eggbench|eggsact|eggsec|codegg|eggpool)(-[A-Za-z0-9_-]+)?[[:space:]]*=' "$1"
+    rg -n -- "$SIBLING_RUNTIME_PATTERN" "$1"
 }
 
 # Guard 2: no async runtime, HTTP client, or Git transport.
 no_transport_dep() {
-    rg -n '^[[:space:]]*(tokio|reqwest|hyper|ureq|surf|isahc|async-std|axum|octocrab|git2|gix)([[:space:]=]|$)' "$1"
+    rg -n -- "$TRANSPORT_DEPENDENCY_PATTERN" "$1"
 }
 
-# Guard 3: no credential or secret-store helper. An adapter is handed
-# already-verified facts and must never hold or request a secret.
+# Guard 3: no credential or secret-store helper.
 no_credential_dep() {
-    rg -n '^[[:space:]]*(secrecy|keyring|jsonwebtoken|oauth2|wiremock)([[:space:]=]|$)' "$1"
+    rg -n -- "$CREDENTIAL_DEPENDENCY_PATTERN" "$1"
 }
 
 # Guard 4: the adapter never executes a sibling process. Both the fully
@@ -82,20 +141,14 @@ requires_core_contract() {
 run_guards() {
     local m="$1" s="$2"
 
-    if no_sibling_runtime "$m"; then
-        echo "provider adapters must not depend on a sibling runtime in any section, including [dev-dependencies] (scanned: $m, all sections)" >&2
-        return 1
-    fi
+    require_clean no_sibling_runtime "$m" \
+        "provider adapters must not depend on a sibling runtime in any section, including [dev-dependencies] (scanned: $m, all sections)" || return $?
 
-    if no_transport_dep "$m"; then
-        echo "provider adapters must not depend on an async runtime, HTTP client, or Git transport in any section, including [dev-dependencies] (scanned: $m, all sections)" >&2
-        return 1
-    fi
+    require_clean no_transport_dep "$m" \
+        "provider adapters must not depend on an async runtime, HTTP client, or Git transport in any section, including [dev-dependencies] (scanned: $m, all sections)" || return $?
 
-    if no_credential_dep "$m"; then
-        echo "provider adapters must not depend on a credential or secret-store helper in any section, including [dev-dependencies] (scanned: $m, all sections)" >&2
-        return 1
-    fi
+    require_clean no_credential_dep "$m" \
+        "provider adapters must not depend on a credential or secret-store helper in any section, including [dev-dependencies] (scanned: $m, all sections)" || return $?
 
     if no_process_source "$s"; then
         echo "provider SPI must only normalize facts and must not execute a process or read host environment (scanned: $s, all files)" >&2
@@ -141,11 +194,15 @@ source_fixture() {
 }
 
 prove() {
-    local label="$1" expect="$2" fn="$3" target="$4"
-    if "$fn" "$target" >/dev/null 2>&1; then
+    local label="$1" expect="$2" fn="$3" target="$4" status=0
+    "$fn" "$target" >/dev/null 2>&1 || status=$?
+    if [ "$status" -gt 1 ]; then
+        echo "integrations boundary guard self-proof could not scan: $label (guard exit $status)" >&2
+        exit 1
+    fi
+    local got=0
+    if [ "$status" -eq 0 ]; then
         got=1
-    else
-        got=0
     fi
     if [ "$got" != "$expect" ]; then
         echo "integrations boundary guard self-proof failed: $label (expected fail=$expect, got fail=$got)" >&2
@@ -175,11 +232,33 @@ do
     prove "guard1 rejects: $case" 1 no_sibling_runtime "$fixtures/Cargo.toml"
 done
 
+# The declaration spellings this repository and Cargo actually use. Each one
+# was invisible to the previous pattern, which modelled only `name = value`.
+manifest_fixture '[dependencies]
+eggbench-core.workspace = true
+'
+prove "guard1 rejects a sibling runtime by workspace inheritance" 1 no_sibling_runtime "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+my-runtime = { package = "eggbench-core", version = "1" }
+'
+prove "guard1 rejects a renamed sibling runtime" 1 no_sibling_runtime "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies.eggbench-core]
+version = "1"
+'
+prove "guard1 rejects a sibling runtime table" 1 no_sibling_runtime "$fixtures/Cargo.toml"
+
 # The guard must not fire on Eggplan's own crate names or on a substring.
 manifest_fixture '[dependencies]
 eggplan-codegg-compat = { path = "../eggplan-codegg-compat" }
 '
 prove "guard1 allows eggplan-codegg-compat" 0 no_sibling_runtime "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+# eggbench-core = "1"
+'
+prove "guard1 allows a commented sibling runtime" 0 no_sibling_runtime "$fixtures/Cargo.toml"
 
 # --- guard 2: transport dependencies ---------------------------------------
 for case in 'tokio = { version = "1" }' 'reqwest = "0.12"' 'octocrab = "0.4"' 'git2 = "0.19"'; do
@@ -193,6 +272,26 @@ serde.workspace = true
 '
 prove "guard2 clean manifest" 0 no_transport_dep "$fixtures/Cargo.toml"
 
+manifest_fixture '[dependencies]
+tokio.workspace = true
+'
+prove "guard2 rejects tokio by workspace inheritance" 1 no_transport_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+tokio-util = "1"
+'
+prove "guard2 rejects the tokio sub-crate" 1 no_transport_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+my-http = { package = "reqwest", version = "0.12" }
+'
+prove "guard2 rejects a renamed reqwest dependency" 1 no_transport_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies.ureq]
+version = "1"
+'
+prove "guard2 rejects a transport dependency table" 1 no_transport_dep "$fixtures/Cargo.toml"
+
 # --- guard 3: credential dependencies --------------------------------------
 for case in 'secrecy = "0.10"' 'keyring = "3"' 'oauth2 = "5"' 'jsonwebtoken = "9"'; do
     manifest_fixture "[dependencies]
@@ -204,6 +303,21 @@ manifest_fixture '[dependencies]
 serde.workspace = true
 '
 prove "guard3 clean manifest" 0 no_credential_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+secrecy.workspace = true
+'
+prove "guard3 rejects secrecy by workspace inheritance" 1 no_credential_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+my-secret = { package = "secrecy", version = "0.10" }
+'
+prove "guard3 rejects a renamed secrecy dependency" 1 no_credential_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+keyring-core = "3"
+'
+prove "guard3 rejects a credential sub-crate" 1 no_credential_dep "$fixtures/Cargo.toml"
 
 # --- guard 4: process execution in source ----------------------------------
 source_fixture 'pub fn normalize(bytes: &[u8]) -> usize { bytes.len() }

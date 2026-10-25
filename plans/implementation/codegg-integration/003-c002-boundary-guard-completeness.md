@@ -11,7 +11,7 @@ Source roadmap:
 Predecessor plan/closure:
 
 - plans/implementation/codegg-integration/003-repository-plan-binding-contract.md
-- plans/closure/codegg-integration/003-conditionally-closed.md
+- plans/closure/codegg-integration/003-closed.md
 - plans/closure/codegg-integration/003-c001-closed.md
 
 Reviewed CodeGG baseline (research baseline, not a pin):

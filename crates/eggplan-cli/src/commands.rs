@@ -469,23 +469,27 @@ pub(crate) fn usage() -> String {
 
 /// Per-command help, listing the exact options, flags, and subcommands the
 /// metadata declares. Rendered rather than hand-maintained.
-pub(crate) fn command_help(name: &str) -> Option<String> {
+///
+/// A named subcommand gets its own page: the subcommand word replaces the
+/// parent's `SUBCOMMAND` slot, the advertised positional shape is the one the
+/// subcommand still consumes, and the option list is exactly the set
+/// `options_for` validates against. The help page and the validator therefore
+/// read one list, and a page cannot list fewer options than the command
+/// accepts.
+pub(crate) fn command_help(name: &str, subcommand: Option<&str>) -> Option<String> {
     let spec = spec(name)?;
-    let mut out = format!("eggplan {} - {}", spec.name, spec.help);
-    let shape = match spec.positional {
-        Positional::None => "",
-        Positional::One => " <ARG>",
-        Positional::ZeroOrOne => " [<ARG>]",
-        Positional::OneOrMore => " <ARG>...",
-        Positional::Subcommand => " <SUBCOMMAND>",
-        Positional::SubcommandThenOne => " <SUBCOMMAND> <ARG>",
-        Positional::SubcommandThenTwo => " <SUBCOMMAND> <ARG> <ARG>",
+    let (options, flags) = options_for(name, subcommand);
+    let mut out = match subcommand {
+        Some(subcommand) => format!("eggplan {} {} - {}", spec.name, subcommand, spec.help),
+        None => format!("eggplan {} - {}", spec.name, spec.help),
     };
-    out.push_str(shape);
-    if !spec.subcommands.is_empty() {
+    out.push_str(positional_shape(spec.positional, subcommand.is_some()));
+    // The subcommand list belongs to the parent page: a page for one
+    // subcommand describes that subcommand, not its siblings.
+    if subcommand.is_none() && !spec.subcommands.is_empty() {
         out.push_str(&format!("\n  subcommands: {}", spec.subcommands.join(", ")));
     }
-    for option in spec.options {
+    for option in options {
         out.push_str(&format!(
             "\n  {} <{}>  {}",
             option.name, option.placeholder, option.help
@@ -494,10 +498,45 @@ pub(crate) fn command_help(name: &str) -> Option<String> {
             out.push_str(&format!(" [{}]", option.values.join("|")));
         }
     }
-    for flag in spec.flags {
+    for flag in flags {
         out.push_str(&format!("\n  {}  {}", flag.name, flag.help));
     }
     Some(out)
+}
+
+/// The positional shape a help page advertises.
+///
+/// Without a subcommand the shape is the command's own. With one, the
+/// subcommand word has already filled the `SUBCOMMAND` slot, so only the
+/// arguments the subcommand still consumes are left to name.
+fn positional_shape(positional: Positional, subcommand_named: bool) -> &'static str {
+    match positional {
+        Positional::None => "",
+        Positional::One => " <ARG>",
+        Positional::ZeroOrOne => " [<ARG>]",
+        Positional::OneOrMore => " <ARG>...",
+        Positional::Subcommand => {
+            if subcommand_named {
+                ""
+            } else {
+                " <SUBCOMMAND>"
+            }
+        }
+        Positional::SubcommandThenOne => {
+            if subcommand_named {
+                " <ARG>"
+            } else {
+                " <SUBCOMMAND> <ARG>"
+            }
+        }
+        Positional::SubcommandThenTwo => {
+            if subcommand_named {
+                " <ARG> <ARG>"
+            } else {
+                " <SUBCOMMAND> <ARG> <ARG>"
+            }
+        }
+    }
 }
 // ---------------------------------------------------------------------------
 // Shell completion generation

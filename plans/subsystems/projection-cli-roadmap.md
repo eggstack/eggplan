@@ -148,6 +148,21 @@ roadmap and the specification, not to an implementation plan. They are now
 made, so the plan is closed against the ADR above.
 
 
+### M004 C001 — CLI help subcommand fidelity
+
+Raised by the 2026-10-25 defect audit against baseline
+`ee54a0b8e2cb0d843565c54930ad2c21111320db`. The help renderer did not scope
+options per subcommand, so a subcommand's help page listed its *parent's*
+options, and `CMD SUBCOMMAND --help` printed the whole top-level usage. Help
+and the CLI's own validation disagreed about which options a command accepts.
+
+| Line | Class | Scope | Plan | Closure |
+|---|---|---|---|---|
+| C001 | correctness / user-facing truthfulness | Render a subcommand's help from the same option list the validator checks, so the two cannot disagree | plans/implementation/projection-cli/004-c001-cli-help-subcommand-fidelity.md | closed — plans/closure/projection-cli/004-c001-closed.md |
+
+The command inventory, the top-level usage, the frozen help fixture, the JSON
+envelope, and every machine code are unchanged.
+
 ## 5. Verification
 
 CLI snapshots, JSON schema fixtures, invalid-state diagnostics, roundtrip

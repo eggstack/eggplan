@@ -18,13 +18,20 @@ facts into Eggplan observations. See [overview](overview.md),
 - Must never enroll trust: adapters produce a core `ProviderDescriptor` for the
   host to consider, but only the host can add it to its trusted
   `ProviderRegistry` (`crates/eggplan-core/src/evidence.rs:140-160`).
-  The boundary script covers only part of this
-  (`scripts/check-integrations-boundary.sh:7-25`): forbidden dependency names in
-  `Cargo.toml` (`:7-10`), forbidden `use`/async/process/transport tokens under
-  `src` (`:12-15`), `register_trusted|ProviderRegistry` in the two adapter files
-  (`:17-20`), and `eggplan-core` presence (`:22-25`). It greps no filesystem,
-  env-var, or clock primitive, names only `tokio`/`reqwest`/`hyper`/`mcp` as
-  transports, and never reads `lib.rs` for the trust check (see findings).
+  The boundary script covered only part of this. At review time — the script as
+  of revision `60a5f92` — its four guards spanned
+  `scripts/check-integrations-boundary.sh:7-25`: forbidden dependency names in
+  `Cargo.toml` (`scripts/check-integrations-boundary.sh:7-10`), forbidden
+  `use`/async/process/transport tokens under `src`
+  (`scripts/check-integrations-boundary.sh:12-15`),
+  `register_trusted|ProviderRegistry` in the two adapter files
+  (`scripts/check-integrations-boundary.sh:17-20`), and `eggplan-core` presence
+  (`scripts/check-integrations-boundary.sh:22-25`). Every one of those ranges is
+  a range in that revision's file, not in the current one. That revision grepped
+  no filesystem, env-var, or clock primitive, named only
+  `tokio`/`reqwest`/`hyper`/`mcp` as transports, and never read `lib.rs` for
+  the trust check (see findings). Section 7 records the later rewrite into six
+  scope-labelled guards that scan the whole `src` tree, which closes that gap.
 - No `SubjectCapture` / closure finalization surface lives here; that authority
   stays in `eggplan-repo`. This crate ends at `EvidenceObservation`.
 
@@ -73,9 +80,11 @@ facts into Eggplan observations. See [overview](overview.md),
   `src/lib.rs:246-285`), then delegates to
   `eggplan-core::verification_digest` for canonical-JSON domain-separated
   hashing — the envelope domain is the literal
-  `eggplan.provider-verification.v1` and the 65_536-byte cap is applied in core
-  (`crates/eggplan-core/src/schema.rs:78-87`). Matches [provider SPI](provider-spi.md)
-  lines 24-25.
+  `eggplan.provider-verification.v1`
+  (`crates/eggplan-core/src/schema.rs:101-107`) and the 65_536-byte cap is
+  applied in core (constant `crates/eggplan-core/src/schema.rs:22`, check
+  `crates/eggplan-core/src/schema.rs:108-110`). Matches
+  [provider SPI](provider-spi.md) lines 26-27.
 - Generic metadata hygiene (`src/lib.rs:373-417`): entry-count and length
   bounds plus a denylist — sensitive key substrings (`token`, `password`,
   `secret`, `credential`, `authorization`, `endpoint`) and credential/endpoint-
@@ -122,54 +131,60 @@ environment, credentials, leases, timestamps, or raw reason prose
 
 ## 4. Eggsearch adapter (`src/eggsearch.rs`)
 
-Pinned review SHA `dfa90e0…` (`src/eggsearch.rs:17`); 2 MiB bundle cap, max 200
-sources / 100 fetched / 128 gaps (`src/eggsearch.rs:18-21`). Descriptor is
+Pinned review SHA `dfa90e0…` (`src/eggsearch.rs:18`); 2 MiB bundle cap, max 200
+sources / 100 fetched / 128 gaps (`src/eggsearch.rs:19-22`). Descriptor is
 `epp_eggsearch` / `Research` / `Research`-only, no in-progress, no verification
-binding, research-trust required (`src/eggsearch.rs:23-28`,
-`src/eggsearch.rs:137-146`). Consumes a strict DTO subset (`Bundle` at
-`src/eggsearch.rs:117-135`); goals, URLs, snippets, fetched text, and warning
+binding, research-trust required (`src/eggsearch.rs:24-29`,
+`src/eggsearch.rs:138-147`). Consumes a strict DTO subset (`Bundle` at
+`src/eggsearch.rs:118-136`); goals, URLs, snippets, fetched text, and warning
 prose are structurally unselectable and never copied to metadata.
 
 | Bundle condition (as implemented) | Eggplan status |
 |---|---|
-| No sources | `Unavailable` (`src/eggsearch.rs:383-384`) |
-| Nonempty, no gaps/truncation/unfetched | `Passed`, operation only (`src/eggsearch.rs:385-392`) |
-| Any gap, any limit/fetch truncation, or any unfetched item | `Inconclusive` (`src/eggsearch.rs:376-389`) |
+| No sources | `Unavailable` (`src/eggsearch.rs:403-404`) |
+| Nonempty, no gaps/truncation/unfetched | `Passed`, operation only (`src/eggsearch.rs:410-412`) |
+| Any gap, any limit/fetch truncation, or any unfetched item | `Inconclusive` (`src/eggsearch.rs:405-409`) |
 
 Trust-marker semantics: `source_trust` is always `Some(ExternalUntrusted)`
-(`src/eggsearch.rs:398-407`), even when the bundle contains `LocalTrusted`
-sources (counted at `src/eggsearch.rs:306-323` as `trust_local_count`).
+(`src/eggsearch.rs:423`), even when the bundle contains `LocalTrusted`
+sources (counted at `src/eggsearch.rs:307-324` as `trust_local_count`).
 `LocalTrusted` is content provenance only; it never enrolls provider authority
-and never flips the marker (comment at `src/eggsearch.rs:381-382`; asserted in
-tests at `src/eggsearch.rs:574-608`). `Passed` claims only a structurally valid
+and never flips the marker (comment at `src/eggsearch.rs:401-402`; asserted in
+tests at `src/eggsearch.rs:660-667`). `Passed` claims only a structurally valid
 bundle production, never truth of external claims — matching
-[provider SPI](provider-spi.md) lines 36-42 and [Eggsearch
+[provider SPI](provider-spi.md) lines 38-44 and [Eggsearch
 adapter](eggsearch-adapter.md) lines 12-15, 24-25. Identity handling:
 deterministic `sha256:` digests over sorted source/fetch/provider IDs
-(`src/eggsearch.rs:231-260`, `src/eggsearch.rs:506-510`); these are plain
+(`src/eggsearch.rs:232-261`, `src/eggsearch.rs:528-531`); these are plain
 SHA-256 with no domain separator, unlike `verification_digest` (see findings).
 Duplicate fetch IDs, unknown link/fetch/gap references, bad line ranges,
-oversized enums, and limit violations all fail (`src/eggsearch.rs:162-196`,
-`src/eggsearch.rs:410-487`). Artifact is a handle only — `eggsearch:bundle:<id>`
-with `digest: None`, body stays host-native (`src/eggsearch.rs:393-397`).
+oversized enums, and limit violations all fail (`src/eggsearch.rs:163-197`,
+`src/eggsearch.rs:430-509`). Artifact is a handle only — `eggsearch:bundle:<id>`
+with `digest: None`, body stays host-native (`src/eggsearch.rs:413-417`).
 
 ## 5. Fixture / baseline strategy
 
-- `tests/fixtures/manifest.json:1-27` records sibling SHAs as fixture/review
+- `tests/fixtures/manifest.json:1-8` records sibling SHAs as fixture/review
   provenance (`fixture_only: true`), an 11-name case list
-  (`tests/fixtures/manifest.json:9-21`), and the native fixtures
-  (`eggwork-snapshots.json`, `eggwork-artifacts.json`, `eggsearch-bundles.json`).
+  (`tests/fixtures/manifest.json:9-21`), the inventory rule it now states
+  (`tests/fixtures/manifest.json:22-26`), and the complete fixture inventory
+  (`tests/fixtures/manifest.json:27-40`): the native sibling fixtures
+  (`eggwork-snapshots.json`, `eggwork-artifacts.json`,
+  `eggsearch-bundles.json`), the two Eggbench files, the five GitHub files, the
+  verification-digest golden, and the synthetic results corpus.
+  `native_fixture_families` is a provenance overlay over seven of those twelve
+  names and adds no file of its own.
   Unit tests consume the native fixtures directly (`src/eggwork.rs:464-486`,
-  `src/eggsearch.rs:643-665`); `tests/fixtures/synthetic-results.json` is typed
+  `src/eggsearch.rs:824-836`); `tests/fixtures/synthetic-results.json` is typed
   by `FixtureCorpus`/`FixtureCase` (`tests/conformance.rs:64-84`) and its rows
-  are fed through `finalize_observation` at `tests/conformance.rs:533-584`. No
+  are fed through `finalize_observation` at `tests/conformance.rs:638-649`. No
   sibling crate is imported — these are contract fixtures, not live integration,
-  per [provider SPI](provider-spi.md) lines 51-57.
+  per [provider SPI](provider-spi.md) lines 55-59.
 - `tests/fixtures/verification-digest.json:1-6` is the golden baseline for the
   domain-separated envelope (namespace `eggwork`, schema 1, payload
   `{"b":2,"a":{"z":1,"y":0}}`), asserted alongside namespace, schema-version,
-  and payload sensitivity at `tests/conformance.rs:143-168`. It is not listed in
-  the manifest's `native_fixtures`.
+  and payload sensitivity at `tests/conformance.rs:143-168`. It is listed in the
+  manifest's `native_fixtures` (`tests/fixtures/manifest.json:27-40`).
 - `tests/fixtures/synthetic-results.json:1-17` models Eggwork states, Eggsearch
   trust/gap shapes, and Eggbench verdicts as a stable status-mapping table for
   conformance tests. It is a documentation-adjacent contract aid, not evidence
@@ -179,7 +194,7 @@ with `digest: None`, body stays host-native (`src/eggsearch.rs:393-397`).
 
 Strengths: fail-closed DTOs with byte/count/charset/path/digest bounds on both
 adapters; safe-listed metadata (explicit `insert` lists at
-`src/eggwork.rs:248-306` and `src/eggsearch.rs:197-380`) with content fields
+`src/eggwork.rs:248-306` and `src/eggsearch.rs:198-399`) with content fields
 structurally excluded; reason/detail prose reduced to outcome labels
 (`src/eggwork.rs:279-305`); verification binding enforced for all
 execution-derived kinds including `StaticAnalysis` (`src/lib.rs:318-326` plus
@@ -191,13 +206,13 @@ Gaps and risks:
 - `synthetic-results.json:8` maps Eggwork `timed_out` to `unavailable`, but the
   implementation maps `TimedOut` to `Failed` (`src/eggwork.rs:244`) and
   [Eggwork adapter](eggwork-adapter.md) lines 16-18 agrees with the code.
-  Resolved 2026-09-25: `tests/conformance.rs:511-584` feeds each fixture row
+  Resolved 2026-09-25: `tests/conformance.rs:579-651` feeds each fixture row
   through `finalize_observation` and asserts round-trip only; it never runs
   the Eggwork `normalize` mapping, so the row is an inert hypothetical input,
   not an asserted mapping. Fixture left unchanged (`fixture_only: true`).
 - `synthetic-results.json:10` models an Eggsearch local bundle with
   `source_trust: provider_trusted`, but `normalize` always emits
-  `external_untrusted` (`src/eggsearch.rs:398-407`) and [Eggsearch
+  `external_untrusted` (`src/eggsearch.rs:423`) and [Eggsearch
   adapter](eggsearch-adapter.md) lines 12-15 mandates that. Resolved
   2026-09-25: same conformance test only branches on `ExternalUntrusted`
   rows, so this row exercises the non-untrusted input path without asserting
@@ -206,9 +221,9 @@ Gaps and risks:
   section cites a recheck at `d870512a…` with manifest v2 separating execution
   status from comparison verdict. The manifest is therefore stale for the
   stated M003 readiness baseline, and no Eggbench adapter exists yet
-  (`src/lib.rs:8-9` at review time exported only `eggwork`/`eggsearch`; §7 below
-  records the later additions) despite Eggbench rows
-  in both fixture files. Scope the next fixture refresh to M003 planning.
+  (`src/lib.rs:8-9` at review time, revision `60a5f92`, exported only
+  `eggwork`/`eggsearch`; §7 below records the later additions) despite Eggbench
+  rows in both fixture files. Scope the next fixture refresh to M003 planning.
 - Generic-layer metadata protection is a denylist (`src/lib.rs:389-417`):
   substring key matching plus `://`/`sk-`/credential-prefix value heuristics.
   Adequate as defense-in-depth behind per-adapter safe-listing, but it misses
@@ -225,72 +240,80 @@ Gaps and risks:
   `tests/conformance.rs:256-275` untrusted → not `Complete`, registered →
   `Complete`). Treat the provider ID on an observation as a label, never as
   authority.
-- The CI trust guard is adapter-file-scoped: `register_trusted|ProviderRegistry`
-  is grepped only in `src/eggwork.rs` and `src/eggsearch.rs`
-  (`scripts/check-integrations-boundary.sh:17-20`), never in `src/lib.rs`, so a
-  registry mutation added to the SPI module would pass the boundary check.
+- The CI trust guard was adapter-file-scoped at review time:
+  `register_trusted|ProviderRegistry` was grepped only in `src/eggwork.rs` and
+  `src/eggsearch.rs` (`scripts/check-integrations-boundary.sh:17-20` at
+  revision `60a5f92`), never in `src/lib.rs`, so a registry mutation added to
+  the SPI module would have passed the boundary check.
   Nothing in `lib.rs` builds a registry today — only `ProviderDescriptor`
-  (`src/lib.rs:106-114`) — but widen the grep before relying on it.
+  (`src/lib.rs:106-114`). **Resolved by the §7 rewrite**: guard 6
+  (`no_trust_enrollment`, `scripts/check-integrations-boundary.sh:130-134`) now
+  scans the whole `src` tree rather than two named adapter files
+  (`scripts/check-integrations-boundary.sh:163-166`), so a registry mutation in
+  `lib.rs` or in any future module fails the build.
 - `SourceTrust::ProviderTrusted` is recordable through the SPI: any `Research`
   descriptor declaring `research_trust_metadata` may carry it, and it is
   persisted verbatim as `source_trust: "provider_trusted"`
   (`src/lib.rs:306-310`, `src/lib.rs:342-351`). Eggsearch hardcodes the
-  opposite (`src/eggsearch.rs:403`) and Eggwork passes `None`
+  opposite (`src/eggsearch.rs:423`) and Eggwork passes `None`
   (`src/eggwork.rs:333`), but a future adapter has no such guard rail in this
   crate — only host-registry assessment downstream.
 - `MAX_VERIFICATION_SPEC_BYTES` (`src/lib.rs:28`) is declared and never
-  referenced; the 65_536-byte cap is enforced in core
-  (`crates/eggplan-core/src/schema.rs:85-87`), and the in-crate check
+  referenced; the 65_536-byte cap is enforced in core (constant
+  `crates/eggplan-core/src/schema.rs:22`, check
+  `crates/eggplan-core/src/schema.rs:108-110`), and the in-crate check
   (`src/lib.rs:246-285`) covers depth/nodes/strings/collections only. Not a
   hole — core rejects the oversize payload (`tests/conformance.rs:163`) — but
   the constant misleads a reader of this crate alone.
 - Eggsearch identity digests have no domain separator: `hex_digest` is plain
-  SHA-256 over NUL-joined sorted IDs (`src/eggsearch.rs:506-510`), in contrast
+  SHA-256 over NUL-joined sorted IDs (`src/eggsearch.rs:528-531`), in contrast
   to the `eggplan.provider-verification.v1` envelope used for verification
-  bindings. The ID charsets exclude NUL (`src/eggsearch.rs:438-456`), so the
+  bindings. The ID charsets exclude NUL (`src/eggsearch.rs:458-478`), so the
   join is unambiguous and the three keys stay distinguishable by name, but one
   sorted ID list hashes identically under `source_ids_digest` and
   `fetch_ids_digest`. All three are inside the observation content digest.
 - The Eggsearch bundle artifact is undigested: `digest: None`
-  (`src/eggsearch.rs:393-397`) is accepted because `ArtifactRef.digest` is
+  (`src/eggsearch.rs:413-417`) is accepted because `ArtifactRef.digest` is
   optional in core (`crates/eggplan-core/src/model.rs:63-69`,
   `crates/eggplan-core/src/model.rs:370-384`). The research observation
   therefore binds to a host-supplied `bundle_id` only, while Eggwork refs are
   content-bound (`src/eggwork.rs:209-213`); a host-side bundle swap is not
   detectable from the observation.
-- `Bundle` (`src/eggsearch.rs:117-135`) has no `deny_unknown_fields`, unlike
+- `Bundle` (`src/eggsearch.rs:118-136`) has no `deny_unknown_fields`, unlike
   every Eggwork DTO (`src/eggwork.rs:76-118`). Unknown bundle fields are
   silently ignored, which matches "ignores unselected fields" in [Eggsearch
   adapter](eggsearch-adapter.md) line 5 but weakens unknown-variant
   fail-closure relative to Eggwork. Confirm this asymmetry is intentional and,
   if so, note which unknown inputs must still fail (today: trust/gap/link
   enums via strict deserialization, of which only the gap variant is asserted,
-  at `src/eggsearch.rs:631-640`).
+  at `src/eggsearch.rs:705-712`).
 - Eggwork DTO enum naming is not uniform across families:
   `ExecutionState`, `ExecutionFailure`, `FinalizationFailure`, and
   `ResourceDimensionResult` accept PascalCase only — no `rename_all`
   (`src/eggwork.rs:26-74`) — while `SandboxResult` is internally tagged by
   `status` with snake_case variants (`src/eggwork.rs:54-61`) and every Eggsearch
-  enum is snake_case (`src/eggsearch.rs:30-104`). Host JSON must match its
+  enum is snake_case (`src/eggsearch.rs:31-105`). Host JSON must match its
   family; lowercase `"succeeded"` is rejected. Fail-closed, but easy to misread
   as a schema drift.
-- `manifest.json`'s `native_fixtures` is not exhaustive: it names three files
-  (`tests/fixtures/manifest.json:22-26`) while
-  `tests/fixtures/verification-digest.json` is also present and asserted as a
-  golden baseline. Add it to the manifest or stop treating the list as
-  complete.
+- `manifest.json`'s `native_fixtures` was not exhaustive at review time: it
+  named three files (`tests/fixtures/manifest.json:22-26` at revision
+  `60a5f92`) while `tests/fixtures/verification-digest.json` was also present
+  and asserted as a golden baseline. **Resolved by this pass**: `native_fixtures`
+  now names every fixture file in the directory
+  (`tests/fixtures/manifest.json:27-40`), and the manifest states the inventory
+  rule and its check (`tests/fixtures/manifest.json:22-26`).
 - Roadmap status text is no longer inconsistent: the header now reads
-  "closed / current; M003 ready for planning"
+  "active / current; M003a and M003b closed"
   (`plans/subsystems/eggstack-integration-roadmap.md:3`) and the M002 section
-  reads "Status: closed" (`plans/subsystems/eggstack-integration-roadmap.md:95-98`),
-  matching `plans/registry.md:59`. The residual risk is narrative, not status:
+  reads "Status: closed" (`plans/subsystems/eggstack-integration-roadmap.md:108-114`),
+  matching `plans/registry.md:60`. The residual risk is narrative, not status:
   section 3 still says to map "bounded stdout/stderr/artifacts" into
   observations (`plans/subsystems/eggstack-integration-roadmap.md:23-24`) while
   the implementation and [Eggwork adapter](eggwork-adapter.md) lines 25-30
   deliberately retain only byte counts. Clarify the roadmap wording so a future
   reader does not regress the content-omission boundary.
 - Status-space coverage is intentionally narrow: the SPI carries eight statuses
-  ([provider SPI](provider-spi.md) lines 28-34) but Eggwork only emits five
+  ([provider SPI](provider-spi.md) lines 31-36) but Eggwork only emits five
   and Eggsearch only three. `NotRun`/`Blocked`/`Unavailable` (Eggwork) can
   never appear by construction today. That preserves the no-collapse rule but
   means future native "not run / blocked" states need explicit mapping work
@@ -339,11 +362,12 @@ is the post-M003a delta.
   unchanged, so the section 6 finding about its staleness is a recorded
   historical observation rather than a silent edit; the M003a families are the
   current closure-grade baseline.
-- Section 6 finding that `native_fixtures` is not exhaustive stands: it names
-  three M001/M002 files and still does not list
+- Section 6 finding that `native_fixtures` is not exhaustive stood on 2026-10-05:
+  it named three M001/M002 files and still did not list
   `verification-digest.json` or the two new Eggbench files. The new families are
   enumerated separately in `native_fixture_families`, so the authoritative
-  Eggbench provenance is no longer dependent on that incomplete list.
+  Eggbench provenance was never dependent on that incomplete list. Section 8
+  records the later change that made `native_fixtures` exhaustive.
 - Section 6 finding on caller-supplied provider identity stands and still
   applies to the Eggbench adapter: `epp_eggbench` is adapter-fixed, so payload
   text cannot select a different provider, but the host registry remains the only
@@ -367,3 +391,30 @@ is the post-M003a delta.
 - The Eggbench adapter emits content-bound artifact references
   (`eggbench:bundle:<run-id>#<path>` with exact digests), so the Eggsearch
   undigested-reference gap recorded above is not repeated here.
+
+## 8. Update — 2026-10-25, fixture inventory and citation repair (Eggstack M004 C001)
+
+- `tests/fixtures/manifest.json` now names every fixture file in
+  `crates/eggplan-integrations/tests/fixtures/` except itself:
+  `native_fixtures` carries all twelve names
+  (`tests/fixtures/manifest.json:27-40`) and the manifest states the inventory
+  scope and its check (`tests/fixtures/manifest.json:22-26`).
+  `native_fixture_families` stays a provenance overlay over seven of those
+  twelve names and adds no file of its own. No fixture file's bytes changed,
+  and the integrations crate has no `.sha256` sidecar. The section 6 finding
+  that `native_fixtures` was not exhaustive is closed.
+- Every `path:line` citation in sections 1-6 has been re-resolved against the
+  current tree. The drift was introduced by `37ad290`, which refactored
+  `crates/eggplan-core/src/schema.rs` and
+  `crates/eggplan-integrations/src/eggsearch.rs` without updating this note;
+  the citations were exact at `60a5f92`. That refactor also inserted one line
+  into the Eggsearch adapter's leading `use` block, so the section 4 ranges for
+  the capability block, the descriptor, the `Bundle` DTO, the trust counters,
+  the ID digests, the reference checks, and the enum block were tightened to
+  their exact units as well.
+- The section 1 boundary-script paragraph and the section 6 trust-guard
+  finding now name the review-time revision they describe, because the script
+  was rewritten into six scope-labelled guards that scan the whole `src` tree
+  (recorded in section 7). The current script states that guard inventory in
+  its banner (`scripts/check-integrations-boundary.sh:18-39`) and runs the
+  guards from `scripts/check-integrations-boundary.sh:141-172`.

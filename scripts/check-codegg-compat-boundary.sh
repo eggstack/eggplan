@@ -41,26 +41,99 @@ done
 # a temporary directory. They never read or write tracked source.
 # ---------------------------------------------------------------------------
 
+# The dependency-key matcher shared by every manifest rule in this script.
+#
+# A Cargo dependency can be declared in four spellings, and a boundary rule
+# that misses one of them is not a boundary:
+#
+#   name = "1"                            plain
+#   name.workspace = true                 workspace inheritance
+#   other = { package = "name" }          renamed
+#   [dependencies.name]                   table form
+#
+# The first spelling alone was the only one the previous pattern modelled.
+# This repository declares every shared dependency in the inheritance form,
+# so a rule that models only the plain form reports success against a
+# manifest that declares exactly what it forbids.
+#
+# A hyphenated sub-crate belongs to the same family and is matched as one
+# (`tokio-util` is `tokio`), except where the name is not a family: a crate
+# named `eggplan-repo-*` would be a plausible future sibling, not a sub-crate
+# of the forbidden `eggplan-repo`, so the suffix is opt-out there.
+#
+# Every alternative is anchored to a dependency-key position, so a comment,
+# a field value, or an unrelated crate whose name merely contains a forbidden
+# name is not a false positive.
+dep_pattern() {
+    local names="$1" sub='(-[A-Za-z0-9_-]+)?'
+    if [ "${2:-}" = "no-subcrate" ]; then
+        sub=''
+    fi
+    printf '%s' \
+        "^[[:space:]]*(${names})${sub}[[:space:]]*(=|\\.workspace[[:space:]]*=|\$)" \
+        "|^\\[[^\\]\\n]*\\.(${names})${sub}[[:space:]]*\\]" \
+        "|^[^#\\n]*package[[:space:]]*=[[:space:]]*\"(${names})${sub}\""
+}
+
+# Extract the production `[dependencies]` section of a manifest, so that a
+# section-scoped rule reuses the same dependency-key matcher as the
+# all-sections rules instead of restating it in a second dialect. A
+# `[dependencies.name]` table is a production dependency too and is kept.
+production_section() {
+    awk '
+        /^\[dependencies\][[:space:]]*$/ { active = 1; next }
+        /^\[dependencies\.[^]]+\][[:space:]]*$/ { active = 1; print; next }
+        /^\[/ { active = 0 }
+        active { print }
+    ' "$1"
+}
+
+# Runs a manifest rule against the production section of one manifest.
+# Maps ripgrep's exit status to a guard result:
+#   0 -> a prohibited match was found (violation)
+#   1 -> clean (no match)
+#   2 -> the scan could not be performed (fail closed; never a pass)
+scan_production_section() {
+    local pattern="$1" target="$2" section status=0
+    if ! section="$(production_section "$target")"; then
+        echo "codegg-compat boundary guard could not scan $target (manifest could not be read); refusing to report a pass" >&2
+        return 2
+    fi
+    rg -n -- "$pattern" - <<<"$section" || status=$?
+    if [ "$status" -gt 1 ]; then
+        echo "codegg-compat boundary guard could not scan $target (rg exited $status); refusing to report a pass" >&2
+        return 2
+    fi
+    return "$status"
+}
+
+# Guard 1 pattern: the production dependency graph must not reach the
+# persistence layer.
+REPO_DEPENDENCY_PATTERN="$(dep_pattern 'eggplan-repo' no-subcrate)"
+
+# Guard 2 pattern: importing the very crate whose runtime ownership is
+# prohibited fails in any section, not only in production dependencies.
+CODEGG_DEPENDENCY_PATTERN="$(dep_pattern 'codegg|codegg-core')"
+
+# Guard 3 pattern: async, database, network, and filesystem client crates
+# fail in any section.
+CLIENT_DEPENDENCY_PATTERN="$(dep_pattern 'tokio|sqlx|reqwest|hyper|ureq|surf|isahc|async-std')"
+
 # Guard 1: the production dependency graph must not reach the persistence layer.
 no_production_repo_dep() {
-    awk '
-        /^\[dependencies\]/ { active = 1; next }
-        /^\[/ { active = 0 }
-        active && /eggplan-repo[[:space:]]*=/ { found = 1 }
-        END { exit !found }
-    ' "$1"
+    scan_production_section "$REPO_DEPENDENCY_PATTERN" "$1"
 }
 
 # Guard 2: importing the very crate whose runtime ownership is prohibited fails
 # in any section, not only in production dependencies.
 no_codegg_dependency() {
-    rg -n '^[[:space:]]*(codegg|codegg-core)[[:space:]]*=' "$1"
+    rg -n -- "$CODEGG_DEPENDENCY_PATTERN" "$1"
 }
 
 # Guard 3: async, database, network, and filesystem client crates fail in any
 # section.
 no_client_dependency() {
-    rg -n '^[[:space:]]*(tokio|sqlx|reqwest|hyper|ureq|surf|isahc|async-std)[[:space:]]*=' "$1"
+    rg -n -- "$CLIENT_DEPENDENCY_PATTERN" "$1"
 }
 
 # Guard 4: a public declaration of a CodeGG-owned identity is an ownership
@@ -78,24 +151,39 @@ no_impure_source() {
     rg -n 'std::process|Command::new|tokio::|reqwest::|hyper::|sqlx::|async_std::|std::net|TcpStream|UdpSocket|std::fs|std::path|tempfile::|fs::(read|read_to_string|write|create_dir|remove_file|rename|copy|File|metadata|canonicalize)|File::(open|create|create_new|open_options)' "$1"
 }
 
+# require_clean <guard-fn> <target> <failure-message>
+#   guard exit 0 -> violation: print the message and fail
+#   guard exit 1 -> clean
+#   guard exit 2 -> the scan could not be performed: fail closed
+require_clean() {
+    local fn="$1" target="$2" message="$3" status=0
+    "$fn" "$target" || status=$?
+    case "$status" in
+        0)
+            echo "$message" >&2
+            return 1
+            ;;
+        1)
+            return 0
+            ;;
+        *)
+            return 2
+            ;;
+    esac
+}
+
 run_guards() {
     local m="$1"
     local s="$2"
 
-    if no_production_repo_dep "$m"; then
-        echo "compatibility [dependencies] must not include eggplan-repo (scanned: $m, [dependencies] section only)" >&2
-        return 1
-    fi
+    require_clean no_production_repo_dep "$m" \
+        "compatibility [dependencies] must not include eggplan-repo (scanned: $m, [dependencies] section only)" || return $?
 
-    if no_codegg_dependency "$m"; then
-        echo "compatibility manifest must not depend on CodeGG in any section, including [dev-dependencies] (scanned: $m, all sections)" >&2
-        return 1
-    fi
+    require_clean no_codegg_dependency "$m" \
+        "compatibility manifest must not depend on CodeGG in any section, including [dev-dependencies] (scanned: $m, all sections)" || return $?
 
-    if no_client_dependency "$m"; then
-        echo "compatibility manifest must not include async, database, or network clients in any section, including [dev-dependencies] (scanned: $m, all sections)" >&2
-        return 1
-    fi
+    require_clean no_client_dependency "$m" \
+        "compatibility manifest must not include async, database, or network clients in any section, including [dev-dependencies] (scanned: $m, all sections)" || return $?
 
     if no_owned_identity "$s"; then
         echo "compatibility source declares ownership outside the WorkPlan seam (scanned: $s, all files)" >&2
@@ -131,11 +219,15 @@ source_fixture() {
 }
 
 prove() {
-    local label="$1" expect="$2" fn="$3" target="$4"
-    if "$fn" "$target" >/dev/null 2>&1; then
+    local label="$1" expect="$2" fn="$3" target="$4" status=0
+    "$fn" "$target" >/dev/null 2>&1 || status=$?
+    if [ "$status" -gt 1 ]; then
+        echo "codegg-compat guard self-proof could not scan: $label (guard exit $status)" >&2
+        exit 1
+    fi
+    local got=0
+    if [ "$status" -eq 0 ]; then
         got=1
-    else
-        got=0
     fi
     if [ "$got" != "$expect" ]; then
         echo "codegg-compat guard self-proof failed: $label (expected fail=$expect, got fail=$got)" >&2
@@ -157,12 +249,35 @@ eggplan-repo = { path = "../eggplan-repo" }
 prove "guard1 rejects production eggplan-repo" 1 no_production_repo_dep "$fixtures/Cargo.toml"
 
 manifest_fixture '[dependencies]
+eggplan-repo.workspace = true
+'
+prove "guard1 rejects production eggplan-repo by workspace inheritance" 1 no_production_repo_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+my-repo = { package = "eggplan-repo", version = "0.1" }
+'
+prove "guard1 rejects a renamed production eggplan-repo" 1 no_production_repo_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies.eggplan-repo]
+path = "../eggplan-repo"
+'
+prove "guard1 rejects a production eggplan-repo table" 1 no_production_repo_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
 eggplan-core = { path = "../eggplan-core" }
 [dev-dependencies]
 eggplan-repo = { path = "../eggplan-repo" }
 tempfile.workspace = true
 '
 prove "guard1 allows dev eggplan-repo" 0 no_production_repo_dep "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+eggplan-core = { path = "../eggplan-core" }
+[dev-dependencies]
+eggplan-repo.workspace = true
+tempfile.workspace = true
+'
+prove "guard1 allows dev eggplan-repo by workspace inheritance" 0 no_production_repo_dep "$fixtures/Cargo.toml"
 
 # --- guard 2: CodeGG dependency in any section ------------------------------
 manifest_fixture '[dependencies]
@@ -182,6 +297,26 @@ codegg-core = "0.1"
 '
 prove "guard2 rejects production codegg-core" 1 no_codegg_dependency "$fixtures/Cargo.toml"
 
+manifest_fixture '[dependencies]
+codegg.workspace = true
+'
+prove "guard2 rejects codegg by workspace inheritance" 1 no_codegg_dependency "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+codegg-core.workspace = true
+'
+prove "guard2 rejects codegg-core by workspace inheritance" 1 no_codegg_dependency "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+my-codegg = { package = "codegg", version = "0.1" }
+'
+prove "guard2 rejects a renamed codegg dependency" 1 no_codegg_dependency "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies.eggwork]
+version = "1"
+'
+prove "guard2 allows an unrelated dependency table" 0 no_codegg_dependency "$fixtures/Cargo.toml"
+
 # --- guard 3: impure client crates in any section --------------------------
 manifest_fixture '[dev-dependencies]
 eggplan-repo = { path = "../eggplan-repo" }
@@ -200,6 +335,26 @@ manifest_fixture '[dev-dependencies]
 tokio = "1"
 '
 prove "guard3 rejects dev-dependency tokio" 1 no_client_dependency "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+tokio.workspace = true
+'
+prove "guard3 rejects tokio by workspace inheritance" 1 no_client_dependency "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+tokio-util = "1"
+'
+prove "guard3 rejects the tokio sub-crate" 1 no_client_dependency "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+my-http = { package = "reqwest", version = "0.12" }
+'
+prove "guard3 rejects a renamed reqwest dependency" 1 no_client_dependency "$fixtures/Cargo.toml"
+
+manifest_fixture '[dependencies]
+# tokio = "1"
+'
+prove "guard3 allows a commented dependency" 0 no_client_dependency "$fixtures/Cargo.toml"
 
 # --- guard 4: owned-identity declarations ----------------------------------
 source_fixture 'pub struct Plain;

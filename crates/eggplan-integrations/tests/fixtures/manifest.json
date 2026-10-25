@@ -19,10 +19,24 @@
     "eggbench_comparison_fail",
     "eggbench_comparison_inconclusive"
   ],
+  "fixture_inventory": {
+    "scope": "every tracked file in crates/eggplan-integrations/tests/fixtures/ except this manifest",
+    "rule": "native_fixtures lists that set exactly; native_fixture_families is a provenance overlay over a subset of it and adds no file of its own",
+    "check": "set(native_fixtures) == set(files in crates/eggplan-integrations/tests/fixtures/) - {manifest.json}; set(native_fixture_families[].fixture) is a subset of set(native_fixtures)"
+  },
   "native_fixtures": [
-    "eggwork-snapshots.json",
+    "eggbench-bundles.json",
+    "eggbench-comparisons.json",
+    "eggsearch-bundles.json",
     "eggwork-artifacts.json",
-    "eggsearch-bundles.json"
+    "eggwork-snapshots.json",
+    "github-artifacts.json",
+    "github-check-runs.json",
+    "github-commit-statuses.json",
+    "github-revisions.json",
+    "github-runs.json",
+    "synthetic-results.json",
+    "verification-digest.json"
   ],
   "native_fixture_families": [
     {

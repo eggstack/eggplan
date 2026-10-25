@@ -11,125 +11,176 @@ per-subsystem architecture notes).
 All five scripts live in `scripts/`, use `set -euo pipefail`, and are
 text/regex guards — not type-system or Cargo-feature enforcement.
 
-### `check-core-boundary.sh` (mechanism: `rg`)
+### `check-core-boundary.sh` (mechanism: `rg` + `awk`)
 
-Three guards, each stated with the exact scope it scans, so a failure message
-never claims more than was checked. The header at `:30-59` states all three
+Four guards, each stated with the exact scope it scans, so a failure message
+never claims more than was checked. The header at `:43-79` states all four
 with their scan scope, and every failure message names the file and the
 scope it scanned.
 
-- Tool precondition (`:17-26`, applied at `:28`): `require_tools rg mktemp`
+- Tool precondition (`:30-39`, applied at `:41`): `require_tools rg mktemp awk`
   refuses with `required boundary-guard tool '<tool>' is not installed;
   refusing to report a pass` and exits non-zero rather than reporting an
   unscanned pass. The precondition is a function so the self-proofs can
   exercise the refusal path against a deliberately absent tool name
-  (`:303-315`).
-- `no_prohibited_dependency` (`:108-110`) `rg -ni` over
+  (`:474-489`).
+- **The dependency-key matcher** (`:105-114`) is shared by every manifest
+  rule in the script. Cargo can spell one dependency four ways, and a rule
+  that matches one spelling is not a boundary: `name = "1"` (plain),
+  `name.workspace = true` (workspace inheritance), `other = { package =
+  "name" }` (renamed), and `[dependencies.name]` (table form). A hyphenated
+  sub-crate belongs to the same family (`tokio-util` is `tokio`) and is
+  matched as one. Every alternative is anchored to a dependency-key
+  position, so a comment, a field value, or an unrelated crate whose name
+  merely contains a forbidden name is not a false positive. This matcher
+  replaced a pattern that modelled only the plain spelling — which meant the
+  rules were inert against the workspace-inheritance form this repository
+  uses exclusively.
+- `no_prohibited_dependency` (`:181-183`) `rg -ni` over
   `crates/eggplan-core/Cargo.toml` for the dependency families `tokio |
   async-std | reqwest | hyper | sqlx | rusqlite | diesel | subprocess |
-  bollard | rmcp | openai | ollama`. The scan is not section-scoped: it
-  covers `[dev-dependencies]` and `[build-dependencies]` as well.
-- `no_impure_source` (`:116-118`) `rg -n` over `crates/eggplan-core/src` for
+  bollard | rmcp | openai | ollama`, in every declaration spelling. The scan
+  is not section-scoped: it covers `[dev-dependencies]` and
+  `[build-dependencies]` as well.
+- `no_impure_source` (`:189-191`) `rg -n` over `crates/eggplan-core/src` for
   filesystem, process, network, path, environment, database, and Git access:
   `std::fs`, the `use`-imported `fs::` call forms, `File::`, `std::process`,
   `process::Command`, `Command::new`, `std::env`, the `env::` call forms,
   `std::net`, `TcpStream`, `UdpSocket`, `std::path`, `PathBuf`, `Path::`,
   `sqlx | rusqlite | diesel | sqlite | postgres | sea_orm | tokio_postgres`,
-  and `git2 | gix | git::` (`:69-86`). The manifest guard cannot express
-  this boundary — `std::fs`, `std::process`, `std::net`, and `std::path` are
-  in the standard library and need no dependency at all — so only a source
-  scan can detect them.
-- `no_reasoning_field` (`:121-123`) `rg -n` over the same tree for
+  `git2 | gix | git::`, and `tempfile::` (`:141-158`). The manifest guard
+  cannot express this boundary — `std::fs`, `std::process`, `std::net`, and
+  `std::path` are in the standard library and need no dependency at all — so
+  only a source scan can detect them.
+- `no_reasoning_field` (`:194-196`) `rg -n` over the same tree for
   `pub ... (thinking | scratchpad | chain_of_thought | hidden_reasoning)`.
-- Every guard maps ripgrep's exit status through the shared `scan` helper
-  (`:94-104`): `0` is a violation, `1` is clean, and any larger status means
+- `no_production_tempfile_dep` (`:201-218`) is section-scoped: it extracts
+  the `[dependencies]` section of a manifest with `production_section`
+  (`:120-127`) and applies the same key matcher to it. `tempfile` is a
+  legitimate dev-dependency for the crates whose tests need a scratch
+  directory, and a legitimate production dependency of `eggplan-repo`,
+  whose atomic write path is built on it; no other crate may reach for it
+  in production. The scan set is the six pure-crate manifests at `:11-18`;
+  `eggplan-repo` is excluded by that list, not by an in-rule exception.
+- Every guard maps ripgrep's exit status through `require_clean`
+  (`:224-239`): `0` is a violation, `1` is clean, and any larger status means
   the scan could not be performed. A missing or unreadable path is reported
   and exits non-zero; it is never reported as a pass.
-- `run_guards` (`:146-157`) applies all three to the real tree (`:162`).
-- Self-proofs (`:164-315`) run the same functions against `mktemp -d`
-  fixtures with positive and negative cases for every guard: a clean
-  manifest, nine prohibited dependency families, a dev-dependency, twelve
-  impure source forms, core's own vocabulary that must not trip the guard
+- `run_guards` (`:241-260`) applies all four to the real tree (`:262`).
+- Self-proofs (`:264-489`) run the same functions against `mktemp -d`
+  fixtures with positive and negative cases for every guard and every
+  declaration spelling the matcher now covers: a clean manifest written in
+  the inheritance form, nine prohibited dependency families, a
+  dev-dependency, the inheritance, renamed, sub-crate, and table-form
+  spellings, a commented dependency, thirteen impure source forms including
+  `tempfile::`, core's own vocabulary that must not trip the guard
   (`EvidenceKind::Command`, a `path` variable, a `"git"` subject kind,
-  `SourcePath::`, `InputFile::`), four reasoning-field forms, three
-  assertions over the real tree, and the precondition refusal. They clean up
-  with a targeted non-recursive `rm -f`/`rmdir` (`:171-175`) and never write
-  tracked source, so the proofs are safe to run in CI.
+  `SourcePath::`, `InputFile::`), four reasoning-field forms, the
+  section-scoped tempfile rule in both directions, the assertions over the
+  real tree, and the precondition refusal. They clean up with a targeted
+  non-recursive `rm -f`/`rmdir` (`:271-275`) and never write tracked source,
+  so the proofs are safe to run in CI.
 - Intent: keep `eggplan-core` a pure deterministic domain (no async/DB/net/
   process/fs/path/Git access, no persisted model-reasoning fields).
 
 ### `check-codegg-compat-boundary.sh` (mechanism: `awk` + `rg`)
 
 Five guards, only the first of which is section-scoped. Each is a named
-function; the header at `:20-42` states all five with their scan scope, and every
+function; the header at `:20-41` states all five with their scan scope, and every
 failure message names the file and section it scanned. Corrective C002 added the
 filesystem coverage in the fifth guard and the self-proofs; before it the
 messages claimed more than was checked.
 
-- `no_production_repo_dep` (`:45-52`) `awk` state machine tracks the
-  `[dependencies]` section of `crates/eggplan-codegg-compat/Cargo.toml` and
-  fails if `eggplan-repo =` appears there (dev-dependencies are out of scope for
-  that test, which is what keeps the legal `Cargo.toml:14` entry legal).
-- `no_codegg_dependency` (`:56-58`) `rg` fails on `codegg | codegg-core =` at
-  line start in the same manifest: the bridge must not depend on CodeGG. Not
-  section-scoped, so a dev- or build-dependency declaration would also fail.
-- `no_client_dependency` (`:62-64`) `rg` fails on `tokio | sqlx | reqwest |
-  hyper | ureq | surf | isahc | async-std =` at line start in the manifest: no
-  async, database, or network client may enter the bridge's dependency graph at
-  all (also not section-scoped).
-- `no_owned_identity` (`:69-71`) `rg` fails on `pub (struct | enum | trait |
+- **The dependency-key matcher** (`:67-76`) is shared by every manifest rule
+  in the script, and `production_section` (`:82-94`) extracts the
+  `[dependencies]` section so a section-scoped rule reuses the same matcher
+  rather than restating it in a second dialect. Cargo can spell one
+  dependency four ways — plain `name = "1"`, workspace inheritance
+  `name.workspace = true`, renamed `other = { package = "name" }`, and the
+  table form `[dependencies.name]` — and a hyphenated sub-crate is the same
+  family. Every alternative is anchored to a dependency-key position, so a
+  comment or a field value is not a false positive.
+- `no_production_repo_dep` (`:123-125`) scans the production section of
+  `crates/eggplan-codegg-compat/Cargo.toml` for `eggplan-repo`: the bridge
+  must not reach the persistence layer in production. It is section-scoped,
+  which is what keeps the legal `Cargo.toml:14` dev-dependency legal. The
+  sub-crate suffix is opted out for this name alone
+  (`dep_pattern 'eggplan-repo' no-subcrate`, `:112`), because a future
+  `eggplan-repo-*` crate would be a sibling, not a sub-crate of the
+  forbidden one.
+- `no_codegg_dependency` (`:129-131`) `rg` fails on `codegg | codegg-core`
+  in the same manifest, in any declaration spelling: the bridge must not
+  depend on CodeGG. Not section-scoped, so a dev- or build-dependency
+  declaration would also fail.
+- `no_client_dependency` (`:135-137`) `rg` fails on `tokio | sqlx | reqwest |
+  hyper | ureq | surf | isahc | async-std` in the manifest: no async,
+  database, or network client may enter the bridge's dependency graph at all
+  (also not section-scoped).
+- `no_owned_identity` (`:142-144`) `rg` fails on `pub (struct | enum | trait |
   type) (WorkOrder | Goal | GoalVerification | TodoState | WorkPlanCheckpoint |
   ContextEpoch | AgentRunExecutor | JobExecutor | WorktreePolicy |
   SandboxPolicy)` in `src/`: the bridge owns only the WorkPlan assessment
   seam, not scheduler/runtime identity. Declarations only, so comments and
   private positions are not failures.
-- `no_impure_source` (`:77-79`) `rg` fails in `src/` on process, **filesystem**,
+- `no_impure_source` (`:150-156`) `rg` fails in `src/` on process, **filesystem**,
   network, and database access: `std::process | Command::new | tokio:: |
   reqwest:: | hyper:: | sqlx:: | async_std:: | std::net | TcpStream | UdpSocket
   | std::fs | std::path | tempfile::`, the `use`-imported `fs::` call forms,
   and `File::open | create | create_new | open_options`.
-- `run_guards` (`:81-109`) applies all five to the real tree. Self-proofs
-  (`:114-260`) run the same functions against `mktemp -d` fixtures with positive
-  and negative cases for every guard, and clean up with a targeted
-  non-recursive `rm -f`/`rmdir`. No tracked file is written, so the proofs are
-  safe to run in CI.
+- `require_clean` (`:158-173`) maps ripgrep's exit status for the three
+  manifest guards: `0` is a violation, `1` is clean, and any larger status
+  means the scan could not be performed, so the guard fails closed rather
+  than reporting a pass.
+- `run_guards` (`:175-197`) applies all five to the real tree (`:417`).
+  Self-proofs (`:221-415`) run the same functions against `mktemp -d`
+  fixtures with positive and negative cases for every guard and every
+  declaration spelling, and clean up with a targeted non-recursive
+  `rm -f`/`rmdir`. No tracked file is written, so the proofs are safe to
+  run in CI.
 
 ### `check-integrations-boundary.sh` (mechanism: `rg`)
 
 Six named guards plus one contract check, each stated with the exact scope it
-scans; the header at `:18-39` states all six with their scan scope, and every
+scans; the header at `:18-40` states all six with their scan scope, and every
 failure message names the file and the scope it scanned.
 
 - Tool precondition (`:11-16`): `command -v` for both `rg` and `awk`; a
   missing tool prints `required boundary-guard tool '<tool>' is not
   installed; refusing to report a pass` and exits 1 instead of reporting an
   unscanned pass.
-- `no_sibling_runtime` (`:44-46`) `rg -n` over
+- **The dependency-key matcher** (`:62-68`) is shared by the three manifest
+  guards. Cargo can spell one dependency four ways — plain `name = "1"`,
+  workspace inheritance `name.workspace = true`, renamed `other = { package =
+  "name" }`, and the table form `[dependencies.name]` — and a hyphenated
+  sub-crate is the same family (`tokio-util` is `tokio`). Every alternative
+  is anchored to a dependency-key position, so a comment or a field value is
+  not a false positive.
+- `no_sibling_runtime` (`:104-106`) `rg -n` over
   `crates/eggplan-integrations/Cargo.toml` for `eggwork | eggsearch |
   eggbench | eggsact | eggsec | codegg | eggpool` in dependency-key position,
   so Eggplan's own `eggplan-codegg-compat` is not a false positive while
   `eggbench-core` is. Not section-scoped: `[dev-dependencies]` and
   `[build-dependencies]` are covered too.
-- `no_transport_dep` (`:49-51`) fails on `tokio | reqwest | hyper | ureq |
-  surf | isahc | async-std | axum | octocrab | git2 | gix` at line start in
-  the same manifest — no async runtime, HTTP client, or Git transport.
-- `no_credential_dep` (`:55-57`) fails on `secrecy | keyring | jsonwebtoken |
-  oauth2 | wiremock` at line start — an adapter is handed already-verified
-  facts and must never hold or request a secret.
-- `no_process_source` (`:61-63`) `rg -n` over the whole
+- `no_transport_dep` (`:109-111`) fails on `tokio | reqwest | hyper | ureq |
+  surf | isahc | async-std | axum | octocrab | git2 | gix` in the same
+  manifest — no async runtime, HTTP client, or Git transport.
+- `no_credential_dep` (`:114-116`) fails on `secrecy | keyring | jsonwebtoken |
+  oauth2 | wiremock` — an adapter is handed already-verified facts and must
+  never hold or request a secret.
+- `no_process_source` (`:120-122`) `rg -n` over the whole
   `crates/eggplan-integrations/src` tree for `std::process |
   process::Command | Command::new | std::env::var | exec( | spawn(`.
-- `no_acquisition_source` (`:67-69`) `rg -n` over the same tree for
+- `no_acquisition_source` (`:126-128`) `rg -n` over the same tree for
   `std::fs | std::path | tempfile::`, the `use`-imported `fs::` call forms,
   `File::(open | create | create_new | open_options)`, `read_dir`,
   `std::net`, `TcpStream`, `UdpSocket`, `reqwest::`, `ureq::`, `octocrab::`,
   `which::`, and `which(` — no filesystem walk, network, or executable
   discovery, because an adapter normalizes facts a host already verified and
   never acquires evidence.
-- `no_trust_enrollment` (`:73-75`) `rg -n` over the same tree for
+- `no_trust_enrollment` (`:132-134`) `rg -n` over the same tree for
   `register_trusted | ProviderRegistry` — enrolling provider trust stays an
   explicit host policy action through `ProviderRegistry::register_trusted`.
-- `requires_core_contract` (`:78-80`) fails unless `eggplan-core` appears in
+- `requires_core_contract` (`:137-139`) fails unless `eggplan-core` appears in
   the manifest: the generic SPI must still be built on the Eggplan core
   evidence contract.
 - Guards 1-3 are deliberately unscoped by manifest section, including
@@ -137,11 +188,15 @@ failure message names the file and the scope it scanned.
   transport, or a credential helper even for tests. Guards 4-6 scan the whole
   source tree rather than a hand-listed set of modules, so a newly added
   adapter cannot escape enforcement by not being named.
-- `run_guards` (`:82-119`) applies all seven checks to the real tree
-  (`:276`). Self-proofs (`:121-274`) run the same functions against
-  `mktemp -d` fixtures with positive and negative cases for every guard, and
-  clean up with a targeted non-recursive `rm -f`/`rmdir` (`:128-132`). No
-  tracked file is written, so the proofs are safe to run in CI.
+- `require_clean` (`:74-89`) maps ripgrep's exit status for the three
+  manifest guards, so a scan that could not be performed fails closed instead
+  of reporting a pass.
+- `run_guards` (`:141-172`) applies all seven checks to the real tree
+  (`:390`). Self-proofs (`:196-388`) run the same functions against
+  `mktemp -d` fixtures with positive and negative cases for every guard and
+  every declaration spelling, and clean up with a targeted non-recursive
+  `rm -f`/`rmdir` (`:181-185`). No tracked file is written, so the proofs are
+  safe to run in CI.
 
 ### `check-projection-cli-boundary.sh` (mechanism: `grep -RInE`)
 
@@ -205,7 +260,7 @@ and every `rg`-based guard calls `rg` inside a conditional, so a missing `rg`
 exits 127 inside the conditional and the guard reports success having scanned
 nothing. This was not hypothetical: `check-core-boundary.sh` and
 `check-codegg-compat-boundary.sh` were both inert in CI until corrective C002
-added the install steps (`ci.yml:28-33`) and a `command -v rg` precondition to
+added the install steps (`.github/workflows/ci.yml:28-33`) and a `command -v rg` precondition to
 the codegg guard. Observed directly in run `37265105852`, job `111620146353`:
 
 ```text
@@ -220,7 +275,7 @@ Both `rg`-based gaps are now closed. `check-integrations-boundary.sh` is an
 way, so it is no longer correct to group it with the guards that never used
 ripgrep.
 `check-core-boundary.sh` now carries its own precondition
-(`scripts/check-core-boundary.sh:17-28`) and fails closed on an unscannable
+(`scripts/check-core-boundary.sh:30-39`) and fails closed on an unscannable
 path, so it is no longer the one residual gap; see finding 6.
 
 The two guards that never used ripgrep were never exposed to *this* trap:
@@ -294,16 +349,17 @@ form a control surface, not documentation decoration:
   updates registry/roadmap lineage (`003 §9` `:107`–`:116`). Evidence M002
   C001/C002/C003 is the worked example, including explicit non-blocking
   scoping (`registry.md:118`–`:123`, `:296`).
-- **Design gates and hygiene.** Twenty-three numbered gates in `registry.md:359`–
-  `:425` (canonical JSON freeze, provider-identity authority, append-only
+- **Design gates and hygiene.** Twenty-five numbered gates in `registry.md:449`–
+  `:526` (canonical JSON freeze, provider-identity authority, append-only
   evidence, finalizer-owned subject capture, test-seam containment,
-  Markdown-import limits, staged CodeGG adoption, and the frozen
-  `capture_git_subject_fingerprint` digest contract at gate 23) plus the
-  hygiene rules at `registry.md:429`–`:436` (register before handoff,
+  Markdown-import limits, staged CodeGG adoption, the frozen
+  `capture_git_subject_fingerprint` digest contract at gate 23, and the
+  plan-lifecycle and structure-editing gates at 24–25) plus the
+  hygiene rules at `registry.md:530`–`:539` (register before handoff,
   preserve historical closure/use corrective plans, record exact evidence and
   unrun/blocked checks, sync/deterministic core, no hidden model reasoning in
   persisted schemas, non-blocking hygiene must not serialize independent
-  handoffs).
+  handoffs, and explicit-path Git-index staging of a closure commit).
 
 Layout and hygiene, verified by enumeration rather than asserted:
 
@@ -329,13 +385,14 @@ Layout and hygiene, verified by enumeration rather than asserted:
   registered or closed.
 - The "historical" qualifications are real and bounded, not discrepancies:
   Foundation M002 is `conditionally closed` (registry `:67`, platform caveat
-  resolved by M003) and CodeGG M003's `003-conditionally-closed.md` has since
-  been satisfied by hosted qualification while the registry row still reads
-  `closed` (registry `:82`). Projection/CLI is no longer unstarted work: M003
-  was split into M003a and M003b, both registered and closed (registry
-  `:78`–`:79`), with three M003b corrective lines open (registry `:94`–`:96`)
-  and M004 proposed (registry `:97`); the subsystem row reads
-  `active/current` (registry `:57`).
+  resolved by M003) and CodeGG M003's closure record, now
+  `plans/closure/codegg-integration/003-closed.md`, was satisfied by hosted
+  qualification; its registry row reads `closed` (registry `:83`). Projection/CLI
+  is no longer unstarted work: M003 was split into M003a and M003b, both
+  registered and closed (registry `:79`–`:80`), the three M003b corrective lines
+  are closed (registry `:95`–`:97`), and M004 is closed with its decisions
+  recorded in ADR-0005 (registry `:98`); the subsystem row reads
+  `active/current` (registry `:58`).
 - `plans/` contains no non-Markdown files, no empty directories, and no
   scratch artifacts: every file under it is Markdown (67 tracked files at the
   recorded baseline `37ad290`).
@@ -378,7 +435,7 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    `crates/eggplan-repo/src/lib.rs` are the one authority check that runs on
    every OS.
 4. **`registry.md` cited a plan path that does not exist — closed by C002.**
-   `registry.md:284`–`:287` names
+   `registry.md:352`–`:354` names
    `plans/implementation/eggplan-assessment-integration/001-durable-execution-subject-provenance.md`
    as the "upstream provenance predecessor", but `plans/implementation/`
    contains only the five subsystem directories; no such file or directory was
@@ -395,7 +452,7 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    build-dependency on `codegg` or `tokio` failed the guard. That strictness was
    kept deliberately — Option 1 of the C002 decision — and resolved by making
    each message state its actual scan scope in the file header
-   (`scripts/check-codegg-compat-boundary.sh:20-42`) and in the failure text,
+   (`scripts/check-codegg-compat-boundary.sh:20-41`) and in the failure text,
    so the file no longer leaves a reader guessing which the intent was. One
    correction to the earlier reading of this
    finding: it claimed *all three* manifest guards said "production
@@ -413,15 +470,46 @@ compact-canonical-JSON golden fixtures keep builds and digests reproducible.
    re-inert it; C002 §4 excluded modifying the other four guards, so this was
    reported rather than changed. C005 closed both gaps. The script now
    requires `rg` and `mktemp` up front
-   (`scripts/check-core-boundary.sh:17-28`), and a third guard,
-   `no_impure_source` (`:116-118`), scans `crates/eggplan-core/src` for
+   (`scripts/check-core-boundary.sh:30-39`), and a third guard,
+   `no_impure_source` (`:189-191`), scans `crates/eggplan-core/src` for
    filesystem, process, network, path, environment, database, and Git access —
    a boundary the manifest guard cannot express, because those APIs are in the
    standard library and need no dependency. Every guard maps ripgrep's exit
    status explicitly, so an unscannable path fails closed instead of
-   reporting a pass, and deterministic synthetic self-proofs (`:164-315`) now
+   reporting a pass, and deterministic synthetic self-proofs (`:264-489`) now
    cover each guard. The core crate's source was always pure; the defect was
    in the enforcement, not in the crate.
+7. **The manifest guards matched one declaration spelling — closed by the
+   2026-10-25 audit corrective.** The seven anchored manifest rules across
+   `check-core-boundary.sh`, `check-codegg-compat-boundary.sh`, and
+   `check-integrations-boundary.sh` matched a dependency name only when it was
+   immediately followed by whitespace, `=`, or end of line. This repository
+   declares every shared dependency in the workspace-inheritance form
+   `name.workspace = true`, where a `.` follows the name — so a rule that
+   modelled only the plain spelling was inert against the form the repository
+   uses exclusively. A renamed dependency (`other = { package = "name" }`) and
+   a hyphenated sub-crate (`tokio-util`) were equally invisible. The guards
+   protecting the sibling-runtime and transport boundaries therefore reported
+   success against manifests that declared exactly what they forbid. The
+   guards now share one dependency-key matcher
+   (`scripts/check-core-boundary.sh:105-114`,
+   `scripts/check-codegg-compat-boundary.sh:67-76`,
+   `scripts/check-integrations-boundary.sh:62-68`) that covers the plain,
+   inheritance, renamed, and table-form spellings plus the sub-crate form, and
+   each guard carries self-proofs for every spelling it now matches.
+8. **The core guard did not forbid `tempfile::` in source, and no guard forbade
+   `tempfile` as a production dependency — closed by the same corrective.**
+   The core guard's source pattern matched every other impure capability but
+   not `tempfile::`, which its two sibling guards did match
+   (`scripts/check-codegg-compat-boundary.sh:150-156`,
+   `scripts/check-integrations-boundary.sh:126-128`). No guard forbade
+   `tempfile` as a *production* dependency at all, so a production filesystem
+   dependency could have entered any pure crate without failing a check. The
+   core guard now carries `no_production_tempfile_dep`
+   (`scripts/check-core-boundary.sh:201-218`), a section-scoped rule over the
+   six pure-crate manifests (`:11-18`) that leaves `eggplan-repo` — the one
+   crate whose atomic write path legitimately depends on `tempfile` — out of
+   scope by construction rather than by an in-rule exception.
 
 ## Verification pointers
 

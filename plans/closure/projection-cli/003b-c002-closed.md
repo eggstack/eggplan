@@ -317,3 +317,18 @@ and its closure is recorded separately.
 is moved from `ready` to `closed` and points at this record. The "Correctives
 raised by the 2026-10-23 repository audit" section records this closure in its
 Projection/CLI subsection.
+
+### Factual erratum (2026-10-25): design-record citation drift
+
+The "Documentation and operations" section above cites
+`architecture/cli-control-surface.md:129` for the new "### Shell completion
+depth" subsection. That citation was already stale before the 2026-10-25
+corrective: the subsection heading sat at
+`architecture/cli-control-surface.md:152` at revision `ee54a0b`, and the
+corrective that added the CLI-help fidelity section to the same design record
+moved it further, to `architecture/cli-control-surface.md:167`.
+
+The subsection itself, and this record's conclusion that it exists and records
+the completion-depth design decision, are unchanged. Only the line anchor
+drifted. The current anchor is
+`architecture/cli-control-surface.md:167`.

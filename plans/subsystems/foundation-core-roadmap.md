@@ -177,6 +177,28 @@ and the conflict is recorded in the closure evidence rather than left implicit.
 
 
 
+### M004 C001 — Boundary-guard dependency-key patterns
+
+Raised by the 2026-10-25 defect audit against baseline
+`ee54a0b8e2cb0d843565c54930ad2c21111320db`. The seven anchored manifest rules
+across the three boundary guards matched a dependency name only when the name
+was immediately followed by whitespace, `=`, or end of line. This repository
+declares every shared dependency in the workspace-inheritance form
+`name.workspace = true`, where a `.` follows the name, so a dependency the
+guards forbid passed them. A renamed dependency
+(`other = { package = "name" }`) and a hyphenated sub-crate were equally
+invisible. Separately, the core guard's source pattern did not forbid
+`tempfile::`, and no guard forbade `tempfile` as a production dependency.
+
+| Line | Class | Scope | Plan | Closure |
+|---|---|---|---|---|
+| C001 | tooling governance | Make every anchored manifest rule match every declaration spelling Cargo and this repository use, and forbid a production `tempfile` dependency outside `eggplan-repo` | plans/implementation/foundation-core/004-c001-boundary-guard-dependency-key-patterns.md | closed — plans/closure/foundation-core/004-c001-closed.md |
+
+The M003 milestone itself remains closed; this is a corrective line against its
+enforcement, not against the core domain. It does not gate another subsystem.
+No production Rust source, crate manifest, dependency set, lock file, schema
+version, digest, or golden byte changed.
+
 ## 8. Cross-cutting requirements
 
 Persistence is local-first; no network. Paths are confined. Schema versions are

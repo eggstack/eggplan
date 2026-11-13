@@ -163,6 +163,18 @@ and the CLI's own validation disagreed about which options a command accepts.
 The command inventory, the top-level usage, the frozen help fixture, the JSON
 envelope, and every machine code are unchanged.
 
+### M004 C002 — Windows fixture byte preservation
+
+Raised by hosted CI run `40206104047` against baseline
+`ee54a0b8e2cb0d843565c54930ad2c21111320db`. The Windows job checked golden
+fixture text out with CRLF, while the recorded SHA-256 sidecars and byte-level
+render anchors describe LF bytes. The implementation and golden content are
+unchanged; the repository must preserve fixture line endings on every runner.
+
+| Line | Class | Scope | Plan | Closure |
+|---|---|---|---|---|
+| C002 | non-blocking cross-platform test infrastructure | Keep Markdown interchange fixtures byte-identical across Git checkouts and verify the Windows failure is resolved | plans/implementation/projection-cli/004-c002-windows-fixture-byte-preservation.md | active |
+
 ## 5. Verification
 
 CLI snapshots, JSON schema fixtures, invalid-state diagnostics, roundtrip

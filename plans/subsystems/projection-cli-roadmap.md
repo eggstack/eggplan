@@ -1,7 +1,7 @@
 # Projection and CLI Roadmap
 
 Status: active / current; M001-M003 (M003a and M003b) closed; M003b corrective
-lines C001-C003 closed; M004 closed
+lines C001-C003 closed; M004 and corrective lines C001-C002 closed
 
 Long-term references: plans/000-long-term-specification.md sections 14-15 and 19-20.
 
@@ -173,7 +173,7 @@ unchanged; the repository must preserve fixture line endings on every runner.
 
 | Line | Class | Scope | Plan | Closure |
 |---|---|---|---|---|
-| C002 | non-blocking cross-platform test infrastructure | Keep Markdown interchange fixtures byte-identical across Git checkouts and verify the Windows failure is resolved | plans/implementation/projection-cli/004-c002-windows-fixture-byte-preservation.md | active |
+| C002 | non-blocking cross-platform test infrastructure | Keep Markdown interchange fixtures byte-identical across Git checkouts and verify the Windows failure is resolved | plans/implementation/projection-cli/004-c002-windows-fixture-byte-preservation.md | closed — plans/closure/projection-cli/004-c002-closed.md; implementation `bccebb9`, hosted CI run `43513363952` (all jobs green) |
 
 ## 5. Verification
 

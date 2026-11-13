@@ -1,6 +1,6 @@
 # Projection/CLI M004 C002 — Windows Fixture Byte Preservation
 
-Status: active
+Status: closed
 
 Repository baseline: `ee54a0b8e2cb0d843565c54930ad2c21111320db`
 
@@ -62,8 +62,7 @@ Out of scope:
 - `git diff --check`
 - hosted CI on the pushed commit, including the native Windows job.
 
-The hosted run is required to close this corrective line. Record its exact run
-ID and result in the closure evidence.
+Hosted CI run `43513363952` on implementation commit `bccebb9083ec0ac6622bfb74b452508bf8628bf2` is required closure evidence; its result is recorded in `plans/closure/projection-cli/004-c002-closed.md`.
 
 ## 6. Acceptance criteria
 
